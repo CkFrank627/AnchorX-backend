@@ -1,0 +1,42 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+        alert('您尚未登录，请先登录！');
+        window.location.href = 'login.html';
+    } else {
+        // 如果有令牌，向受保护的后端路由发送请求
+        fetch('http://localhost:3000/api/users/profile', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token // 附带令牌
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.user) {
+                welcomeMessage.textContent = '欢迎来到创作页面，' + data.user.username + '！';
+            } else {
+                // 令牌无效或过期，提示用户重新登录
+                alert('登录状态已失效，请重新登录。');
+                localStorage.removeItem('token');
+                window.location.href = 'login.html';
+            }
+        })
+        .catch(error => {
+            console.error('获取个人资料失败:', error);
+            alert('获取个人资料失败，请重新登录。');
+            localStorage.removeItem('token');
+            window.location.href = 'login.html';
+        });
+    }
+
+    // 退出登录按钮的事件监听器
+    logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('token');
+        window.location.href = 'login.html';
+    });
+});
