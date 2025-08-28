@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'login.html';
     } else {
         // 如果有令牌，向受保护的后端路由发送请求
-        fetch('http://localhost:3000/api/users/profile', {
+        fetch('hhttps://lit-stream-78819-b3e5745b1632.herokuapp.com/api/users/profile', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',

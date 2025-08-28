@@ -23,7 +23,7 @@ mongoose.connect('mongodb://localhost:27017/ankou_app')
 // 使用中间件
 // 1. 使用 CORS 中间件，允许你的前端地址进行跨域请求
 app.use(cors({
-    origin: 'http://127.0.0.1:8080' // 确保这里是你的前端地址
+    origin: 'https://anchorfrontend.netlify.app' // 确保这里是你的前端地址
 }));
 
 // 2. 使用 Express 的内置中间件来解析 JSON 格式的请求体

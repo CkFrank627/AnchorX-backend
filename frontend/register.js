@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         try {
-            const response = await fetch('http://localhost:3000/api/users/register', {
+            const response = await fetch('https://lit-stream-78819-b3e5745b1632.herokuapp.com/api/users/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

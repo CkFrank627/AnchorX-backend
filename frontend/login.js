@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const password = document.getElementById('password').value;
         
         try {
-            const response = await fetch('http://localhost:3000/api/users/login', {
+            const response = await fetch('https://lit-stream-78819-b3e5745b1632.herokuapp.com/api/users/login', {
                 method: 'POST', // 确保这里是 POST
                 headers: {
                     'Content-Type': 'application/json'
