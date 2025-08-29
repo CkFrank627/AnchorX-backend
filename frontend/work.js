@@ -8,19 +8,25 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'login.html';
     } else {
         // 如果有令牌，向受保护的后端路由发送请求
-        fetch('hhttps://lit-stream-78819-b3e5745b1632.herokuapp.com/api/users/profile', {
+        fetch('https://lit-stream-78819-b3e5745b1632.herokuapp.com/api/users/profile', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token // 附带令牌
+                // 确保这里是 'Bearer ' + token
+                'Authorization': `Bearer ${token}` 
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                // 如果响应状态不是 200 OK，抛出错误
+                throw new Error('获取个人资料失败');
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.user) {
                 welcomeMessage.textContent = '欢迎来到创作页面，' + data.user.username + '！';
             } else {
-                // 令牌无效或过期，提示用户重新登录
                 alert('登录状态已失效，请重新登录。');
                 localStorage.removeItem('token');
                 window.location.href = 'login.html';

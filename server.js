@@ -17,20 +17,33 @@ const PORT = process.env.PORT || 3000;
 
 // 连接 MongoDB 数据库
 // 使用环境变量来获取 MongoDB Atlas 的连接字符串
-const dbURI = process.env.MONGO_URI; 
+const dbURI = process.env.MONGO_URI;
 
 mongoose.connect(dbURI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
 })
-  .then(() => console.log('MongoDB 连接成功'))
-  .catch(err => console.error('MongoDB 连接失败', err));
+  .then(() => console.log('MongoDB connected...'))
+  .catch(err => console.log(err));
 
 // 使用中间件
-// 1. 使用 CORS 中间件，允许你的前端地址进行跨域请求
-app.use(cors({
-    origin: 'https://anchorfrontend.netlify.app' // 你的 Netlify 前端网址
-}));
+// 1. 使用 CORS 中间件，允许多个前端地址进行跨域请求
+const allowedOrigins = [
+  'https://anchorx.ca', // 添加你的新域名
+  'https://anchorfrontend.netlify.app' // 还是得保留旧域名以防万一
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+};
+
+app.use(cors(corsOptions));
 
 // 2. 使用 Express 的内置中间件来解析 JSON 格式的请求体
 app.use(express.json());
