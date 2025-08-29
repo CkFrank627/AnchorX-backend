@@ -81,4 +81,19 @@ router.delete('/:id', auth, async (req, res) => {
     }
 });
 
+// 新增：获取单个作品的路由（用于阅读页面）
+// 这个路由不需要认证，因此任何人都可以访问
+router.get('/:id', async (req, res) => {
+    try {
+        const work = await Work.findById(req.params.id);
+        if (!work) {
+            return res.status(404).json({ message: '作品不存在' });
+        }
+        res.json(work);
+    } catch (error) {
+        // 如果ID格式不正确，也会触发此处的错误
+        res.status(500).json({ message: '获取作品失败', error: error.message });
+    }
+});
+
 module.exports = router;
