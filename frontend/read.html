@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>作品阅读</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .content {
+            line-height: 1.6;
+            color: #555;
+            min-height: 200px; /* 至少保证有一定高度 */
+        }
+        .meta-info {
+            font-size: 0.9em;
+            color: #999;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="work-title">正在加载...</h1>
+        <div class="meta-info">
+            <span id="work-author">作者：</span>
+            <span id="work-updated">最后更新：</span>
+        </div>
+        <div id="work-content" class="content"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://lit-stream-78819-b3e5745b1632.herokuapp.com/api/works';
+        const urlParams = new URLSearchParams(window.location.search);
+        const workId = urlParams.get('id');
+
+        const workTitle = document.getElementById('work-title');
+        const workAuthor = document.getElementById('work-author');
+        const workUpdated = document.getElementById('work-updated');
+        const workContent = document.getElementById('work-content');
+
+        async function fetchWorkContent() {
+            if (!workId) {
+                workTitle.textContent = '作品ID未提供';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/${workId}`);
+                if (!response.ok) {
+                    throw new Error('作品获取失败');
+                }
+                const work = await response.json();
+                
+                // 渲染数据
+                workTitle.textContent = work.title;
+                workAuthor.textContent = `作者：${work.author || '未知'}`;
+                workUpdated.textContent = `最后更新：${new Date(work.updatedAt).toLocaleString()}`;
+                workContent.innerHTML = work.content || '暂无内容';
+
+            } catch (error) {
+                workTitle.textContent = '加载作品失败';
+                workContent.textContent = error.message;
+                console.error('加载作品失败:', error);
+            }
+        }
+
+        fetchWorkContent();
+    </script>
+</body>
+</html>
