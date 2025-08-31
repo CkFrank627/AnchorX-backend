@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="book-title-tag">作品详情</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .book-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .book-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .book-header h1 {
+            font-size: 2.2rem;
+            color: #222;
+            margin: 0 0 10px;
+        }
+
+        .book-header p {
+            font-size: 0.9rem;
+            color: #888;
+            margin: 0;
+        }
+
+        .book-content {
+            line-height: 1.8;
+            font-size: 1.1rem;
+        }
+
+        /* 隐藏 Quill 编辑器自带的工具栏和边框，只保留内容 */
+        #book-content .ql-editor {
+            padding: 0;
+        }
+        #book-content .ql-container.ql-snow {
+            border: none;
+        }
+        #book-content .ql-toolbar.ql-snow {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="book-container">
+    <div class="book-header">
+        <h1 id="work-title">正在加载...</h1>
+        <p id="work-info">作者：<span id="work-author">未知</span> | 更新时间：<span id="work-date">未知</span></p>
+    </div>
+    <div class="book-content" id="book-content">
+        <p>作品内容正在加载中...</p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const bookTitleTag = document.getElementById('book-title-tag');
+        const workTitle = document.getElementById('work-title');
+        const workAuthor = document.getElementById('work-author');
+        const workDate = document.getElementById('work-date');
+        const bookContent = document.getElementById('book-content');
+
+        // 初始化一个只读的Quill实例来显示内容
+        const quill = new Quill('#book-content', {
+            theme: 'snow',
+            readOnly: true
+        });
+
+        // 从URL中获取作品ID
+        function getWorkIdFromUrl() {
+            const pathParts = window.location.pathname.split('/');
+            // 假设URL格式是 /read/作品ID
+            if (pathParts[1] === 'read' && pathParts.length > 2) {
+                return pathParts[2];
+            }
+            return null;
+        }
+        
+        // 从 localStorage 获取作品数据并显示
+        function loadWorkContent(workId) {
+            const token = localStorage.getItem('token');
+            const API_BASE_URL = 'https://lit-stream-78819-b3e5745b1632.herokuapp.com/api/works';
+
+            if (!workId) {
+                displayError("作品ID无效，请返回主页。");
+                return;
+            }
+
+            // 从服务器获取作品内容
+            fetch(`${API_BASE_URL}/${workId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('获取作品内容失败。');
+                }
+                return response.json();
+            })
+            .then(work => {
+                if (work) {
+                    // 更新页面标题和信息
+                    bookTitleTag.textContent = work.title + ' - 作品详情';
+                    workTitle.textContent = work.title;
+                    workDate.textContent = new Date(work.updatedAt).toLocaleString();
+
+                    // 设置 Quill 内容
+                    quill.root.innerHTML = work.content || '该作品暂无内容。';
+                } else {
+                    displayError("未找到该作品。");
+                }
+            })
+            .catch(error => {
+                console.error("加载作品内容出错:", error);
+                displayError("加载作品内容失败，请检查网络或作品ID是否正确。");
+            });
+        }
+
+        function displayError(message) {
+            workTitle.textContent = "错误";
+            bookContent.innerHTML = `<p style="color: red; text-align: center;">${message}</p>`;
+        }
+
+        const workId = getWorkIdFromUrl();
+        loadWorkContent(workId);
+    });
+</script>
+
+</body>
+</html>
