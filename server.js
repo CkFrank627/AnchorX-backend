@@ -4,11 +4,16 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors'); 
+const path = require('path');
+const fs = require('fs');
+
+// 引入 Multer
+const multer = require('multer');
 
 // 引入你创建的路由文件
 const userRoutes = require('./routes/userRoutes');
 const workRoutes = require('./routes/workRoutes');
-const readRoutes = require('./routes/readRoutes'); // 确保引入 readRoutes
+const readRoutes = require('./routes/readRoutes'); 
 
 // 创建 Express 应用实例
 const app = express();
@@ -17,7 +22,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 连接 MongoDB 数据库
-// 使用环境变量来获取 MongoDB Atlas 的连接字符串
 const dbURI = process.env.MONGO_URI;
 
 mongoose.connect(dbURI)
@@ -29,12 +33,11 @@ mongoose.connect(dbURI)
 const allowedOrigins = [
   'https://anchorx.ca',
   'https://anchorfrontend.netlify.app',
-  'http://localhost:3000' // 开发时可以加上
+  'http://localhost:3000'
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // 允许来自白名单的请求，或者对于非浏览器的工具（如Postman），origin 为 undefined
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
     } else {
@@ -47,7 +50,43 @@ app.use(cors(corsOptions));
 // 2. 使用 Express 的内置中间件来解析 JSON 格式的请求体
 app.use(express.json());
 
+// 3. 配置 Multer，用于处理文件上传
+const uploadDir = path.join(__dirname, 'uploads');
+// 检查上传目录是否存在，不存在则创建
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir); // 文件将存储在项目根目录的 'uploads' 文件夹
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// 4. 设置静态文件服务，让 uploads 文件夹下的图片可以被公开访问
+app.use('/uploads', express.static(uploadDir));
+
 // 路由设置
+// 图片上传接口
+app.post('/upload-image', upload.single('image'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ success: false, message: '没有上传文件' });
+    }
+
+    // 构建图片的 URL，确保协议、域名和端口与你前端请求的URL一致
+    const imageUrl = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+    
+    // 返回包含图片 URL 的 JSON 响应
+    res.status(200).json({ success: true, url: imageUrl });
+});
+
 // 将所有以 '/api/users' 开头的请求，都交给 userRoutes 处理
 app.use('/api/users', userRoutes);
 
