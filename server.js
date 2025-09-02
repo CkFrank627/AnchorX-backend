@@ -1,5 +1,7 @@
 // server.js
 
+require('dotenv').config();
+
 // 引入所需的模块
 const express = require('express');
 const mongoose = require('mongoose');
