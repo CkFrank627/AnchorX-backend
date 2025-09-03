@@ -15,7 +15,7 @@ const db = require('./db'); // 用于 PostgreSQL
 const userRoutes = require('./routes/userRoutes');
 const workRoutes = require('./routes/workRoutes');
 const readRoutes = require('./routes/readRoutes'); 
-const galleryRoutes = require('./routes/gallery'); // 用于图库
+const galleryRoutes = require('./routes/galleryRoutes'); // 👈 修复了这里
 
 // 2. 创建 Express 应用实例
 const app = express();
@@ -61,7 +61,7 @@ if (!fs.existsSync(uploadDir)) {
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadDir); // 文件将存储在项目根目录的 'uploads' 文件夹
+        cb(null, uploadDir); 
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
