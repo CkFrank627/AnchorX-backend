@@ -18,11 +18,11 @@ const auth = (req, res, next) => {
     }
 };
 
-// 获取当前用户的所有作品
-router.get('/', auth, async (req, res) => {
+// 获取所有已发布的作品，任何人都可以访问
+router.get('/', async (req, res) => {
     try {
-        // 修改：使用 populate 来获取作者的用户名
-        const works = await Work.find({ author: req.userId }).populate('author', 'username');
+        // 修改：移除 auth 中间件，并移除查询条件，以获取所有作品
+        const works = await Work.find().populate('author', 'username');
         res.json(works);
     } catch (error) {
         res.status(500).json({ message: '获取作品失败', error: error.message });
