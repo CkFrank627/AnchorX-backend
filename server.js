@@ -16,6 +16,7 @@ const userRoutes = require('./routes/userRoutes');
 const workRoutes = require('./routes/workRoutes');
 const readRoutes = require('./routes/readRoutes'); 
 const galleryRoutes = require('./routes/galleryRoutes'); // 👈 修复了这里
+const commentRoutes = require('./routes/commentRoutes');
 
 // 2. 创建 Express 应用实例
 const app = express();
@@ -98,6 +99,9 @@ app.use('/api/read', readRoutes);
 
 // 新增：将所有以 '/api/galleries' 开头的请求，都交给 galleryRoutes 处理
 app.use('/api/galleries', galleryRoutes);
+
+// 新增：将所有以 '/api/comments' 开头的请求，都交给 commentRoutes 处理
+app.use('/api/comments', commentRoutes);
 
 // 6. 启动服务器并监听指定端口
 app.listen(PORT, () => {
