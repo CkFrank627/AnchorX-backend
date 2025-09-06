@@ -21,36 +21,39 @@ const auth = (req, res, next) => {
 };
 
 // GET: 获取某个作品特定句子的所有评论
-// 这是一个公共接口，但如果用户已登录，我们会返回额外的点赞信息
+// 这个接口需要认证，才能返回正确的点赞状态
 router.get('/:workId/:sentenceId', async (req, res) => {
     try {
         const { workId, sentenceId } = req.params;
         const token = req.header('Authorization')?.replace('Bearer ', '');
         let currentUserId = null;
 
-        // 尝试解析 token，但不阻止请求（即使没有登录也能看到评论）
+        // 尝试解析 token，但不阻止请求
         if (token) {
             try {
                 const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
                 currentUserId = decoded.userId;
             } catch (error) {
-                // 无效 token，不返回用户ID
+                // 如果 token 无效，忽略它
+                currentUserId = null;
             }
         }
-
+        
+        // 确保你的数据库模型已经添加了 `likes` 字段
         const comments = await Comment.find({ workId, sentenceId })
             .populate('author', 'username')
             .sort({ createdAt: 1 });
 
         // 格式化评论数据，添加点赞状态
         const formattedComments = comments.map(comment => {
-            const isLikedByCurrentUser = comment.likes.includes(currentUserId);
+            // 确保 comment.likes 是一个数组，即使为空
+            const isLikedByCurrentUser = comment.likes && comment.likes.some(likeId => likeId.toString() === currentUserId);
             return {
                 _id: comment._id,
                 content: comment.content,
                 author: comment.author.username,
                 createdAt: comment.createdAt,
-                likesCount: comment.likes.length,
+                likesCount: comment.likes ? comment.likes.length : 0,
                 isLikedByCurrentUser // 告诉前端当前用户是否点赞
             };
         });
@@ -93,6 +96,7 @@ router.post('/:id/like', auth, async (req, res) => {
         const { id } = req.params;
         const userId = req.userId;
 
+        // 确保找到评论
         const comment = await Comment.findById(id);
         if (!comment) {
             return res.status(404).json({ message: '评论不存在' });
@@ -111,7 +115,7 @@ router.post('/:id/like', auth, async (req, res) => {
         await comment.save();
         res.json({ 
     likesCount: comment.likes.length,
-    isLikedByCurrentUser: comment.likes.includes(userId) 
+    isLikedByCurrentUser: comment.likes.includes(userId)
 });
 
     } catch (error) {
