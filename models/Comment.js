@@ -1,3 +1,5 @@
+// comment.js
+
 const mongoose = require('mongoose');
 
 const commentSchema = new mongoose.Schema({
@@ -20,6 +22,12 @@ const commentSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    // **新增：用于存储点赞用户的ID，是一个ObjectId数组**
+    likes: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    
     createdAt: {
         type: Date,
         default: Date.now
