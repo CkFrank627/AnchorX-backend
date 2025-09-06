@@ -4,6 +4,65 @@ const express = require('express');
 const router = express.Router();
 const Work = require('../models/Work');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// 配置 Multer，用于处理文件上传
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, 'cover-' + uniqueSuffix + ext);
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// **新增：上传和更新作品封面的路由**
+router.patch('/:id/cover', auth, upload.single('coverImage'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: '未上传图片文件' });
+        }
+
+        const workId = req.params.id;
+        const work = await Work.findById(workId);
+
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
+        
+        // 验证用户权限，确保是作品作者
+        if (work.author.toString() !== req.userId) {
+            return res.status(403).json({ message: '无权修改此作品' });
+        }
+        
+        // 检查并删除旧封面（可选，但推荐）
+        if (work.coverImage) {
+            const oldImagePath = path.join(uploadDir, path.basename(work.coverImage));
+            if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+            }
+        }
+        
+        // 更新作品的 coverImage 字段
+        work.coverImage = `https://lit-stream-78819-b3e5745b1632.herokuapp.com/uploads/${req.file.filename}`;
+        await work.save();
+
+        res.json({ message: '封面更新成功', coverImageUrl: work.coverImage });
+    } catch (error) {
+        res.status(500).json({ message: '更新封面失败', error: error.message });
+    }
+});
 
 // 认证中间件
 const auth = (req, res, next) => {
