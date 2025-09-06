@@ -5,7 +5,7 @@ const router = express.Router();
 const Comment = require('../models/Comment');
 const jwt = require('jsonwebtoken');
 
-// 认证中间件，确保只有登录用户可以发表评论
+// 认证中间件
 const auth = (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     if (!token) {
@@ -21,43 +21,47 @@ const auth = (req, res, next) => {
 };
 
 // GET: 获取某个作品特定句子的所有评论
-// 这个接口需要认证，才能返回正确的点赞状态
 router.get('/:workId/:sentenceId', async (req, res) => {
     try {
         const { workId, sentenceId } = req.params;
         const token = req.header('Authorization')?.replace('Bearer ', '');
         let currentUserId = null;
 
-        // 尝试解析 token，但不阻止请求
         if (token) {
             try {
                 const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
                 currentUserId = decoded.userId;
             } catch (error) {
-                // 如果 token 无效，忽略它
                 currentUserId = null;
             }
         }
-        
-        // 确保你的数据库模型已经添加了 `likes` 字段
+
         const comments = await Comment.find({ workId, sentenceId })
             .populate('author', 'username')
             .sort({ createdAt: 1 });
 
-        // 格式化评论数据，添加点赞状态
+        // 🔍 日志：获取评论时 likes 状态
+        console.log('[GET COMMENTS]', comments.map(c => ({
+            id: c._id.toString(),
+            likesCount: (c.likes || []).length,
+            likes: (c.likes || []).map(id => id.toString())
+        })));
+
         const formattedComments = comments.map(comment => {
-            // 确保 comment.likes 是一个数组，即使为空
-            const isLikedByCurrentUser = comment.likes && comment.likes.some(likeId => likeId.toString() === currentUserId);
+            const isLikedByCurrentUser =
+                comment.likes && currentUserId
+                    ? comment.likes.some(likeId => likeId.toString() === currentUserId)
+                    : false;
             return {
                 _id: comment._id,
                 content: comment.content,
                 author: comment.author.username,
                 createdAt: comment.createdAt,
                 likesCount: comment.likes ? comment.likes.length : 0,
-                isLikedByCurrentUser // 告诉前端当前用户是否点赞
+                isLikedByCurrentUser
             };
         });
-        
+
         res.json(formattedComments);
     } catch (error) {
         res.status(500).json({ message: '获取评论失败', error: error.message });
@@ -68,14 +72,33 @@ router.get('/:workId/:sentenceId', async (req, res) => {
 router.post('/', auth, async (req, res) => {
     try {
         const { workId, sentenceId, content } = req.body;
+
+        // 🔍 新评论保存前，打印当前 sentenceId 下所有评论 likes 状态
+        const before = await Comment.find({ sentenceId }).select('_id likes').lean();
+        console.log('[NEW COMMENT] BEFORE', before.map(c => ({
+            id: c._id.toString(),
+            likesCount: (c.likes || []).length,
+            likes: (c.likes || []).map(id => id.toString())
+        })));
+
         const newComment = new Comment({
             workId,
             sentenceId,
             author: req.userId,
-            content
+            content,
+            likes: [] // 新评论 likes 应为空数组
         });
+
         await newComment.save();
-        // 返回新创建的评论，并包含作者信息
+
+        // 🔍 新评论保存后，再打印一次
+        const after = await Comment.find({ sentenceId }).select('_id likes').lean();
+        console.log('[NEW COMMENT] AFTER', after.map(c => ({
+            id: c._id.toString(),
+            likesCount: (c.likes || []).length,
+            likes: (c.likes || []).map(id => id.toString())
+        })));
+
         const savedComment = await Comment.findById(newComment._id).populate('author', 'username');
         res.status(201).json({
             _id: savedComment._id,
@@ -83,41 +106,46 @@ router.post('/', auth, async (req, res) => {
             author: savedComment.author.username,
             createdAt: savedComment.createdAt,
             likesCount: 0,
-            isLikedByCurrentUser: true // 新评论默认已点赞
+            isLikedByCurrentUser: false // 新评论默认未点赞
         });
     } catch (error) {
         res.status(400).json({ message: '发表评论失败', error: error.message });
     }
 });
 
-// 新增：POST 点赞/取消点赞评论
+// POST: 点赞/取消点赞
 router.post('/:id/like', auth, async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.userId;
 
-        // 确保找到评论
         const comment = await Comment.findById(id);
         if (!comment) {
             return res.status(404).json({ message: '评论不存在' });
         }
 
-        const index = comment.likes.indexOf(userId);
+        // 确保处理 ObjectId 的比较
+        const index = comment.likes.findIndex(likeId => likeId.toString() === userId);
 
         if (index > -1) {
-            // 用户已点赞，执行取消点赞
             comment.likes.splice(index, 1);
         } else {
-            // 用户未点赞，执行点赞
             comment.likes.push(userId);
         }
 
         await comment.save();
-        res.json({ 
-    likesCount: comment.likes.length,
-    isLikedByCurrentUser: comment.likes.includes(userId)
-});
 
+        // 🔍 点赞操作后打印 likes 状态
+        console.log('[LIKE]', {
+            id: comment._id.toString(),
+            likesCount: comment.likes.length,
+            likes: comment.likes.map(id => id.toString())
+        });
+
+        res.json({
+            likesCount: comment.likes.length,
+            isLikedByCurrentUser: comment.likes.some(likeId => likeId.toString() === userId)
+        });
     } catch (error) {
         res.status(500).json({ message: '点赞操作失败', error: error.message });
     }
