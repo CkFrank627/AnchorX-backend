@@ -109,7 +109,10 @@ router.post('/:id/like', auth, async (req, res) => {
         }
 
         await comment.save();
-        res.json({ likesCount: comment.likes.length });
+        res.json({ 
+    likesCount: comment.likes.length,
+    isLikedByCurrentUser: comment.likes.includes(userId) 
+});
 
     } catch (error) {
         res.status(500).json({ message: '点赞操作失败', error: error.message });
