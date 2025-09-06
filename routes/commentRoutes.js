@@ -1,8 +1,8 @@
-// commentRoutes.js
-
 const express = require('express');
 const router = express.Router();
 const Comment = require('../models/Comment');
+const Work = require('../models/Work');               // ✅ 引入作品模型
+const Notification = require('../models/Notification'); // ✅ 引入通知模型
 const jwt = require('jsonwebtoken');
 
 // 认证中间件
@@ -73,7 +73,7 @@ router.post('/', auth, async (req, res) => {
     try {
         const { workId, sentenceId, content } = req.body;
 
-        // 🔍 新评论保存前，打印当前 sentenceId 下所有评论 likes 状态
+        // 🔍 新评论保存前日志
         const before = await Comment.find({ sentenceId }).select('_id likes').lean();
         console.log('[NEW COMMENT] BEFORE', before.map(c => ({
             id: c._id.toString(),
@@ -86,12 +86,25 @@ router.post('/', auth, async (req, res) => {
             sentenceId,
             author: req.userId,
             content,
-            likes: [] // 新评论 likes 应为空数组
+            likes: [] // 默认空数组
         });
 
-        await newComment.save();
+        const savedComment = await newComment.save();
 
-        // 🔍 新评论保存后，再打印一次
+        // ✅ 给作品作者发通知
+        const work = await Work.findById(savedComment.workId);
+        if (work && work.author.toString() !== req.userId) {
+            const newNotification = new Notification({
+                recipient: work.author,
+                type: 'comment',
+                sender: req.userId,
+                comment: savedComment._id,
+                message: `评论了你的作品 "${work.title}"`
+            });
+            await newNotification.save();
+        }
+
+        // 🔍 新评论保存后日志
         const after = await Comment.find({ sentenceId }).select('_id likes').lean();
         console.log('[NEW COMMENT] AFTER', after.map(c => ({
             id: c._id.toString(),
@@ -99,14 +112,14 @@ router.post('/', auth, async (req, res) => {
             likes: (c.likes || []).map(id => id.toString())
         })));
 
-        const savedComment = await Comment.findById(newComment._id).populate('author', 'username');
+        const populatedComment = await Comment.findById(savedComment._id).populate('author', 'username');
         res.status(201).json({
-            _id: savedComment._id,
-            content: savedComment.content,
-            author: savedComment.author.username,
-            createdAt: savedComment.createdAt,
+            _id: populatedComment._id,
+            content: populatedComment.content,
+            author: populatedComment.author.username,
+            createdAt: populatedComment.createdAt,
             likesCount: 0,
-            isLikedByCurrentUser: false // 新评论默认未点赞
+            isLikedByCurrentUser: false
         });
     } catch (error) {
         res.status(400).json({ message: '发表评论失败', error: error.message });
@@ -124,18 +137,29 @@ router.post('/:id/like', auth, async (req, res) => {
             return res.status(404).json({ message: '评论不存在' });
         }
 
-        // 确保处理 ObjectId 的比较
         const index = comment.likes.findIndex(likeId => likeId.toString() === userId);
 
         if (index > -1) {
-            comment.likes.splice(index, 1);
+            comment.likes.splice(index, 1); // 取消点赞
         } else {
-            comment.likes.push(userId);
+            comment.likes.push(userId); // 新点赞
+
+            // ✅ 给评论作者发通知
+            if (comment.author.toString() !== userId) {
+                const newNotification = new Notification({
+                    recipient: comment.author,
+                    type: 'like',
+                    sender: userId,
+                    likedComment: comment._id,
+                    message: `点赞了你的评论`
+                });
+                await newNotification.save();
+            }
         }
 
         await comment.save();
 
-        // 🔍 点赞操作后打印 likes 状态
+        // 🔍 点赞操作日志
         console.log('[LIKE]', {
             id: comment._id.toString(),
             likesCount: comment.likes.length,

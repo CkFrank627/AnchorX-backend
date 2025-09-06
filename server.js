@@ -15,8 +15,9 @@ const db = require('./db'); // 用于 PostgreSQL
 const userRoutes = require('./routes/userRoutes');
 const workRoutes = require('./routes/workRoutes');
 const readRoutes = require('./routes/readRoutes'); 
-const galleryRoutes = require('./routes/galleryRoutes'); // 👈 修复了这里
+const galleryRoutes = require('./routes/galleryRoutes');
 const commentRoutes = require('./routes/commentRoutes');
+const notificationRoutes = require('./routes/notificationRoutes'); // 👈 新增：引入通知路由
 
 // 2. 创建 Express 应用实例
 const app = express();
@@ -97,11 +98,13 @@ app.use('/api/works', workRoutes);
 // 将所有以 '/api/read' 开头的请求，都交给 readRoutes 处理
 app.use('/api/read', readRoutes);
 
-// 新增：将所有以 '/api/galleries' 开头的请求，都交给 galleryRoutes 处理
+// 将所有以 '/api/galleries' 开头的请求，都交给 galleryRoutes 处理
 app.use('/api/galleries', galleryRoutes);
 
-// 新增：将所有以 '/api/comments' 开头的请求，都交给 commentRoutes 处理
+// 将所有以 '/api/comments' 开头的请求，都交给 commentRoutes 处理
 app.use('/api/comments', commentRoutes);
+
+app.use('/api/notifications', notificationRoutes); // 👈 新增：注册通知路由
 
 // 6. 启动服务器并监听指定端口
 app.listen(PORT, () => {
