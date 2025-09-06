@@ -22,11 +22,11 @@ const commentSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
-    // **新增：用于存储点赞用户的ID，是一个ObjectId数组**
-    likes: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-    }],
+    // ✅ 修复：likes 默认是空数组，避免被 undefined 覆盖
+    likes: {
+        type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+        default: []
+    },
     
     createdAt: {
         type: Date,
