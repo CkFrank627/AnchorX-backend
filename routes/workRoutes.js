@@ -20,11 +20,11 @@ const auth = (req, res, next) => {
     }
 };
 
-// 获取当前登录用户的所有作品 (用于创作页面)
-// 这个路由受 auth 中间件保护
-router.get('/', auth, async (req, res) => {
+// 新增：获取所有作品的路由 (用于阅读页面)
+// 这个路由不带认证中间件，因此任何人都可以访问
+router.get('/all', async (req, res) => {
     try {
-        const works = await Work.find({ author: req.userId }).populate('author', 'username');
+        const works = await Work.find().populate('author', 'username');
         res.json(works);
     } catch (error) {
         res.status(500).json({ message: '获取作品失败', error: error.message });
