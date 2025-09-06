@@ -1,3 +1,5 @@
+//workRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const Work = require('../models/Work');
@@ -19,15 +21,17 @@ const auth = (req, res, next) => {
 };
 
 // 获取所有已发布的作品，任何人都可以访问
-router.get('/', async (req, res) => {
-    try {
-        // 修改：移除 auth 中间件，并移除查询条件，以获取所有作品
-        const works = await Work.find().populate('author', 'username');
-        res.json(works);
-    } catch (error) {
-        res.status(500).json({ message: '获取作品失败', error: error.message });
-    }
+// 获取当前登录用户的作品
+router.get('/', auth, async (req, res) => {
+    try {
+        // 根据 token 解析得到的 userId 来筛选
+        const works = await Work.find({ author: req.userId }).populate('author', 'username');
+        res.json(works);
+    } catch (error) {
+        res.status(500).json({ message: '获取作品失败', error: error.message });
+    }
 });
+
 
 // 创建新作品
 router.post('/', auth, async (req, res) => {
