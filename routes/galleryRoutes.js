@@ -37,6 +37,7 @@ router.get('/', async (req, res) => {
     const allGalleries = await Gallery.find({}).sort({ createdAt: -1 });
 
     const formattedGalleries = allGalleries.map(gallery => ({
+      _id: gallery._id, // 新增：返回图库的唯一ID
       title: gallery.title,
       author: gallery.author,
       // 从 images 数组中获取图片数量
@@ -50,6 +51,23 @@ router.get('/', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// 新增：DELETE /api/galleries/:id - 根据ID删除图库
+router.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await Gallery.findByIdAndDelete(id);
+
+        if (!result) {
+            return res.status(404).json({ error: 'Gallery not found' });
+        }
+        
+        res.status(200).json({ message: 'Gallery successfully deleted' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 module.exports = router;
