@@ -53,6 +53,24 @@ router.get('/', async (req, res) => {
   }
 });
 
+// 新增：GET /api/galleries/:id - 根据ID获取单个图库
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const gallery = await Gallery.findById(id);
+
+        if (!gallery) {
+            // 如果没有找到图库，返回 404
+            return res.status(404).json({ error: 'Gallery not found' });
+        }
+
+        res.json(gallery);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // 新增：DELETE /api/galleries/:id - 根据ID删除图库
 router.delete('/:id', async (req, res) => {
     try {
