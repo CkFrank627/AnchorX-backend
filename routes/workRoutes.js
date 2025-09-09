@@ -85,7 +85,12 @@ router.post('/', auth, async (req, res) => {
         newWork.draftId = draftFloor._id;
         await newWork.save();
 
-        res.status(201).json(newWork);
+        // 关键修改：将作品、楼层和草稿一起返回
+        res.status(201).json({
+            work: newWork,
+            floors: [firstFloor],
+            draft: draftFloor
+        });
     } catch (error) {
         res.status(400).json({ message: '创建作品失败', error: error.message });
     }
