@@ -191,25 +191,5 @@ router.patch('/:id/cover', auth, async (req, res) => {
         res.status(500).json({ message: '更新封面失败', error: error.message });
     }
 });
-// 获取所有作品的路由 (用于阅读页面)
-router.get('/all', async (req, res) => {
-    try {
-        const works = await Work.find().populate('author', 'username');
-        res.json(works);
-    } catch (error) {
-        res.status(500).json({ message: '获取作品失败', error: error.message });
-    }
-});
-// 获取单个作品的路由（用于阅读页面）
-router.get('/:id', async (req, res) => {
-    try {
-        const work = await Work.findById(req.params.id).populate('author', 'username');
-        if (!work) {
-            return res.status(404).json({ message: '作品不存在' });
-        }
-        res.json(work);
-    } catch (error) {
-        res.status(500).json({ message: '获取作品失败', error: error.message });
-    }
-});
+
 module.exports = router;
