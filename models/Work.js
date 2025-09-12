@@ -1,18 +1,21 @@
+// models/Work.js
+
 const mongoose = require('mongoose');
+const roleSchema = require('./Role'); // 引入 Role Schema
 
 const workSchema = new mongoose.Schema({
   title: { type: String, required: true },
   content: { type: String, default: '' },
-   // **新增：作品封面图片 URL**
     coverImage: {
         type: String,
-        default: '' // 默认值可以为空字符串
+        default: ''
     },
   wordCount: { type: Number, default: 0 },
-  // 关联到用户ID，这是关键
-  author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+  author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  // **新增：用于存储角色数据的数组**
+  roles: [roleSchema]
 }, {
-  timestamps: true // 自动添加创建和更新时间
+  timestamps: true
 });
 
 module.exports = mongoose.model('Work', workSchema);

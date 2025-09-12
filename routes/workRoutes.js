@@ -134,4 +134,104 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+// **新增：角色相关的 API 路由**
+
+// 获取单个作品的所有角色
+router.get('/:id/roles', auth, async (req, res) => {
+    try {
+        const work = await Work.findById(req.params.id);
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
+        if (work.author.toString() !== req.userId) {
+            return res.status(403).json({ message: '无权查看此作品的角色' });
+        }
+        res.json(work.roles);
+    } catch (error) {
+        res.status(500).json({ message: '获取角色失败', error: error.message });
+    }
+});
+
+// 为作品添加新角色
+router.post('/:id/roles', auth, async (req, res) => {
+    try {
+        const { name, notes, color } = req.body;
+        if (!name) {
+            return res.status(400).json({ message: '角色名称不能为空' });
+        }
+
+        const work = await Work.findById(req.params.id);
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
+        if (work.author.toString() !== req.userId) {
+            return res.status(403).json({ message: '无权修改此作品' });
+        }
+
+        // 创建新角色对象并推入数组
+        work.roles.push({ name, notes, color });
+        await work.save();
+
+        // 返回新创建的角色对象，其 _id 由 MongoDB 自动生成
+        const newRole = work.roles[work.roles.length - 1];
+        res.status(201).json(newRole);
+    } catch (error) {
+        res.status(500).json({ message: '添加角色失败', error: error.message });
+    }
+});
+
+// 更新作品中的某个角色
+router.put('/:workId/roles/:roleId', auth, async (req, res) => {
+    try {
+        const { workId, roleId } = req.params;
+        const { name, notes, color } = req.body;
+
+        const work = await Work.findById(workId);
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
+        if (work.author.toString() !== req.userId) {
+            return res.status(403).json({ message: '无权修改此作品' });
+        }
+        
+        // 找到并更新指定的角色
+        const roleToUpdate = work.roles.id(roleId);
+        if (!roleToUpdate) {
+            return res.status(404).json({ message: '角色未找到' });
+        }
+
+        roleToUpdate.name = name ?? roleToUpdate.name;
+        roleToUpdate.notes = notes ?? roleToUpdate.notes;
+        roleToUpdate.color = color ?? roleToUpdate.color;
+
+        await work.save();
+        res.json(roleToUpdate);
+
+    } catch (error) {
+        res.status(500).json({ message: '更新角色失败', error: error.message });
+    }
+});
+
+// 删除作品中的某个角色
+router.delete('/:workId/roles/:roleId', auth, async (req, res) => {
+    try {
+        const { workId, roleId } = req.params;
+        
+        const work = await Work.findById(workId);
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
+        if (work.author.toString() !== req.userId) {
+            return res.status(403).json({ message: '无权修改此作品' });
+        }
+
+        work.roles.pull({ _id: roleId });
+        await work.save();
+
+        res.json({ message: '角色删除成功' });
+    } catch (error) {
+        res.status(500).json({ message: '删除角色失败', error: error.message });
+    }
+});
+
 module.exports = router;
