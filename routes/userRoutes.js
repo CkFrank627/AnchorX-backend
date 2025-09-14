@@ -40,22 +40,19 @@ router.post('/login', async (req, res) => {
 });
 
 // 获取个人资料（受保护路由）
-// 获取当前登录用户信息
-router.get('/profile', authMiddleware, async (req, res) => {
+router.get('/profile', auth, async (req, res) => {
+  console.log('Received GET request to /profile');
     try {
-        // authMiddleware 会把解码后的用户信息放到 req.user
-        const user = req.user; 
+        const userId = req.userData.userId;
+        const user = await User.findById(userId).select('-password');
         if (!user) {
-            return res.status(404).json({ message: "用户不存在" });
+            return res.status(404).json({ message: '找不到该用户' });
         }
-
-        res.json({ user });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "服务器错误" });
+        res.json({ message: '您已成功访问受保护的个人资料！', user });
+    } catch (error) {
+        res.status(500).json({ message: '无法获取个人资料', error: error.message });
     }
 });
-
 
 // --- 新增代码段 ---
 // 修改密码（受保护路由）
