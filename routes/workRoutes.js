@@ -1,5 +1,3 @@
-// workRoutes.js
-
 const express = require('express');
 const router = express.Router();
 const Work = require('../models/Work');
@@ -23,19 +21,38 @@ const auth = (req, res, next) => {
 // **新增：可选认证中间件**
 // 如果有 token，解析并设置 req.userId，没有则继续
 const optionalAuth = (req, res, next) => {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
-            req.userId = decoded.userId;
-        } catch (error) {
-            // 令牌无效，但我们不中断请求，只把 userId 设为 null
-            req.userId = null; 
-        }
-    } else {
-        req.userId = null;
-    }
-    next();
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
+            req.userId = decoded.userId;
+        } catch (error) {
+            // 令牌无效，但我们不中断请求，只把 userId 设为 null
+            req.userId = null; 
+        }
+    } else {
+        req.userId = null;
+    }
+    next();
+};
+
+// **新增：计算字数的辅助函数**
+const calculateWordCount = (pages) => {
+    if (!Array.isArray(pages) || pages.length === 0) {
+        return 0;
+    }
+
+    return pages.reduce((sum, p) => {
+        if (!p.content) return sum;
+        if (typeof p.content === 'object' && Array.isArray(p.content.ops)) {
+            // 如果是 Delta 格式，提取文本并计算长度
+            const text = p.content.ops.map(op => op.insert || '').join('');
+            // 排除图片和换行符等非文字内容
+            const cleanText = text.replace(/[\n\r\t\s\u200B-\u200D\uFEFF]/g, '');
+            return sum + cleanText.length;
+        }
+        return sum;
+    }, 0);
 };
 
 // **接收 JSON 数据中的 coverImageUrl**
@@ -89,15 +106,16 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
-// 创建新作品
+// **修改：创建新作品**
 router.post('/', auth, async (req, res) => {
     try {
-        const { title } = req.body;
-        // 新增：为新作品创建一个默认的空页面
+        const { title, content } = req.body; // 新增：从请求体中获取 content
         const newWork = new Work({ 
             title, 
             author: req.userId,
-            content: [{ content: {} }] // 默认包含一个空页面
+            // 新增：根据请求中的内容计算初始字数
+            content: content || [{ content: {} }],
+            wordCount: calculateWordCount(content) 
         });
         await newWork.save();
         res.status(201).json(newWork);
@@ -106,19 +124,23 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
-// 更新作品的路由
+// **修改：更新作品的路由**
 router.put('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
         const { content } = req.body; 
         
         if (!Array.isArray(content)) {
-             return res.status(400).json({ message: '内容格式不正确，需要是一个页面数组' });
+            return res.status(400).json({ message: '内容格式不正确，需要是一个页面数组' });
         }
+
+        // 新增：计算更新后的字数
+        const newWordCount = calculateWordCount(content);
 
         const updatedWork = await Work.findOneAndUpdate(
             { _id: id, author: req.userId },
-            { content, updatedAt: new Date() },
+            // 更新内容、更新时间和字数
+            { content, updatedAt: new Date(), wordCount: newWordCount },
             { new: true }
         );
 
@@ -145,65 +167,73 @@ router.delete('/:id', auth, async (req, res) => {
     }
 });
 
-// **修改：获取单个作品的路由（用于阅读页面）**
-// 现在使用 optionalAuth 中间件
+// 修改：获取单个作品的路由（用于阅读页面），并增加浏览量
 router.get('/:id', optionalAuth, async (req, res) => {
-    try {
-        // 使用 populate 来获取作者的用户名
-        const work = await Work.findById(req.params.id).populate('author', 'username');
-        if (!work) {
-            return res.status(404).json({ message: '作品不存在' });
-        }
-        
-        // 新增：检查当前用户是否已点赞
-        const isLikedByCurrentUser = req.userId ? work.likedBy.includes(req.userId) : false;
-        
-        // 返回作品信息，并附带点赞数和用户点赞状态
-        res.json({
-            _id: work._id,
-            title: work.title,
-            author: work.author,
-            content: work.content,
-            likesCount: work.likesCount,
-            isLikedByCurrentUser: isLikedByCurrentUser
-        });
-    } catch (error) {
-        res.status(500).json({ message: '获取作品失败', error: error.message });
-    }
+    try {
+        const workId = req.params.id;
+
+        // 使用 findByIdAndUpdate 原子性地增加浏览量，并返回更新后的文档
+        const work = await Work.findByIdAndUpdate(
+            workId,
+            { $inc: { views: 1 } }, // 使用 $inc 操作符让 views 字段自增1
+            { new: true } // 返回更新后的文档
+        ).populate('author', 'username');
+
+        if (!work) {
+            return res.status(404).json({ message: '作品不存在' });
+        }
+        
+        // 检查当前用户是否已点赞
+        const isLikedByCurrentUser = req.userId ? work.likedBy.includes(req.userId) : false;
+        
+        // 返回作品信息，并附带点赞数、浏览量和用户点赞状态
+        res.json({
+            _id: work._id,
+            title: work.title,
+            author: work.author,
+            content: work.content,
+            views: work.views, // 返回更新后的浏览量
+            likesCount: work.likesCount,
+            isLikedByCurrentUser: isLikedByCurrentUser
+        });
+    } catch (error) {
+        console.error('获取作品失败:', error);
+        res.status(500).json({ message: '获取作品失败', error: error.message });
+    }
 });
 
 // **新增：作品点赞/取消点赞的路由**
 router.post('/:id/like', auth, async (req, res) => {
-    try {
-        const work = await Work.findById(req.params.id);
-        if (!work) {
-            return res.status(404).json({ message: '作品未找到' });
-        }
+    try {
+        const work = await Work.findById(req.params.id);
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
 
-        const userId = req.userId;
-        const index = work.likedBy.indexOf(userId);
-        
-        if (index > -1) {
-            // 用户已经点赞，执行取消点赞
-            work.likedBy.splice(index, 1);
-            work.likesCount -= 1;
-        } else {
-            // 用户尚未点赞，执行点赞
-            work.likedBy.push(userId);
-            work.likesCount += 1;
-        }
+        const userId = req.userId;
+        const index = work.likedBy.indexOf(userId);
+        
+        if (index > -1) {
+            // 用户已经点赞，执行取消点赞
+            work.likedBy.splice(index, 1);
+            work.likesCount -= 1;
+        } else {
+            // 用户尚未点赞，执行点赞
+            work.likedBy.push(userId);
+            work.likesCount += 1;
+        }
 
-        await work.save();
+        await work.save();
 
-        res.json({
-            likesCount: work.likesCount,
-            isLikedByCurrentUser: index === -1 // 如果是新增点赞，则状态为 true
-        });
+        res.json({
+            likesCount: work.likesCount,
+            isLikedByCurrentUser: index === -1 // 如果是新增点赞，则状态为 true
+        });
 
-    } catch (error) {
-        console.error('Work like/unlike error:', error);
-        res.status(500).json({ message: '点赞操作失败', error: error.message });
-    }
+    } catch (error) {
+        console.error('Work like/unlike error:', error);
+        res.status(500).json({ message: '点赞操作失败', error: error.message });
+    }
 });
 
 // **新增：角色相关的 API 路由**
