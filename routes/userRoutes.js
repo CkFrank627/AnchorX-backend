@@ -41,6 +41,7 @@ router.post('/login', async (req, res) => {
 
 // 获取个人资料（受保护路由）
 router.get('/profile', auth, async (req, res) => {
+  console.log('Received GET request to /profile');
     try {
         const userId = req.userData.userId;
         const user = await User.findById(userId).select('-password');
