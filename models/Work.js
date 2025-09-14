@@ -21,6 +21,7 @@ const workSchema = new mongoose.Schema({
         default: ''
     },
     wordCount: { type: Number, default: 0 },
+    views: { type: Number, default: 0 }, // 新增：浏览量字段
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     roles: [roleSchema],
     // --- 新增点赞相关字段 ---
