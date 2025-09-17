@@ -55,31 +55,29 @@ app.use(express.json());
 
 // 繁简转换 API 端点
 // POST /api/convert-text
+// POST /api/convert-text
 app.post('/api/convert-text', async (req, res) => {
     const { text, direction } = req.body;
 
     if (!text || !direction) {
-        return res.status(400).json({ error: 'Missing text or direction in request body.' });
+        return res.status(400).json({ error: '缺少文本或转换方向' });
     }
 
     try {
-        let convertedText = '';
-
-        // 检查 direction 参数并选择正确的转换器
+        let converter;
         if (direction === 't2s') {
-            const converter = OpenCC.Converter({ from: 'hk', to: 'cn' });
-            convertedText = converter(text);
+            converter = OpenCC.Converter({ from: 'hk', to: 'cn' });
         } else if (direction === 's2t') {
-            const converter = OpenCC.Converter({ from: 'cn', to: 'hk' });
-            convertedText = converter(text);
+            converter = OpenCC.Converter({ from: 'cn', to: 'hk' });
         } else {
-            return res.status(400).json({ error: 'Invalid direction value.' });
+            return res.status(400).json({ error: '无效的转换方向' });
         }
-
+        
+        const convertedText = converter(text);
         res.json({ convertedText });
     } catch (error) {
-        console.error('OpenCC failed to load converter:', error);
-        res.status(500).json({ error: 'Failed to convert text.' });
+        console.error('繁简转换失败:', error);
+        res.status(500).json({ error: '繁简转换服务出错' });
     }
 });
 
