@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 // 引入 OpenCC 库
-const OpenCC = require('opencc-js'); 
+const { Converter } = require('opencc-js/full');
 
 // 引入你创建的路由文件
 const userRoutes = require('./routes/userRoutes');
@@ -66,15 +66,12 @@ app.post('/api/convert-text', async (req, res) => {
     try {
         let converter;
         if (direction === 't2s') {
-            // 将 "hk" 改为更通用的 "t"
-            converter = OpenCC.Converter({ from: 't', to: 's' });
+            converter = Converter({ from: 't', to: 's' }); // 使用新的 Converter
         } else if (direction === 's2t') {
-            // 将 "cn" 改为 "s"，"hk" 改为 "t"
-            converter = OpenCC.Converter({ from: 's', to: 't' });
+            converter = Converter({ from: 's', to: 't' }); // 使用新的 Converter
         } else {
             return res.status(400).json({ error: '无效的转换方向' });
         }
-
         const convertedText = converter(text);
         res.json({ convertedText });
     } catch (error) {
