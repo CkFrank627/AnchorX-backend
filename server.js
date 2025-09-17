@@ -4,12 +4,14 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); 
+const cors = require('cors');
+
+// 引入 OpenCC 库
+const OpenCC = require('opencc-js'); 
 
 // 引入你创建的路由文件
 const userRoutes = require('./routes/userRoutes');
 const workRoutes = require('./routes/workRoutes');
-// const readRoutes = require('./routes/readRoutes'); // 移除
 const galleryRoutes = require('./routes/galleryRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const notificationRoutes = require('./routes/notificationRoutes'); 
@@ -24,25 +26,25 @@ const PORT = process.env.PORT || 3000;
 const dbURI = process.env.MONGO_URI;
 
 mongoose.connect(dbURI)
-  .then(() => console.log('MongoDB connected...'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('MongoDB connected...'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // 4. 使用中间件
 // 使用 CORS 中间件，允许多个前端地址进行跨域请求
 const allowedOrigins = [
-  'https://anchorx.ca',
-  'https://anchorfrontend.netlify.app',
-  'http://localhost:3000'
+  'https://anchorx.ca',
+  'https://anchorfrontend.netlify.app',
+  'http://localhost:3000'
 ];
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }
+  origin: function (origin, callback) {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
 };
 app.use(cors(corsOptions));
 
@@ -50,14 +52,42 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // 5. 路由设置
+
+// 繁简转换 API 端点
+app.post('/api/convert-text', async (req, res) => {
+    // 从请求体中获取要转换的文本和转换方向
+    const { text, direction } = req.body;
+    
+    // 检查参数是否完整
+    if (!text || !direction) {
+        return res.status(400).json({ error: 'Missing "text" or "direction" parameter.' });
+    }
+
+    let converter;
+    try {
+        // 根据方向（t2s.json 或 s2t.json）创建一个转换器实例
+        converter = OpenCC.Converter(direction);
+    } catch (error) {
+        // 如果方向参数无效，返回错误
+        return res.status(400).json({ error: 'Invalid conversion direction.' });
+    }
+
+    try {
+        // 使用转换器进行异步转换
+        const convertedText = await converter.convertPromise(text);
+        // 返回转换后的文本
+        res.json({ convertedText });
+    } catch (error) {
+        console.error('Conversion failed:', error);
+        res.status(500).json({ error: 'Failed to convert text.' });
+    }
+});
+
 // 将所有以 '/api/users' 开头的请求，都交给 userRoutes 处理
 app.use('/api/users', userRoutes);
 
 // 将所有以 '/api/works' 开头的请求，都交给 workRoutes 处理
 app.use('/api/works', workRoutes);
-
-// 将所有以 '/api/read' 开头的请求，都交给 readRoutes 处理
-// app.use('/api/read', readRoutes); // 移除
 
 // 将所有以 '/api/galleries' 开头的请求，都交给 galleryRoutes 处理
 app.use('/api/galleries', galleryRoutes);
@@ -70,5 +100,5 @@ app.use('/api/notifications', notificationRoutes);
 
 // 6. 启动服务器并监听指定端口
 app.listen(PORT, () => {
-  console.log(`服务器正在运行，请访问 http://localhost:${PORT}`);
+  console.log(`服务器正在运行，请访问 http://localhost:${PORT}`);
 });
