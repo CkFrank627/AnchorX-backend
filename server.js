@@ -61,19 +61,27 @@ app.post('/api/convert-text', async (req, res) => {
         return res.status(400).json({ error: 'Missing "text" or "direction" parameter.' });
     }
 
-    // 修复：确保 OpenCC.Converter() 接收到的是完整的配置文件名
-    const fullDirection = direction.includes('.json') ? direction : `${direction}.json`;
-    
-    let converter;
-    try {
-        converter = OpenCC.Converter(fullDirection);
-    } catch (error) {
-        console.error('OpenCC failed to load converter:', error);
+    // 根据前端传入的 direction 字符串，构建 opencc-js 需要的对象
+    let converterConfig;
+    if (direction === 't2s') {
+        converterConfig = { from: 't', to: 's' };
+    } else if (direction === 's2t') {
+        converterConfig = { from: 's', to: 't' };
+    } else {
+        // 如果方向不是 t2s 或 s2t，则返回错误
         return res.status(400).json({ error: 'Invalid conversion direction.' });
     }
 
+    let converter;
     try {
-        const convertedText = await converter.convertPromise(text);
+        converter = OpenCC.Converter(converterConfig);
+    } catch (error) {
+        console.error('OpenCC failed to load converter:', error);
+        return res.status(400).json({ error: 'Failed to initialize converter.' });
+    }
+
+    try {
+        const convertedText = converter(text); // 注意：opencc-js 的 convert 方法是同步的
         res.json({ convertedText });
     } catch (error) {
         console.error('Conversion failed:', error);
