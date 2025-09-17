@@ -66,13 +66,15 @@ app.post('/api/convert-text', async (req, res) => {
     try {
         let converter;
         if (direction === 't2s') {
-            converter = OpenCC.Converter({ from: 'hk', to: 'cn' });
+            // 将 "hk" 改为更通用的 "t"
+            converter = OpenCC.Converter({ from: 't', to: 's' });
         } else if (direction === 's2t') {
-            converter = OpenCC.Converter({ from: 'cn', to: 'hk' });
+            // 将 "cn" 改为 "s"，"hk" 改为 "t"
+            converter = OpenCC.Converter({ from: 's', to: 't' });
         } else {
             return res.status(400).json({ error: '无效的转换方向' });
         }
-        
+
         const convertedText = converter(text);
         res.json({ convertedText });
     } catch (error) {
