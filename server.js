@@ -54,37 +54,31 @@ app.use(express.json());
 // 5. 路由设置
 
 // 繁简转换 API 端点
+// POST /api/convert-text
 app.post('/api/convert-text', async (req, res) => {
     const { text, direction } = req.body;
-    
+
     if (!text || !direction) {
-        return res.status(400).json({ error: 'Missing "text" or "direction" parameter.' });
-    }
-
-    // 根据前端传入的 direction 字符串，构建 opencc-js 需要的对象
-    let converterConfig;
-    if (direction === 't2s') {
-        converterConfig = { from: 't', to: 's' };
-    } else if (direction === 's2t') {
-        converterConfig = { from: 's', to: 't' };
-    } else {
-        // 如果方向不是 t2s 或 s2t，则返回错误
-        return res.status(400).json({ error: 'Invalid conversion direction.' });
-    }
-
-    let converter;
-    try {
-        converter = OpenCC.Converter(converterConfig);
-    } catch (error) {
-        console.error('OpenCC failed to load converter:', error);
-        return res.status(400).json({ error: 'Failed to initialize converter.' });
+        return res.status(400).json({ error: 'Missing text or direction in request body.' });
     }
 
     try {
-        const convertedText = converter(text); // 注意：opencc-js 的 convert 方法是同步的
+        let convertedText = '';
+
+        // 检查 direction 参数并选择正确的转换器
+        if (direction === 't2s') {
+            const converter = OpenCC.Converter({ from: 'hk', to: 'cn' });
+            convertedText = converter(text);
+        } else if (direction === 's2t') {
+            const converter = OpenCC.Converter({ from: 'cn', to: 'hk' });
+            convertedText = converter(text);
+        } else {
+            return res.status(400).json({ error: 'Invalid direction value.' });
+        }
+
         res.json({ convertedText });
     } catch (error) {
-        console.error('Conversion failed:', error);
+        console.error('OpenCC failed to load converter:', error);
         res.status(500).json({ error: 'Failed to convert text.' });
     }
 });
