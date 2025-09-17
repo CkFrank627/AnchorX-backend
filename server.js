@@ -55,27 +55,25 @@ app.use(express.json());
 
 // 繁简转换 API 端点
 app.post('/api/convert-text', async (req, res) => {
-    // 从请求体中获取要转换的文本和转换方向
     const { text, direction } = req.body;
     
-    // 检查参数是否完整
     if (!text || !direction) {
         return res.status(400).json({ error: 'Missing "text" or "direction" parameter.' });
     }
 
+    // 修复：确保 OpenCC.Converter() 接收到的是完整的配置文件名
+    const fullDirection = direction.includes('.json') ? direction : `${direction}.json`;
+    
     let converter;
     try {
-        // 根据方向（t2s.json 或 s2t.json）创建一个转换器实例
-        converter = OpenCC.Converter(direction);
+        converter = OpenCC.Converter(fullDirection);
     } catch (error) {
-        // 如果方向参数无效，返回错误
+        console.error('OpenCC failed to load converter:', error);
         return res.status(400).json({ error: 'Invalid conversion direction.' });
     }
 
     try {
-        // 使用转换器进行异步转换
         const convertedText = await converter.convertPromise(text);
-        // 返回转换后的文本
         res.json({ convertedText });
     } catch (error) {
         console.error('Conversion failed:', error);
@@ -87,7 +85,7 @@ app.post('/api/convert-text', async (req, res) => {
 app.use('/api/users', userRoutes);
 
 // 将所有以 '/api/works' 开头的请求，都交给 workRoutes 处理
-app.use('/api/works', workRoutes);
+app.use('/api/works', workRoutes);    
 
 // 将所有以 '/api/galleries' 开头的请求，都交给 galleryRoutes 处理
 app.use('/api/galleries', galleryRoutes);
