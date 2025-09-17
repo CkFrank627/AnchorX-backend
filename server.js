@@ -56,29 +56,31 @@ app.use(express.json());
 // 繁简转换 API 端点
 // POST /api/convert-text
 // POST /api/convert-text
-app.post('/api/convert-text', async (req, res) => {
-    const { text, direction } = req.body;
+// 引入 OpenCC
+const OpenCC = require('opencc');
+const s2t = new OpenCC('s2t.json'); // 简体 -> 繁体
+const t2s = new OpenCC('t2s.json'); // 繁体 -> 简体
 
-    if (!text || !direction) {
-        return res.status(400).json({ error: '缺少文本或转换方向' });
+// 繁简转换中间件，根据 query 参数决定输出
+app.use((req, res, next) => {
+  // 重写 res.json
+  const originalJson = res.json;
+  res.json = function (data) {
+    if (req.query.lang === 'cn') {
+      // 转简体
+      return Promise.resolve(t2s.convert(JSON.stringify(data)))
+        .then(result => originalJson.call(this, JSON.parse(result)));
+    } else if (req.query.lang === 'tw') {
+      // 转繁体
+      return Promise.resolve(s2t.convert(JSON.stringify(data)))
+        .then(result => originalJson.call(this, JSON.parse(result)));
+    } else {
+      return originalJson.call(this, data); // 默认不转换
     }
-
-    try {
-        let converter;
-        if (direction === 't2s') {
-            converter = Converter({ from: 't', to: 's' }); // 使用新的 Converter
-        } else if (direction === 's2t') {
-            converter = Converter({ from: 's', to: 't' }); // 使用新的 Converter
-        } else {
-            return res.status(400).json({ error: '无效的转换方向' });
-        }
-        const convertedText = converter(text);
-        res.json({ convertedText });
-    } catch (error) {
-        console.error('繁简转换失败:', error);
-        res.status(500).json({ error: '繁简转换服务出错' });
-    }
+  };
+  next();
 });
+
 
 // 将所有以 '/api/users' 开头的请求，都交给 userRoutes 处理
 app.use('/api/users', userRoutes);
