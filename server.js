@@ -94,6 +94,12 @@ const corsOptions = {
 
 };
 
+// 在這裡處理對網站根目錄的請求
+app.get('/', (req, res) => {
+  res.send('你的網站正在運行!');
+});
+
+
 app.use(cors(corsOptions));
 
 
