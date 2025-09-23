@@ -70,6 +70,8 @@ const allowedOrigins = [
 
   'https://anchorfrontend.netlify.app',
 
+  'https://zhidianworld.com',
+
   'http://localhost:3000'
 
 ];
