@@ -66,11 +66,11 @@ mongoose.connect(dbURI)
 
 const allowedOrigins = [
 
+  'https://zhidianworld.com',
+
   'https://anchorx.ca',
 
   'https://anchorfrontend.netlify.app',
-
-  'https://zhidianworld.com',
 
   'http://localhost:3000'
 
