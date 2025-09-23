@@ -20,6 +20,8 @@
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
     "opencc-js": "^1.0.5",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "quill": "^2.0.3",
+    "quill-image-resize": "^3.0.9"
   }
 }

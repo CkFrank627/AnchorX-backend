@@ -143,7 +143,7 @@ router.put('/:id', auth, async (req, res) => {
             { _id: id, author: req.userId },
             // 更新内容、更新时间和字数
             { content, updatedAt: new Date(), wordCount: newWordCount },
-            { new: true }
+            { new: true, timestamps: true }
         );
 
         if (!updatedWork) {
