@@ -5,6 +5,47 @@ const router = express.Router();
 const Work = require('../models/Work');
 const jwt = require('jsonwebtoken');
 
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// 定义文件存储的目标文件夹
+const uploadDir = 'public/uploads';
+// 确保目录存在
+fs.mkdirSync(uploadDir, { recursive: true });
+
+// 配置存储引擎
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir); // 文件将存储在 'public/uploads' 目录
+  },
+  filename: function (req, file, cb) {
+    // 创建一个唯一的文件名，防止重名覆盖
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
+// --- 新增：创建文件上传接口 ---
+// 客户端会将图片 POST 到这个路由
+router.post('/upload', upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: '没有上传文件' });
+    }
+    // 构建图片的公开访问 URL
+    // 注意：这里的 URL 结构需要和你配置静态文件服务的方式匹配
+    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    
+    // 将 URL 返回给前端
+    res.status(200).json({ message: '上传成功', imageUrl: imageUrl });
+  } catch (error) {
+    res.status(500).json({ message: '上传失败', error: error.message });
+  }
+});
+
 // 认证中间件
 const auth = (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');

@@ -13,6 +13,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 
+const path = require('path');
+
 
 // 引入 OpenCC 库
 
@@ -199,6 +201,11 @@ app.use('/api/comments', commentRoutes);
 // 注册通知路由
 
 app.use('/api/notifications', notificationRoutes);
+
+// --- 新增：配置静态文件服务 ---
+// 这会让 /uploads/some-image.jpg 指向 public/uploads/some-image.jpg 文件
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
 
 
 
