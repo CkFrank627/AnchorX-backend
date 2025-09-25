@@ -286,34 +286,41 @@ router.post('/:id/roles', auth, async (req, res) => {
 
 // 更新作品中的某个角色
 router.put('/:workId/roles/:roleId', auth, async (req, res) => {
-    try {
-        const { workId, roleId } = req.params;
-        const { name, notes, color } = req.body;
+    try {
+        const { workId, roleId } = req.params;
+        // 修改：从请求体中解构出 gallery 字段
+        const { name, notes, color, gallery } = req.body;
 
-        const work = await Work.findById(workId);
-        if (!work) {
-            return res.status(404).json({ message: '作品未找到' });
-        }
-        if (work.author.toString() !== req.userId) {
-            return res.status(403).json({ message: '无权修改此作品' });
-        }
-        
-        // 找到并更新指定的角色
-        const roleToUpdate = work.roles.id(roleId);
-        if (!roleToUpdate) {
-            return res.status(404).json({ message: '角色未找到' });
-        }
+        const work = await Work.findById(workId);
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
+        if (work.author.toString() !== req.userId) {
+            return res.status(403).json({ message: '无权修改此作品' });
+        }
+        
+        // 找到并更新指定的角色
+        const roleToUpdate = work.roles.id(roleId);
+        if (!roleToUpdate) {
+            return res.status(404).json({ message: '角色未找到' });
+        }
 
-        roleToUpdate.name = name ?? roleToUpdate.name;
-        roleToUpdate.notes = notes ?? roleToUpdate.notes;
-        roleToUpdate.color = color ?? roleToUpdate.color;
+        roleToUpdate.name = name ?? roleToUpdate.name;
+        roleToUpdate.notes = notes ?? roleToUpdate.notes;
+        roleToUpdate.color = color ?? roleToUpdate.color;
+        
+        // 新增：如果请求体中包含 gallery 字段，则更新它
+        // 使用 ?? 确保只有在 gallery 存在时才进行更新
+        if (gallery !== undefined) {
+            roleToUpdate.gallery = gallery;
+        }
 
-        await work.save();
-        res.json(roleToUpdate);
+        await work.save();
+        res.json(roleToUpdate);
 
-    } catch (error) {
-        res.status(500).json({ message: '更新角色失败', error: error.message });
-    }
+    } catch (error) {
+        res.status(500).json({ message: '更新角色失败', error: error.message });
+    }
 });
 
 // 删除作品中的某个角色
