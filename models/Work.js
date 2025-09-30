@@ -3,10 +3,18 @@
 const mongoose = require('mongoose');
 const roleSchema = require('./Role'); // 引入 Role Schema
 
-// 新增：定义页面的 Schema
+// 新增：定义骰子记录的 Schema
+const diceLogSchema = new mongoose.Schema({
+    timestamp: { type: Date, default: Date.now },
+    rollType: { type: String, required: true }, // 骰子类型，如 '1D100'
+    result: { type: Number, required: true }, // 结果
+    rollText: { type: String, required: true } // 插入文本，如 '[1D100=45]'
+}, { _id: false }); // 嵌入式文档，不需要单独的 _id
+
+// 定义页面的 Schema
 const pageSchema = new mongoose.Schema({
     // Quill 的内容通常以 JSON (Delta) 格式存储，因此类型设为 Object
-    content: { type: Object, default: {} }, 
+    content: { type: Object, default: {} },
     createdAt: { type: Date, default: Date.now },
 });
 
@@ -26,7 +34,13 @@ const workSchema = new mongoose.Schema({
     roles: [roleSchema],
     // --- 新增点赞相关字段 ---
     likesCount: { type: Number, default: 0 },
-    likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    // ----------------------
+    // --- 新增骰子记录字段 ---
+    diceLog: {
+        type: [diceLogSchema],
+        default: []
+    }
     // ----------------------
 }, {
     timestamps: true

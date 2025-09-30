@@ -386,4 +386,79 @@ router.delete('/:workId/roles/:roleId', auth, async (req, res) => {
     }
 });
 
+// ... [在文件末尾或其他合适位置添加以下代码] ...
+
+// ------------------------------------------------------------------
+// **新增：骰子记录相关的 API 路由**
+// ------------------------------------------------------------------
+
+// 记录一次骰子使用情况 (POST /api/work/:id/dice-log)
+router.post('/:id/dice-log', auth, async (req, res) => {
+    try {
+        const workId = req.params.id;
+        // 接收前端发送的记录数据
+        const { rollType, result, rollText } = req.body; 
+        
+        if (!rollType || typeof result !== 'number' || !rollText) {
+            return res.status(400).json({ message: '缺少骰子记录所需的参数' });
+        }
+
+        const work = await Work.findById(workId);
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
+        if (work.author.toString() !== req.userId) {
+            return res.status(403).json({ message: '无权修改此作品' });
+        }
+
+        // 创建新的骰子记录对象，使用服务器时间
+        const newLog = {
+            rollType,
+            result,
+            rollText,
+            timestamp: new Date()
+        };
+
+        // 将新记录添加到数组最前面 (unshift)
+        work.diceLog.unshift(newLog);
+
+        // 可选：限制记录数量，例如只保留最新的 100 条，防止数据库字段过大
+        if (work.diceLog.length > 100) {
+             work.diceLog = work.diceLog.slice(0, 100);
+        }
+
+        await work.save();
+
+        // 返回新记录和状态
+        res.status(201).json({ message: '骰子记录成功', logEntry: newLog });
+
+    } catch (error) {
+        console.error('Dice log error:', error);
+        res.status(500).json({ message: '记录骰子失败', error: error.message });
+    }
+});
+
+// 获取作品的骰子记录 (GET /api/work/:id/dice-log)
+router.get('/:id/dice-log', auth, async (req, res) => {
+    try {
+        const workId = req.params.id;
+
+        // 只查询 diceLog 字段
+        const work = await Work.findById(workId).select('diceLog author'); 
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
+        if (work.author.toString() !== req.userId) {
+            return res.status(403).json({ message: '无权查看此作品的骰子记录' });
+        }
+
+        // 返回骰子记录列表
+        res.json(work.diceLog);
+
+    } catch (error) {
+        res.status(500).json({ message: '获取骰子记录失败', error: error.message });
+    }
+});
+
+
 module.exports = router;
