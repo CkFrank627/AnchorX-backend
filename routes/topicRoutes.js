@@ -8,16 +8,18 @@ const mongoose = require('mongoose');
 // ===================================
 // 接口 1: 创建新主题 (需要登录)
 // POST /api/topics
+// (新增对 section 的支持)
 // ===================================
 router.post('/', auth, async (req, res) => {
     try {
-        const { title, content } = req.body;
+        const { title, content, section } = req.body; // <-- 接收 section
         const author = req.userData.userId; // 从 auth 中间件获取用户 ID
 
         const newTopic = new Topic({
             title,
             content,
             author,
+            section, // <-- 保存 section
             lastReplyAt: new Date(),
             lastRepliedBy: author
         });
@@ -34,26 +36,33 @@ router.post('/', auth, async (req, res) => {
 });
 
 // ===================================
-// 接口 2: 获取主题列表 (可分页)
-// GET /api/topics?page=1&limit=10
+// 接口 2: 获取主题列表 (可分页、可按 section 筛选)
+// GET /api/topics?page=1&limit=10&section=讨论区
 // ===================================
 router.get('/', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
+        const section = req.query.section; // <-- 接收 section 筛选参数
         const skip = (page - 1) * limit;
+        
+        // 构建筛选条件
+        const filter = {};
+        if (section) {
+            filter.section = section;
+        }
 
-        // 查询主题列表，并按最后回复时间降序排列 (即最新回复的在最上面)
-        const topics = await Topic.find({})
+        // 查询主题列表
+        const topics = await Topic.find(filter) // <-- 应用筛选
             .sort({ lastReplyAt: -1, createdAt: -1 }) // 优先按最新回复时间，其次按创建时间
             .skip(skip)
             .limit(limit)
             .populate('author', 'username') // 关联查询作者的用户名
             .populate('lastRepliedBy', 'username') // 关联查询最后回复者的用户名
-            .select('-content') // 列表页不返回完整内容，只返回摘要信息
+            .select('-content -likedBy') // 列表页不返回完整内容和点赞用户列表
             .exec();
 
-        const totalTopics = await Topic.countDocuments({});
+        const totalTopics = await Topic.countDocuments(filter); // <-- 应用筛选
 
         res.json({
             topics,
@@ -71,6 +80,7 @@ router.get('/', async (req, res) => {
 // ===================================
 // 接口 3: 获取单个主题详情 (及分页回复)
 // GET /api/topics/:topicId
+// (主题和回复现在包含 likesCount 和 likedBy)
 // ===================================
 router.get('/:topicId', async (req, res) => {
     const topicId = req.params.topicId;
@@ -79,7 +89,7 @@ router.get('/:topicId', async (req, res) => {
     const skip = (page - 1) * limit;
 
     try {
-        // 1. 获取主题详情
+        // 1. 获取主题详情 (会自动带上 likesCount 和 likedBy)
         const topic = await Topic.findById(topicId)
             .populate('author', 'username')
             .select('-__v')
@@ -92,7 +102,7 @@ router.get('/:topicId', async (req, res) => {
         // 2. 增加浏览量 (不等待，异步执行)
         Topic.findByIdAndUpdate(topicId, { $inc: { viewsCount: 1 } }).exec();
 
-        // 3. 获取主题的回复列表
+        // 3. 获取主题的回复列表 (会自动带上 likesCount 和 likedBy)
         const replies = await Reply.find({ topic: topicId })
             .sort({ createdAt: 1 }) // 按时间升序排列
             .skip(skip)
@@ -117,7 +127,7 @@ router.get('/:topicId', async (req, res) => {
 });
 
 // ===================================
-// 接口 4: 添加回复 (需要登录)
+// 接口 4: 添加回复 (保持不变)
 // POST /api/topics/:topicId/replies
 // ===================================
 router.post('/:topicId/replies', auth, async (req, res) => {
@@ -157,6 +167,80 @@ router.post('/:topicId/replies', auth, async (req, res) => {
     } catch (error) {
         console.error('添加回复失败:', error);
         res.status(500).json({ message: '添加回复失败', error: error.message });
+    }
+});
+
+
+// ===================================
+// 接口 5: 点赞/取消点赞主题 (需要登录)
+// POST /api/topics/:topicId/like
+// ===================================
+router.post('/:topicId/like', auth, async (req, res) => {
+    const topicId = req.params.topicId;
+    const userId = req.userData.userId; // 当前登录用户 ID
+
+    try {
+        const topic = await Topic.findById(topicId);
+        if (!topic) {
+            return res.status(404).json({ message: '主题不存在' });
+        }
+
+        // 检查用户是否已点赞
+        const userLikedIndex = topic.likedBy.findIndex(id => id.toString() === userId.toString());
+
+        if (userLikedIndex === -1) {
+            // 用户尚未点赞，执行点赞操作
+            topic.likedBy.push(userId);
+            topic.likesCount += 1;
+            await topic.save();
+            return res.status(200).json({ message: '点赞成功', isLiked: true, likesCount: topic.likesCount });
+        } else {
+            // 用户已点赞，执行取消点赞操作
+            topic.likedBy.splice(userLikedIndex, 1);
+            topic.likesCount -= 1;
+            await topic.save();
+            return res.status(200).json({ message: '取消点赞成功', isLiked: false, likesCount: topic.likesCount });
+        }
+    } catch (error) {
+        console.error('主题点赞操作失败:', error);
+        res.status(500).json({ message: '主题点赞操作失败', error: error.message });
+    }
+});
+
+
+// ===================================
+// 接口 6: 点赞/取消点赞回复 (需要登录)
+// POST /api/topics/replies/:replyId/like
+// ===================================
+router.post('/replies/:replyId/like', auth, async (req, res) => {
+    const replyId = req.params.replyId;
+    const userId = req.userData.userId; // 当前登录用户 ID
+
+    try {
+        const reply = await Reply.findById(replyId);
+        if (!reply) {
+            return res.status(404).json({ message: '回复不存在' });
+        }
+
+        // 检查用户是否已点赞
+        const userLikedIndex = reply.likedBy.findIndex(id => id.toString() === userId.toString());
+
+        if (userLikedIndex === -1) {
+            // 用户尚未点赞，执行点赞操作
+            reply.likedBy.push(userId);
+            reply.likesCount += 1;
+            await reply.save();
+            return res.status(200).json({ message: '点赞成功', isLiked: true, likesCount: reply.likesCount });
+        } else {
+            // 用户已点赞，执行取消点赞操作
+            reply.likedBy.splice(userLikedIndex, 1);
+            reply.likesCount -= 1;
+            await reply.save();
+            return res.status(200).json({ message: '取消点赞成功', isLiked: false, likesCount: reply.likesCount });
+        }
+    } catch (error) {
+        console.error('回复点赞操作失败:', error);
+        res.status(500).json({ message: '回复点赞操作失败', error: error.message });
     }
 });
 

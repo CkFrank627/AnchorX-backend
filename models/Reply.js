@@ -18,6 +18,20 @@ const replySchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    
+    // ===================================
+    // 新增：点赞功能
+    // ===================================
+    likesCount: {
+        type: Number,
+        default: 0
+    },
+    // 记录点赞用户
+    likedBy: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+
     // 如果是回复另一条回复，则存储父回复 ID (用于嵌套评论，可选)
     parentReply: {
         type: mongoose.Schema.Types.ObjectId,

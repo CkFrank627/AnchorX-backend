@@ -20,6 +20,31 @@ const topicSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    
+    // ===================================
+    // 新增：主题分区
+    // ===================================
+    section: {
+        type: String,
+        required: [true, '主题分区是必需的'],
+        trim: true,
+        // 建议：如果分区固定，可在此处添加 enum 校验
+        // 例如: enum: ['讨论区', '创作交流', '站务']
+    },
+
+    // ===================================
+    // 新增：点赞功能
+    // ===================================
+    likesCount: {
+        type: Number,
+        default: 0
+    },
+    // 记录点赞用户，用于检查是否重复点赞和取消点赞
+    likedBy: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    
     // 浏览量
     viewsCount: {
         type: Number,
