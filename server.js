@@ -33,6 +33,8 @@ const galleryRoutes = require('./routes/galleryRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 
 const notificationRoutes = require('./routes/notificationRoutes');
+// --- 新增：引入讨论区路由 ---
+const topicRoutes = require('./routes/topicRoutes');
 
 
 
@@ -201,6 +203,15 @@ app.use('/api/comments', commentRoutes);
 // 注册通知路由
 
 app.use('/api/notifications', notificationRoutes);
+
+// 将所有以 '/api/comments' 开头的请求，都交给 commentRoutes 处理
+app.use('/api/comments', commentRoutes);
+
+// 注册通知路由
+app.use('/api/notifications', notificationRoutes);
+
+// --- 新增：注册讨论区路由 ---
+app.use('/api/topics', topicRoutes); 
 
 // --- 新增：配置静态文件服务 ---
 // 这会让 /uploads/some-image.jpg 指向 public/uploads/some-image.jpg 文件
