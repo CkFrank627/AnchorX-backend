@@ -182,9 +182,9 @@ app.use('/api/users', userRoutes);
 
 
 
-// 将所有以 '/api/works' 开头的请求，都交给 workRoutes 处理
+// 将所有以 '/api/work' 开头的请求，都交给 workRoutes 处理
 
-app.use('/api/works', workRoutes);    
+app.use('/api/work', workRoutes);    
 
 
 
