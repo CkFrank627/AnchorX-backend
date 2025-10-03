@@ -1,8 +1,8 @@
-//worksRoutes.js
+//workRoutes.js
 
 const express = require('express');
 const router = express.Router();
-const Work = require('../models/works');
+const Work = require('../models/Work');
 const jwt = require('jsonwebtoken');
 
 const multer = require('multer');
@@ -392,7 +392,7 @@ router.delete('/:workId/roles/:roleId', auth, async (req, res) => {
 // **新增：骰子记录相关的 API 路由**
 // ------------------------------------------------------------------
 
-// 记录一次骰子使用情况 (POST /api/works/:id/dice-log)
+// 记录一次骰子使用情况 (POST /api/work/:id/dice-log)
 router.post('/:id/dice-log', auth, async (req, res) => {
     try {
         const workId = req.params.id;
@@ -438,7 +438,7 @@ router.post('/:id/dice-log', auth, async (req, res) => {
     }
 });
 
-// 获取作品的骰子记录 (GET /api/works/:id/dice-log)
+// 获取作品的骰子记录 (GET /api/work/:id/dice-log)
 router.get('/:id/dice-log', auth, async (req, res) => {
     try {
         const workId = req.params.id;
