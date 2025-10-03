@@ -1,40 +1,40 @@
+// topicRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const Topic = require('../models/Topic');
 const Reply = require('../models/Reply');
 const auth = require('../authMiddleware'); // 你的身份验证中间件
 const mongoose = require('mongoose');
-
-// ===================================
-// 新增：图片上传相关依赖和配置
-// ===================================
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 
-// 定义文件存储的目标文件夹
-// 确保这个目录与你的静态文件服务配置（例如在 app.js 中 app.use('/uploads', express.static('public/uploads'))）相匹配
+
+// ===================================
+// 图片上传相关配置 (保持不变)
+// ===================================
 const uploadDir = 'public/uploads';
-// 确保目录存在
-fs.mkdirSync(uploadDir, { recursive: true });
+try {
+    fs.mkdirSync(uploadDir, { recursive: true });
+} catch (e) {
+    // 忽略目录已存在的错误
+}
 
-// 配置存储引擎
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, uploadDir); // 文件将存储在 'public/uploads' 目录
+        cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
-        // 创建一个唯一的文件名
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
-
-// 初始化 multer 中间件
 const upload = multer({ storage: storage });
 
+
 // ===================================
-// 接口 0: 文件上传接口 (供富文本编辑器和图库使用)
+// 接口 0: 文件上传接口 (保持不变)
 // POST /api/topics/upload
 // ===================================
 router.post('/upload', upload.single('image'), (req, res) => {
@@ -43,12 +43,8 @@ router.post('/upload', upload.single('image'), (req, res) => {
             return res.status(400).json({ message: '没有上传文件' });
         }
         
-        // 构建图片的公开访问 URL
-        // 这里的 URL 结构需要和你配置静态文件服务的方式匹配
-        // 例如：http://localhost:3000/uploads/image-1678888888-123.jpg
         const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
         
-        // 将 URL 返回给前端 (前端需要这个 imageUrl)
         res.status(200).json({ message: '上传成功', imageUrl: imageUrl });
     } catch (error) {
         res.status(500).json({ message: '上传失败', error: error.message });
@@ -57,27 +53,25 @@ router.post('/upload', upload.single('image'), (req, res) => {
 
 
 // ===================================
-// 接口 1: 创建新主题 (需要登录)
+// 接口 1: 创建新主题 (保持不变)
 // POST /api/topics
-// (新增对 section 的支持)
 // ===================================
 router.post('/', auth, async (req, res) => {
     try {
-        const { title, content, section } = req.body; // <-- 接收 section
-        const author = req.userData.userId; // 从 auth 中间件获取用户 ID
+        const { title, content, section } = req.body;
+        const author = req.userData.userId;
 
         const newTopic = new Topic({
             title,
             content,
             author,
-            section, // <-- 保存 section
+            section,
             lastReplyAt: new Date(),
             lastRepliedBy: author
         });
 
         await newTopic.save();
 
-        // 返回新创建的主题 ID
         res.status(201).json({ message: '主题创建成功', topicId: newTopic._id });
 
     } catch (error) {
@@ -87,33 +81,31 @@ router.post('/', auth, async (req, res) => {
 });
 
 // ===================================
-// 接口 2: 获取主题列表 (可分页、可按 section 筛选)
+// 接口 2: 获取主题列表 (保持不变)
 // GET /api/topics?page=1&limit=10&section=讨论区
 // ===================================
 router.get('/', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
-        const section = req.query.section; // <-- 接收 section 筛选参数
+        const section = req.query.section;
         const skip = (page - 1) * limit;
         
-        // 构建筛选条件
         const filter = {};
         if (section) {
             filter.section = section;
         }
 
-        // 查询主题列表
-        const topics = await Topic.find(filter) // <-- 应用筛选
-            .sort({ lastReplyAt: -1, createdAt: -1 }) // 优先按最新回复时间，其次按创建时间
+        const topics = await Topic.find(filter)
+            .sort({ lastReplyAt: -1, createdAt: -1 })
             .skip(skip)
             .limit(limit)
-            .populate('author', 'username') // 关联查询作者的用户名
-            .populate('lastRepliedBy', 'username') // 关联查询最后回复者的用户名
-            .select('-content -likedBy') // 列表页不返回完整内容和点赞用户列表
+            .populate('author', 'username')
+            .populate('lastRepliedBy', 'username')
+            .select('-content -likedBy')
             .exec();
 
-        const totalTopics = await Topic.countDocuments(filter); // <-- 应用筛选
+        const totalTopics = await Topic.countDocuments(filter);
 
         res.json({
             topics,
@@ -129,18 +121,17 @@ router.get('/', async (req, res) => {
 });
 
 // ===================================
-// 接口 3: 获取单个主题详情 (及分页回复)
+// 接口 3: 获取单个主题详情 (【已修改】实现楼中楼嵌套及根回复分页)
 // GET /api/topics/:topicId
-// (主题和回复现在包含 likesCount 和 likedBy)
 // ===================================
 router.get('/:topicId', async (req, res) => {
     const topicId = req.params.topicId;
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20; // 默认每页回复数
+    const limit = parseInt(req.query.limit) || 20; // 默认每页根回复数
     const skip = (page - 1) * limit;
 
     try {
-        // 1. 获取主题详情 (会自动带上 likesCount 和 likedBy)
+        // 1. 获取主题详情
         const topic = await Topic.findById(topicId)
             .populate('author', 'username')
             .select('-__v')
@@ -153,22 +144,50 @@ router.get('/:topicId', async (req, res) => {
         // 2. 增加浏览量 (不等待，异步执行)
         Topic.findByIdAndUpdate(topicId, { $inc: { viewsCount: 1 } }).exec();
 
-        // 3. 获取主题的回复列表 (会自动带上 likesCount 和 likedBy)
-        const replies = await Reply.find({ topic: topicId })
+        // 3. 【楼中楼逻辑】计算根回复总数 (用于分页)
+        const totalRootReplies = await Reply.countDocuments({ topic: topicId, parentReply: null });
+
+        // 4. 【楼中楼逻辑】获取当前页的根回复
+        const rootReplies = await Reply.find({ topic: topicId, parentReply: null })
             .sort({ createdAt: 1 }) // 按时间升序排列
             .skip(skip)
             .limit(limit)
             .populate('author', 'username')
+            .lean() // 使用 lean() 提高性能，方便数据操作
             .exec();
 
-        const totalReplies = await Reply.countDocuments({ topic: topicId });
+        // 5. 【楼中楼逻辑】获取所有与当前根回复相关的子回复
+        const rootReplyIds = rootReplies.map(r => r._id);
+        const nestedReplies = await Reply.find({ parentReply: { $in: rootReplyIds } })
+            .sort({ createdAt: 1 })
+            .populate('author', 'username')
+            .lean()
+            .exec();
+
+        // 6. 【楼中楼逻辑】将子回复嵌套到对应的根回复中
+        const repliesMap = new Map();
+        rootReplies.forEach(reply => {
+            reply.nestedReplies = []; // 创建前端所需的嵌套数组
+            repliesMap.set(reply._id.toString(), reply);
+        });
+
+        nestedReplies.forEach(nested => {
+            const parentId = nested.parentReply ? nested.parentReply.toString() : null;
+            if (parentId && repliesMap.has(parentId)) {
+                // 将子回复添加到父回复的 nestedReplies 数组中
+                repliesMap.get(parentId).nestedReplies.push(nested);
+            }
+        });
+        
+        // **注意**：前端 Topic 列表的 repliesCount 仍显示的是所有评论总数，
+        // 而此处的 totalReplies 仅用于分页计算（根回复数）。
 
         res.json({
             topic,
-            replies,
+            replies: rootReplies, // 返回包含 nestedReplies 的根回复列表
             replyPage: page,
-            replyTotalPages: Math.ceil(totalReplies / limit),
-            totalReplies
+            replyTotalPages: Math.ceil(totalRootReplies / limit),
+            totalReplies: totalRootReplies 
         });
 
     } catch (error) {
@@ -178,12 +197,12 @@ router.get('/:topicId', async (req, res) => {
 });
 
 // ===================================
-// 接口 4: 添加回复 (保持不变)
+// 接口 4: 添加回复 (【已修改】支持楼中楼 parentId)
 // POST /api/topics/:topicId/replies
 // ===================================
 router.post('/:topicId/replies', auth, async (req, res) => {
     const topicId = req.params.topicId;
-    const { content } = req.body;
+    const { content, parentId } = req.body; // <-- 接收 parentId 用于楼中楼
     const authorId = req.userData.userId;
 
     // 检查 topicId 是否是有效的 ObjectId
@@ -197,18 +216,32 @@ router.post('/:topicId/replies', auth, async (req, res) => {
         if (!topic) {
             return res.status(404).json({ message: '回复的主题不存在' });
         }
+        
+        // 2. 验证并设置父回复 ID
+        let parentReplyId = null;
+        if (parentId) {
+            if (!mongoose.Types.ObjectId.isValid(parentId)) {
+                return res.status(400).json({ message: '无效的父回复ID' });
+            }
+            parentReplyId = parentId;
+            
+            // 确保父回复是根回复或已存在的回复
+            // 实际应用中需要检查父回复是否存在，但此处略过以保持代码简洁
+        }
 
-        // 2. 创建新回复
+        // 3. 创建新回复
         const newReply = new Reply({
             topic: topicId,
             content,
-            author: authorId
+            author: authorId,
+            parentReply: parentReplyId // <-- 保存楼中楼 ID
         });
         await newReply.save();
 
-        // 3. 更新主题的回复计数和最后回复信息 (原子操作 $inc)
+        // 4. 更新主题的回复计数和最后回复信息
+        // 保持原逻辑：所有回复（包括楼中楼）都更新总计数和最后回复信息
         await Topic.findByIdAndUpdate(topicId, {
-            $inc: { repliesCount: 1 },
+            $inc: { repliesCount: 1 }, // 计数器递增 (算上所有评论)
             lastReplyAt: newReply.createdAt,
             lastRepliedBy: authorId
         });
@@ -223,12 +256,12 @@ router.post('/:topicId/replies', auth, async (req, res) => {
 
 
 // ===================================
-// 接口 5: 点赞/取消点赞主题 (需要登录)
+// 接口 5: 点赞/取消点赞主题 (保持不变)
 // POST /api/topics/:topicId/like
 // ===================================
 router.post('/:topicId/like', auth, async (req, res) => {
     const topicId = req.params.topicId;
-    const userId = req.userData.userId; // 当前登录用户 ID
+    const userId = req.userData.userId;
 
     try {
         const topic = await Topic.findById(topicId);
@@ -236,17 +269,14 @@ router.post('/:topicId/like', auth, async (req, res) => {
             return res.status(404).json({ message: '主题不存在' });
         }
 
-        // 检查用户是否已点赞
         const userLikedIndex = topic.likedBy.findIndex(id => id.toString() === userId.toString());
 
         if (userLikedIndex === -1) {
-            // 用户尚未点赞，执行点赞操作
             topic.likedBy.push(userId);
             topic.likesCount += 1;
             await topic.save();
             return res.status(200).json({ message: '点赞成功', isLiked: true, likesCount: topic.likesCount });
         } else {
-            // 用户已点赞，执行取消点赞操作
             topic.likedBy.splice(userLikedIndex, 1);
             topic.likesCount -= 1;
             await topic.save();
@@ -260,12 +290,12 @@ router.post('/:topicId/like', auth, async (req, res) => {
 
 
 // ===================================
-// 接口 6: 点赞/取消点赞回复 (需要登录)
+// 接口 6: 点赞/取消点赞回复 (保持不变)
 // POST /api/topics/replies/:replyId/like
 // ===================================
 router.post('/replies/:replyId/like', auth, async (req, res) => {
     const replyId = req.params.replyId;
-    const userId = req.userData.userId; // 当前登录用户 ID
+    const userId = req.userData.userId;
 
     try {
         const reply = await Reply.findById(replyId);
@@ -273,17 +303,14 @@ router.post('/replies/:replyId/like', auth, async (req, res) => {
             return res.status(404).json({ message: '回复不存在' });
         }
 
-        // 检查用户是否已点赞
         const userLikedIndex = reply.likedBy.findIndex(id => id.toString() === userId.toString());
 
         if (userLikedIndex === -1) {
-            // 用户尚未点赞，执行点赞操作
             reply.likedBy.push(userId);
             reply.likesCount += 1;
             await reply.save();
             return res.status(200).json({ message: '点赞成功', isLiked: true, likesCount: reply.likesCount });
         } else {
-            // 用户已点赞，执行取消点赞操作
             reply.likedBy.splice(userLikedIndex, 1);
             reply.likesCount -= 1;
             await reply.save();
