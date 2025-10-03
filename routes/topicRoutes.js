@@ -6,6 +6,57 @@ const auth = require('../authMiddleware'); // 你的身份验证中间件
 const mongoose = require('mongoose');
 
 // ===================================
+// 新增：图片上传相关依赖和配置
+// ===================================
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// 定义文件存储的目标文件夹
+// 确保这个目录与你的静态文件服务配置（例如在 app.js 中 app.use('/uploads', express.static('public/uploads'))）相匹配
+const uploadDir = 'public/uploads';
+// 确保目录存在
+fs.mkdirSync(uploadDir, { recursive: true });
+
+// 配置存储引擎
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir); // 文件将存储在 'public/uploads' 目录
+    },
+    filename: function (req, file, cb) {
+        // 创建一个唯一的文件名
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+// 初始化 multer 中间件
+const upload = multer({ storage: storage });
+
+// ===================================
+// 接口 0: 文件上传接口 (供富文本编辑器和图库使用)
+// POST /api/topics/upload
+// ===================================
+router.post('/upload', upload.single('image'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: '没有上传文件' });
+        }
+        
+        // 构建图片的公开访问 URL
+        // 这里的 URL 结构需要和你配置静态文件服务的方式匹配
+        // 例如：http://localhost:3000/uploads/image-1678888888-123.jpg
+        const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        
+        // 将 URL 返回给前端 (前端需要这个 imageUrl)
+        res.status(200).json({ message: '上传成功', imageUrl: imageUrl });
+    } catch (error) {
+        res.status(500).json({ message: '上传失败', error: error.message });
+    }
+});
+
+
+// ===================================
 // 接口 1: 创建新主题 (需要登录)
 // POST /api/topics
 // (新增对 section 的支持)
