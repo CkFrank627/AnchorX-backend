@@ -57,16 +57,12 @@ const dbURI = process.env.MONGO_URI;
 
 
 mongoose.connect(dbURI, {
-    // 增加服务器选择超时时间到 30 秒（原约为 5-10 秒）
     serverSelectionTimeoutMS: 30000, 
-    // 增加套接字（数据传输）超时时间到 45 秒
     socketTimeoutMS: 45000,          
-
-    // 确保使用最新的 MongoDB 驱动程序解析器
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })
-// 增加 .then() 和 .catch() 来处理连接结果，确保应用启动时能看到连接状态
+
 .then(() => {
     console.log('MongoDB: 连接成功，超时时间已延长。');
 })
@@ -74,12 +70,6 @@ mongoose.connect(dbURI, {
     console.error('MongoDB: 连接失败，错误信息:', err);
 });
 
-// 如果您的 dbURI 中没有包含数据库名，可能还需要在连接后监听状态：
-// const db = mongoose.connection;
-// db.on('error', console.error.bind(console, 'connection error:'));
-// db.once('open', function() {
-//   console.log("Database connected!");
-// });
 
 
 // 4. 使用中间件
@@ -230,6 +220,30 @@ app.use('/api/notifications', notificationRoutes);
 
 // --- 新增：注册讨论区路由 ---
 app.use('/api/topics', topicRoutes); 
+
+
+// --- 新增：配置 Quill 及插件的静态文件服务 (自托管) ---
+
+// 1. Quill 核心文件 (JS 和 CSS)
+// 映射：浏览器访问 /static/quill/quill.js 或 /static/quill/quill.snow.css
+// 物理路径：node_modules/quill/dist
+app.use('/static/quill', express.static(
+    path.join(__dirname, 'node_modules', 'quill', 'dist')
+));
+
+// 2. browser-image-compression 插件
+// 映射：浏览器访问 /static/compression/browser-image-compression.js
+// 物理路径：node_modules/browser-image-compression/dist
+app.use('/static/compression', express.static(
+    path.join(__dirname, 'node_modules', 'browser-image-compression', 'dist')
+));
+
+// 3. quill-image-resize 插件
+// 映射：浏览器访问 /static/resize/image-resize.min.js
+// 物理路径：node_modules/quill-image-resize (该文件直接在根目录)
+app.use('/static/resize', express.static(
+    path.join(__dirname, 'node_modules', 'quill-image-resize')
+));
 
 // --- 新增：配置静态文件服务 ---
 // 这会让 /uploads/some-image.jpg 指向 public/uploads/some-image.jpg 文件

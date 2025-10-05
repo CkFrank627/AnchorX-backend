@@ -37,8 +37,7 @@ router.post('/upload', upload.single('image'), (req, res) => {
     }
     // 构建图片的公开访问 URL
     // 注意：这里的 URL 结构需要和你配置静态文件服务的方式匹配
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-    
+    const imageUrl = `https://${req.get('host')}/uploads/${req.file.filename}`; 
     // 将 URL 返回给前端
     res.status(200).json({ message: '上传成功', imageUrl: imageUrl });
   } catch (error) {
@@ -222,23 +221,79 @@ router.get('/:id', optionalAuth, async (req, res) => {
             { new: true } // 返回更新后的文档
         ).populate('author', 'username');
 
-        if (!work) {
+if (!work) {
             return res.status(404).json({ message: '作品不存在' });
+        }
+        
+        // -------------------------------------------------------------
+        // 【新增代码：替换图片链接协议】
+        // -------------------------------------------------------------
+        if (work.content && Array.isArray(work.content)) {
+             // 假设 content 是一个页面数组，每个页面有 content 字段
+             work.content.forEach(page => {
+                 if (page.content && typeof page.content === 'object') {
+                     // Quill Delta 内容可能包含图片 URL。
+                     // 简单地在整个 JSON 字符串中替换可能会破坏 Delta 结构，
+                     // 但我们假设图片 URL是以字符串形式存储在 Delta 对象的某个 insert 属性中。
+                     // 最安全的做法是在返回前，将其内容对象转换为 JSON 字符串再替换，然后作为字符串返回给前端。
+                     // 
+                     // *注意：如果 content 是一个包含 Quill Delta 对象的数组，
+                     // 那么内容中的图片 URL通常出现在 op.insert.image 字段中，
+                     // 但由于 Delta 结构复杂，我们先做最简单和最广泛的字符串替换。
+                     
+                     // 将 Delta 对象转换为字符串进行替换
+                     let contentString = JSON.stringify(page.content);
+                     contentString = contentString.replace(
+                         /http:\/\/api\.anchorx\.ca\/uploads/g,
+                         'https://api.anchorx.ca/uploads'
+                     );
+                     
+                     // 替换完成后，需要将字符串再解析回对象，
+                     // 但为了避免破坏 Mongoose 文档，通常是创建一个副本或直接在返回时处理。
+                     // 为了简单和安全，我们只在返回时处理。
+                     
+                     // 暂时跳过对 work.content 的原地修改，我们在最终返回对象中处理。
+                 }
+             });
         }
         
         // 检查当前用户是否已点赞
         const isLikedByCurrentUser = req.userId ? work.likedBy.includes(req.userId) : false;
         
         // 返回作品信息，并附带点赞数、浏览量和用户点赞状态
-        res.json({
+        const responseWork = {
             _id: work._id,
             title: work.title,
             author: work.author,
-            content: work.content,
-            views: work.views, // 返回更新后的浏览量
+            views: work.views,
             likesCount: work.likesCount,
-            isLikedByCurrentUser: isLikedByCurrentUser
-        });
+            isLikedByCurrentUser: isLikedByCurrentUser,
+            // -------------------------------------------------------------
+            // 【核心修复：在返回时处理 content 字段】
+            // -------------------------------------------------------------
+            content: work.content.map(page => {
+                if (page.content && typeof page.content === 'object') {
+                    // 将 Delta 对象转换为字符串进行替换
+                    let contentString = JSON.stringify(page.content);
+                    contentString = contentString.replace(
+                        /http:\/\/api\.anchorx\.ca\/uploads/g,
+                        'https://api.anchorx.ca/uploads'
+                    );
+                    
+                    // 将替换后的字符串重新解析回对象（只替换 content 字段）
+                    try {
+                        return { ...page.toObject(), content: JSON.parse(contentString) };
+                    } catch (e) {
+                        console.error("Content replacement error:", e);
+                        return page; // 失败时返回原始页面
+                    }
+                }
+                return page;
+            })
+            // -------------------------------------------------------------
+        };
+
+        res.json(responseWork);
     } catch (error) {
         console.error('获取作品失败:', error);
         res.status(500).json({ message: '获取作品失败', error: error.message });
