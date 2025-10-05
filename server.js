@@ -222,15 +222,13 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/topics', topicRoutes); 
 
 
-// --- 替换掉之前所有的 /static/quill, /static/compression, /static/resize 映射 ---
+// --- 替换掉之前所有的 /static/node_modules 映射 ---
 
-// 统一映射：将整个 node_modules 目录映射到 URL 路径 /static/node_modules
-// 注意：路径 '/static/node_modules' 只是示例，您可以替换为任何您喜欢的 URL 路径
-app.use('/static/node_modules', express.static(
-    path.join(__dirname, 'node_modules')
+// 2. 新增：映射公共静态资源文件夹 /vendor_assets
+// 这个 URL 路径 /vendor_assets 将指向项目目录下的 public/vendor_assets 文件夹
+app.use('/vendor_assets', express.static(
+    path.join(__dirname, 'public', 'vendor_assets')
 ));
-
-
 
 // --- 新增：配置静态文件服务 ---
 // 这会让 /uploads/some-image.jpg 指向 public/uploads/some-image.jpg 文件
