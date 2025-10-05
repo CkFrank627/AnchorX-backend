@@ -222,28 +222,15 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/topics', topicRoutes); 
 
 
-// --- 新增：配置 Quill 及插件的静态文件服务 (自托管) ---
+// --- 替换掉之前所有的 /static/quill, /static/compression, /static/resize 映射 ---
 
-// 1. Quill 核心文件 (JS 和 CSS)
-// 映射：浏览器访问 /static/quill/quill.js 或 /static/quill/quill.snow.css
-// 物理路径：node_modules/quill/dist
-app.use('/static/quill', express.static(
-    path.join(__dirname, 'node_modules', 'quill', 'dist')
+// 统一映射：将整个 node_modules 目录映射到 URL 路径 /static/node_modules
+// 注意：路径 '/static/node_modules' 只是示例，您可以替换为任何您喜欢的 URL 路径
+app.use('/static/node_modules', express.static(
+    path.join(__dirname, 'node_modules')
 ));
 
-// 2. browser-image-compression 插件
-// 映射：浏览器访问 /static/compression/browser-image-compression.js
-// 物理路径：node_modules/browser-image-compression/dist
-app.use('/static/compression', express.static(
-    path.join(__dirname, 'node_modules', 'browser-image-compression', 'dist')
-));
 
-// 3. quill-image-resize 插件
-// 映射：浏览器访问 /static/resize/image-resize.min.js
-// 物理路径：node_modules/quill-image-resize (该文件直接在根目录)
-app.use('/static/resize', express.static(
-    path.join(__dirname, 'node_modules', 'quill-image-resize')
-));
 
 // --- 新增：配置静态文件服务 ---
 // 这会让 /uploads/some-image.jpg 指向 public/uploads/some-image.jpg 文件
