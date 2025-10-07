@@ -127,6 +127,54 @@ router.patch('/:id/cover', auth, async (req, res) => {
     }
 });
 
+// **修改：增加查询条件 isPublished: true**
+// ------------------------------------------------------------------
+router.get('/all', async (req, res) => {
+    try {
+        const works = await Work.find({ isPublished: true }).populate('author', 'username');
+        res.json(works);
+    } catch (error) {
+        res.status(500).json({ message: '获取作品失败', error: error.message });
+    }
+});
+// ------------------------------------------------------------------
+
+// ------------------------------------------------------------------
+// **新增：切换作品发布状态的路由 (PATCH /:id/publish)**
+// ------------------------------------------------------------------
+router.patch('/:id/publish', auth, async (req, res) => {
+    try {
+        const workId = req.params.id;
+        const { isPublished } = req.body; // 期望接收 true 或 false
+
+        // 验证 isPublished 字段
+        if (typeof isPublished !== 'boolean') {
+            return res.status(400).json({ message: 'isPublished 字段必须为布尔值' });
+        }
+
+        const work = await Work.findById(workId);
+        if (!work) {
+            return res.status(404).json({ message: '作品未找到' });
+        }
+
+        // 验证用户权限
+        if (work.author.toString() !== req.userId) {
+            return res.status(403).json({ message: '无权修改此作品的发布状态' });
+        }
+
+        // 更新发布状态
+        work.isPublished = isPublished;
+        await work.save();
+
+        const message = isPublished ? '作品已成功发布' : '作品已成功下架';
+        res.json({ message, isPublished: work.isPublished });
+
+    } catch (error) {
+        res.status(500).json({ message: '更新发布状态失败', error: error.message });
+    }
+});
+// ------------------------------------------------------------------
+
 // 获取所有作品的路由 (用于阅读页面)
 router.get('/all', async (req, res) => {
     try {

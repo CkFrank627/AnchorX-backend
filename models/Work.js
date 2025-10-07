@@ -40,6 +40,13 @@ const workSchema = new mongoose.Schema({
     diceLog: {
         type: [diceLogSchema],
         default: []
+    },
+    // ----------------------
+    
+    // 【✅ 新增：作品发布状态】
+    isPublished: {
+        type: Boolean,
+        default: false // 默认未发布
     }
     // ----------------------
 }, {
