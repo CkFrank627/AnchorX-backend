@@ -244,6 +244,54 @@ router.put('/:id', auth, async (req, res) => {
     }
 });
 
+// **新增：支持页面(pages)删除/更新的 PATCH 路由**
+// 前端使用 PATCH /api/works/:id 发送 { pages: newPages }
+router.patch('/:id', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        // 从请求体中解构出前端可能发送的字段
+        const { pages, title, ...otherFields } = req.body; 
+
+        const updateFields = { ...otherFields };
+
+        // 核心逻辑：如果请求体中包含 pages 字段，则更新数据库中的 content 字段和字数
+        if (pages !== undefined) {
+            if (!Array.isArray(pages)) {
+                return res.status(400).json({ message: 'pages 格式不正确，需要是一个页面数组' });
+            }
+            // 将前端的 pages 映射到数据库模型中的 content 字段
+            updateFields.content = pages;
+            updateFields.wordCount = calculateWordCount(pages);
+            updateFields.updatedAt = new Date(); // 记录更新时间
+        }
+        
+        // 允许同时更新 title 等其他字段
+        if (title !== undefined) {
+            updateFields.title = title;
+        }
+
+        // 如果没有任何需要更新的字段
+        if (Object.keys(updateFields).length === 0) {
+            return res.status(200).json({ message: '没有需要更新的字段' });
+        }
+
+        const updatedWork = await Work.findOneAndUpdate(
+            { _id: id, author: req.userId },
+            { $set: updateFields }, // 使用 $set 进行部分字段更新
+            { new: true, timestamps: true }
+        );
+
+        if (!updatedWork) {
+            return res.status(404).json({ message: '作品不存在或无权修改' });
+        }
+
+        res.json(updatedWork);
+    } catch (error) {
+        console.error('PATCH /:id 更新作品失败:', error);
+        res.status(500).json({ message: '更新作品失败', error: error.message });
+    }
+});
+
 // 删除作品
 router.delete('/:id', auth, async (req, res) => {
     try {
