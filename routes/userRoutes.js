@@ -32,7 +32,7 @@ router.post('/login', async (req, res) => {
         }
 
         // 生成 JWT
-        const token = jwt.sign({ userId: user._id }, 'YOUR_SECRET_KEY', { expiresIn: '1d' });
+        const token = jwt.sign({ userId: user._id }, 'YOUR_SECRET_KEY', { expiresIn: '7d' });
         res.json({ message: '登录成功', token });
     } catch (error) {
         res.status(500).json({ message: '登录失败', error: error.message });
