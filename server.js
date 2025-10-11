@@ -91,21 +91,17 @@ const allowedOrigins = [
 
 
 const corsOptions = {
-
-  origin: function (origin, callback) {
-
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-
-      callback(null, true);
-
-    } else {
-
-      callback(new Error('Not allowed by CORS'));
-
-    }
-
-  }
-
+  origin: function (origin, callback) {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true, // 如果前端要带 cookie/token，可保留
+  optionsSuccessStatus: 200
 };
 
 // 在這裡處理對網站根目錄的請求
@@ -116,6 +112,7 @@ app.get('/', (req, res) => {
 
 app.use(cors(corsOptions));
 
+app.options('*', cors(corsOptions));
 
 
 // 使用 Express 的内置中间件来解析 JSON 格式的请求体
