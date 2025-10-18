@@ -1,22 +1,18 @@
 // server.js
-// 还原至最初版本，使用 CommonJS 模块 (require) 和异步 OpenCC 初始化逻辑。
-
-// 1. 引入所需的模块
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 
-// 引入 OpenCC 库
-const OpenCC = require('opencc-js'); 
-// 注意：如果您的初衷是使用 C++ 版的 opencc，这里应是：
-// const OpenCC = require('opencc'); 
+// ✅ 1. 引入 opencc-js 的纯 JS 版本
+const OpenCC = require('opencc-js');
 
-// --- 新增: 全局转换器变量 ---
-let t2sConverter; // 繁到简
-let s2tConverter; // 简到繁
-// -----------------------------
+// ✅ 2. 初始化两个转换器（同步即可，无需 await）
+const t2sConverter = OpenCC.Converter({ from: 'tw', to: 'cn' }); // 繁→简
+const s2tConverter = OpenCC.Converter({ from: 'cn', to: 'tw' }); // 简→繁
+// 引入 OpenCC 库
+
 
 // 引入你创建的路由文件
 const userRoutes = require('./routes/userRoutes');
@@ -102,39 +98,28 @@ app.get('/', (req, res) => {
 
 
 // 5. 路由设置
-
-// 繁简转换 API 端点
-// POST /api/convert-text
-app.post('/api/convert-text', (req, res) => { // ⚠️ 注意: 这里在原版中是同步函数，但依赖于异步初始化的全局变量
+// ✅ 3. 定义繁简转换接口
+app.post('/api/convert-text', async (req, res) => {
+  try {
     const { text, direction } = req.body;
-
     if (!text || !direction) {
-        return res.status(400).json({ error: '缺少文本或转换方向' });
+      return res.status(400).json({ error: '缺少 text 或 direction 参数' });
     }
 
-    let converter;
+    let convertedText;
     if (direction === 't2s') {
-        converter = t2sConverter; // 使用已初始化的全局变量
+      convertedText = t2sConverter(text);
     } else if (direction === 's2t') {
-        converter = s2tConverter; // 使用已初始化的全局变量
+      convertedText = s2tConverter(text);
     } else {
-        return res.status(400).json({ error: '无效的转换方向' });
-    }
-    
-    // **新增：检查转换器是否可用**
-    if (!converter) {
-        return res.status(503).json({ error: '繁简转换服务未就绪或初始化失败。' });
+      return res.status(400).json({ error: '无效的 direction 参数' });
     }
 
-    try {
-        // 直接同步调用已初始化的转换器实例
-        const convertedText = converter(text);
-        res.json({ convertedText });
-    } catch (error) {
-        // 捕获运行时错误 (不太可能，但安全起见保留)
-        console.error('繁简转换运行时失败:', error);
-        res.status(500).json({ error: '繁简转换服务在执行时出错' });
-    }
+    return res.json({ convertedText });
+  } catch (err) {
+    console.error('繁简转换失败:', err);
+    res.status(500).json({ error: '繁简转换失败' });
+  }
 });
 
 // 将所有以 '/api/users' 开头的请求，都交给 userRoutes 处理
