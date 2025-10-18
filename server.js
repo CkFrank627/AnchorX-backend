@@ -1,4 +1,5 @@
 // server.js
+// 还原至最初版本，使用 CommonJS 模块 (require) 和异步 OpenCC 初始化逻辑。
 
 // 1. 引入所需的模块
 require('dotenv').config();
@@ -8,7 +9,9 @@ const cors = require('cors');
 const path = require('path');
 
 // 引入 OpenCC 库
-const OpenCC = require('opencc-js');
+const OpenCC = require('opencc-js'); 
+// 注意：如果您的初衷是使用 C++ 版的 opencc，这里应是：
+// const OpenCC = require('opencc'); 
 
 // --- 新增: 全局转换器变量 ---
 let t2sConverter; // 繁到简
@@ -48,12 +51,12 @@ mongoose.connect(dbURI, {
     console.error('MongoDB: 连接失败，错误信息:', err);
 });
 
-// 4. 异步初始化 OpenCC 转换器（新增）
+// 4. 异步初始化 OpenCC 转换器（原版逻辑）
 const initializeConverters = async () => {
     try {
         console.log('OpenCC: 正在初始化繁简转换器...');
         
-        // 确保使用 await 等待初始化完成
+        // 确保使用 await 等待初始化完成 (这是您原版代码的写法)
         t2sConverter = await OpenCC.Converter({ from: 't', to: 's' }); 
         s2tConverter = await OpenCC.Converter({ from: 's', to: 't' });
         
@@ -94,7 +97,7 @@ app.use(express.json());
 
 // 在這裡處理對網站根目錄的請求
 app.get('/', (req, res) => {
-  res.send('你的网站正在运行!');
+    res.send('你的网站正在运行!');
 });
 
 
@@ -102,8 +105,7 @@ app.get('/', (req, res) => {
 
 // 繁简转换 API 端点
 // POST /api/convert-text
-// 注意：移除 async 关键字
-app.post('/api/convert-text', (req, res) => {
+app.post('/api/convert-text', (req, res) => { // ⚠️ 注意: 这里在原版中是同步函数，但依赖于异步初始化的全局变量
     const { text, direction } = req.body;
 
     if (!text || !direction) {
@@ -145,10 +147,10 @@ app.use('/api/works', workRoutes);
 app.use('/api/galleries', galleryRoutes);
 
 // 将所有以 '/api/comments' 开头的请求，都交给 commentRoutes 处理
-app.use('/api/comments', commentRoutes); // 注意：原始代码中有重复注册，已保留一个
+app.use('/api/comments', commentRoutes); 
 
 // 注册通知路由
-app.use('/api/notifications', notificationRoutes); // 注意：原始代码中有重复注册，已保留一个
+app.use('/api/notifications', notificationRoutes); 
 
 // --- 新增：注册讨论区路由 ---
 app.use('/api/topics', topicRoutes); 
