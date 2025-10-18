@@ -10,6 +10,11 @@ const path = require('path');
 // 引入 OpenCC 库
 const OpenCC = require('opencc-js');
 
+// --- 新增: 全局转换器变量 ---
+let t2sConverter; // 繁到简
+let s2tConverter; // 简到繁
+// -----------------------------
+
 // 引入你创建的路由文件
 const userRoutes = require('./routes/userRoutes');
 const workRoutes = require('./routes/workRoutes');
@@ -43,6 +48,22 @@ mongoose.connect(dbURI, {
     console.error('MongoDB: 连接失败，错误信息:', err);
 });
 
+// 4. 异步初始化 OpenCC 转换器（新增）
+const initializeConverters = async () => {
+    try {
+        console.log('OpenCC: 正在初始化繁简转换器...');
+        
+        // 确保使用 await 等待初始化完成
+        t2sConverter = await OpenCC.Converter({ from: 't', to: 's' }); 
+        s2tConverter = await OpenCC.Converter({ from: 's', to: 't' });
+        
+        console.log('OpenCC: 繁简转换器初始化成功。');
+    } catch (err) {
+        console.error('OpenCC: 转换器初始化失败，服务将无法使用:', err);
+        // 建议在这里退出程序或禁用转换服务
+        // process.exit(1); 
+    }
+}
 
 // 4. 使用中间件
 
@@ -81,32 +102,36 @@ app.get('/', (req, res) => {
 
 // 繁简转换 API 端点
 // POST /api/convert-text
-app.post('/api/convert-text', async (req, res) => {
+// 注意：移除 async 关键字
+app.post('/api/convert-text', (req, res) => {
     const { text, direction } = req.body;
 
     if (!text || !direction) {
         return res.status(400).json({ error: '缺少文本或转换方向' });
     }
 
+    let converter;
+    if (direction === 't2s') {
+        converter = t2sConverter; // 使用已初始化的全局变量
+    } else if (direction === 's2t') {
+        converter = s2tConverter; // 使用已初始化的全局变量
+    } else {
+        return res.status(400).json({ error: '无效的转换方向' });
+    }
+    
+    // **新增：检查转换器是否可用**
+    if (!converter) {
+        return res.status(503).json({ error: '繁简转换服务未就绪或初始化失败。' });
+    }
+
     try {
-        let converter;
-        if (direction === 't2s') {
-            // 从繁体（香港/台湾）到简体（大陆）
-            // opencc-js 提供了多种配置，'hk2s' (香港到简体) 或 't2s' (繁体到简体) 是常用的
-            // 使用 t2s (Traditional to Simplified) 作为通用繁体到简体转换
-            converter = OpenCC.Converter({ from: 't', to: 's' });
-        } else if (direction === 's2t') {
-            // 从简体（大陆）到繁体（香港/台湾）
-            converter = OpenCC.Converter({ from: 's', to: 't' });
-        } else {
-            return res.status(400).json({ error: '无效的转换方向' });
-        }
-        
+        // 直接同步调用已初始化的转换器实例
         const convertedText = converter(text);
         res.json({ convertedText });
     } catch (error) {
-        console.error('繁简转换失败:', error);
-        res.status(500).json({ error: '繁简转换服务出错' });
+        // 捕获运行时错误 (不太可能，但安全起见保留)
+        console.error('繁简转换运行时失败:', error);
+        res.status(500).json({ error: '繁简转换服务在执行时出错' });
     }
 });
 
@@ -140,8 +165,18 @@ app.use('/vendor_assets', express.static(
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 
+// ... (在文件末尾)
+
 // 6. 启动服务器并监听指定端口
-app.listen(PORT, () => {
-    // 使用模板字符串进行输出
-    console.log(`服务器正在运行，请访问 http://localhost:${PORT}`);
-});
+
+const startServer = async () => {
+    // **确保在启动前等待转换器初始化**
+    await initializeConverters(); 
+    
+    app.listen(PORT, () => {
+        console.log(`服务器正在运行，请访问 http://localhost:${PORT}`);
+    });
+}
+
+// 调用启动函数
+startServer();
