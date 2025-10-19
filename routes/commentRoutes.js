@@ -1,3 +1,5 @@
+//commentRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const Comment = require('../models/Comment');
@@ -214,6 +216,33 @@ router.get('/work/:workId', async (req, res) => {
         res.json(formattedComments);
     } catch (error) {
         res.status(500).json({ message: '获取作品评论失败', error: error.message });
+    }
+});
+
+// 新增 GET: 获取某个作品下所有有评论的句子 ID 列表
+// 这个接口用于前端判断哪些句子需要显示“评论”标识
+router.get('/work/commented-sentences/:workId', async (req, res) => {
+    try {
+        const { workId } = req.params;
+        
+        // 确保 workId 是一个有效的 ObjectId
+        if (!mongoose.Types.ObjectId.isValid(workId)) {
+            return res.status(400).json({ message: '作品ID格式无效' });
+        }
+
+        // 使用聚合 (Aggregation) 来查找 workId 下所有不重复的 sentenceId
+        const result = await Comment.aggregate([
+            { $match: { workId: mongoose.Types.ObjectId(workId) } }, // 1. 过滤作品ID
+            { $group: { _id: "$sentenceId" } }                        // 2. 按 sentenceId 分组
+        ]);
+
+        // 提取 sentenceId 数组
+        const commentedSentenceIds = result.map(item => item._id);
+
+        res.json(commentedSentenceIds);
+    } catch (error) {
+        // 在生产环境中，应记录 error.message
+        res.status(500).json({ message: '获取有评论的句子ID失败' });
     }
 });
 
