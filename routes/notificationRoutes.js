@@ -16,15 +16,16 @@ router.get('/', auth, async (req, res) => {
 
     try {
         const notifications = await Notification.find({ recipient: currentUserId }) // <--- 使用正确的变量名
-            .populate('sender', 'username') 
-            .sort({ createdAt: -1 }) 
-            .limit(50); 
+            .populate('sender', 'username avatar') // ✅ 修改处：同时取出用户名和头像
+            .sort({ createdAt: -1 })
+            .limit(50);
 
         res.json(notifications);
     } catch (error) {
         res.status(500).json({ message: '获取消息失败', error: error.message });
     }
 });
+
 
 // POST: 将通知标记为已读（可选，但推荐）
 router.post('/mark-read/:id', auth, async (req, res) => {
