@@ -9,6 +9,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const Notification = require('../models/Notification'); // <--- 【修改点 3】引入 Notification 模型
 
 
 // ===================================
@@ -246,6 +247,39 @@ router.post('/:topicId/replies', auth, async (req, res) => {
             lastRepliedBy: authorId
         });
 
+        // 5. 【修改点 4】创建通知 (回复主题的通知)
+        // 只有当回复者不是主题作者本人时才创建通知
+        if (topic.author.toString() !== authorId.toString()) {
+            const newNotification = new Notification({
+                recipient: topic.author, // 主题作者是通知接收者
+                type: 'comment',
+                sender: authorId, // 回复者是发送者
+                comment: newReply._id, // 关联到新回复
+                topic: topicId, // 关联到主题 (用于跳转)
+                message: `回复了你的主题: ${topic.title.substring(0, 20)}...` 
+            });
+            await newNotification.save();
+        }
+        // *如果是楼中楼回复（parentId存在），还需通知被回复的楼层作者*
+        if (parentReplyId) {
+            const parentReply = await Reply.findById(parentReplyId).select('author');
+            // 且被回复者不是当前回复者本人，也不是主题作者（避免重复通知）
+            if (parentReply && 
+                parentReply.author.toString() !== authorId.toString() &&
+                parentReply.author.toString() !== topic.author.toString()) {
+
+                const nestedNotification = new Notification({
+                    recipient: parentReply.author,
+                    type: 'comment',
+                    sender: authorId,
+                    comment: newReply._id,
+                    topic: topicId,
+                    message: `回复了你的评论: ${content.substring(0, 20)}...`
+                });
+                await nestedNotification.save();
+            }
+        }
+
         res.status(201).json({ message: '回复成功', replyId: newReply._id });
 
     } catch (error) {
@@ -275,6 +309,21 @@ router.post('/:topicId/like', auth, async (req, res) => {
             topic.likedBy.push(userId);
             topic.likesCount += 1;
             await topic.save();
+
+            // 【修改点 5】创建通知 (主题点赞)
+            // 只有当点赞者不是主题作者本人时才创建通知
+            if (topic.author.toString() !== userId.toString()) {
+                const newNotification = new Notification({
+                    recipient: topic.author, // 主题作者是通知接收者
+                    type: 'like',
+                    sender: userId, // 点赞者是发送者
+                    likedWork: topic._id, // 关联到被点赞的主题 (Work 可能是 Topic 的别名)
+                    topic: topic._id, // 关联到主题 (用于跳转)
+                    message: `点赞了你的主题: ${topic.title.substring(0, 20)}...`
+                });
+
+                await newNotification.save();
+            }
             return res.status(200).json({ message: '点赞成功', isLiked: true, likesCount: topic.likesCount });
         } else {
             topic.likedBy.splice(userLikedIndex, 1);
@@ -309,6 +358,25 @@ router.post('/replies/:replyId/like', auth, async (req, res) => {
             reply.likedBy.push(userId);
             reply.likesCount += 1;
             await reply.save();
+
+// 【修改点 6】创建通知 (回复点赞)
+            // 只有当点赞者不是回复作者本人时才创建通知
+            if (reply.author.toString() !== userId.toString()) {
+                // 需要获取主题标题用于消息内容
+                const topic = await Topic.findById(reply.topic).select('title'); 
+                const topicTitle = topic ? topic.title : '某主题';
+
+                const newNotification = new Notification({
+                    recipient: reply.author, // 回复作者是通知接收者
+                    type: 'like',
+                    sender: userId, // 点赞者是发送者
+                    likedComment: reply._id, // 关联到被点赞的评论
+                    topic: reply.topic, // 关联到主题 (用于跳转)
+                    message: `点赞了你在主题《${topicTitle.substring(0, 20)}...》中的评论`
+                });
+                await newNotification.save();
+            }
+
             return res.status(200).json({ message: '点赞成功', isLiked: true, likesCount: reply.likesCount });
         } else {
             reply.likedBy.splice(userLikedIndex, 1);

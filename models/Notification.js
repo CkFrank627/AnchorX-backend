@@ -12,7 +12,7 @@ const NotificationSchema = new mongoose.Schema({
     // 通知类型：'like', 'comment'
     type: {
         type: String,
-        enum: ['like', 'comment'],
+        enum: ['like', 'comment', 'system'],
         required: true,
     },
     // 通知发送者
@@ -45,6 +45,11 @@ const NotificationSchema = new mongoose.Schema({
     read: {
         type: Boolean,
         default: false,
+    },
+    // 如果是点赞或评论，关联到它发生的主题
+    topic: { // <--- 【修改点 2】新增 topic 字段
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Topic',
     },
     // 消息创建时间
     createdAt: {
