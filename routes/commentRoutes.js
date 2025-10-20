@@ -136,18 +136,26 @@ router.post('/', auth, async (req, res) => {
         const savedComment = await newComment.save();
 
         // ✅ 给作品作者发通知
+        const commenterId = req.userData.userId; // 【修正点 1】定义正确的评论者 ID 变量
         const work = await Work.findById(savedComment.workId);
-        if (work && work.author.toString() !== req.userId) {
-            const newNotification = new Notification({
-                recipient: work.author,
-                type: 'comment',
-                sender: req.userId,
-                comment: savedComment._id,
-                message: `评论了你的作品 "${work.title}"`
-            });
-            await newNotification.save();
-        }
+// 检查：作品存在 且 作品作者ID 不等于 评论者ID
+if (work && work.author.toString() !== commenterId) {
+    
+    // ----------------------------------------------------------------------------------
+    // 可选增强：从 req.userData 获取评论者用户名，让通知消息更清晰
+    const senderName = req.userData.username || '一位用户';
+    // ----------------------------------------------------------------------------------
 
+    const newNotification = new Notification({
+        recipient: work.author,
+        type: 'comment',
+        sender: commenterId, // 【修正点 2】使用正确的评论者 ID
+        comment: savedComment._id,
+        // 【可选增强】将发送者名字加入消息内容
+        message: `${senderName} 评论了你的作品 "${work.title}"` 
+    });
+    await newNotification.save();
+}
         // 🔍 新评论保存后日志
         const after = await Comment.find({ sentenceId }).select('_id likes').lean();
         console.log('[NEW COMMENT] AFTER', after.map(c => ({
