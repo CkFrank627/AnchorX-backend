@@ -142,8 +142,8 @@ router.post('/', auth, async (req, res) => {
 if (work && work.author.toString() !== commenterId) {
     
     // ----------------------------------------------------------------------------------
-    // 可选增强：从 req.userData 获取评论者用户名，让通知消息更清晰
-    const senderName = req.userData.username || '一位用户';
+const sender = await User.findById(commenterId).select('username');
+const senderName = sender ? sender.username : '未知用户';
     // ----------------------------------------------------------------------------------
 
     const newNotification = new Notification({

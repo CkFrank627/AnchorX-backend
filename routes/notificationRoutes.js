@@ -16,7 +16,7 @@ router.get('/', auth, async (req, res) => {
 
     try {
         const notifications = await Notification.find({ recipient: currentUserId }) // <--- 使用正确的变量名
-            .populate('sender', 'username avatar') // ✅ 修改处：同时取出用户名和头像
+            .populate('sender') // ✅ 修改处：同时取出用户名和头像
             .sort({ createdAt: -1 })
             .limit(50);
 
