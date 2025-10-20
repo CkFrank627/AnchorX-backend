@@ -255,7 +255,7 @@ if (topic.author.toString() !== authorId.toString()) {
         sender: authorId,
         comment: newReply._id,
         topic: topicId,
-        message: `有人在你的主题《${topic.title.substring(0, 20)}...》中发表评论`
+        message: `在你的主题《${topic.title.substring(0, 20)}...》中发表评论`
     });
     await topicNotification.save();
 }
@@ -273,7 +273,7 @@ if (topic.author.toString() !== authorId.toString()) {
                     sender: authorId,
                     comment: newReply._id,
                     topic: topicId,
-                    message: `有人在主题《${topic.title.substring(0, 20)}...》中回复了你的评论: ${content.substring(0, 20)}...`
+                    message: `在主题《${topic.title.substring(0, 20)}...》中回复了你的评论: ${content.substring(0, 20)}...`
                 });
                 await nestedNotification.save();
             }
