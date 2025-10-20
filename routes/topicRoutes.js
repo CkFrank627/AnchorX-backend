@@ -247,19 +247,18 @@ router.post('/:topicId/replies', auth, async (req, res) => {
             lastRepliedBy: authorId
         });
 
-        // 5. 【修改点 4】创建通知 (回复主题的通知)
-        // 只有当回复者不是主题作者本人时才创建通知
-        if (topic.author.toString() !== authorId.toString()) {
-            const newNotification = new Notification({
-                recipient: topic.author, // 主题作者是通知接收者
-                type: 'comment',
-                sender: authorId, // 回复者是发送者
-                comment: newReply._id, // 关联到新回复
-                topic: topicId, // 关联到主题 (用于跳转)
-                message: `回复了你的主题: ${topic.title.substring(0, 20)}...` 
-            });
-            await newNotification.save();
-        }
+// ✅ 通知主题作者：只要有人在主题内发表评论，主题作者都收到通知
+if (topic.author.toString() !== authorId.toString()) {
+    const topicNotification = new Notification({
+        recipient: topic.author,
+        type: 'comment',
+        sender: authorId,
+        comment: newReply._id,
+        topic: topicId,
+        message: `有人在你的主题《${topic.title.substring(0, 20)}...》中发表评论`
+    });
+    await topicNotification.save();
+}
         // *如果是楼中楼回复（parentId存在），还需通知被回复的楼层作者*
         if (parentReplyId) {
             const parentReply = await Reply.findById(parentReplyId).select('author');
@@ -274,7 +273,7 @@ router.post('/:topicId/replies', auth, async (req, res) => {
                     sender: authorId,
                     comment: newReply._id,
                     topic: topicId,
-                    message: `回复了你的评论: ${content.substring(0, 20)}...`
+                    message: `有人在主题《${topic.title.substring(0, 20)}...》中回复了你的评论: ${content.substring(0, 20)}...`
                 });
                 await nestedNotification.save();
             }
