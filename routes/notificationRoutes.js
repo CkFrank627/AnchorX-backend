@@ -7,11 +7,18 @@ const auth = require('./authMiddleware'); // 确保你有这个认证中间件
 
 // GET: 获取当前用户的所有通知
 router.get('/', auth, async (req, res) => {
+    // 【重要修复】从 req.userData 中获取 userId
+    const currentUserId = req.userData ? req.userData.userId : null; 
+
+    if (!currentUserId) {
+        return res.status(401).json({ message: '授权失败：无法识别用户ID' });
+    }
+
     try {
-        const notifications = await Notification.find({ recipient: req.userId })
-            .populate('sender', 'username') // 填充发送者信息
-            .sort({ createdAt: -1 }) // 按时间倒序
-            .limit(50); // 限制数量，避免数据过多
+        const notifications = await Notification.find({ recipient: currentUserId }) // <--- 使用正确的变量名
+            .populate('sender', 'username') 
+            .sort({ createdAt: -1 }) 
+            .limit(50); 
 
         res.json(notifications);
     } catch (error) {
