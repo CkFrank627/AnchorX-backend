@@ -114,6 +114,7 @@ router.get('/:workId/:sentenceId', async (req, res) => {
 
 // POST: 提交新评论
 router.post('/', auth, async (req, res) => {
+    console.log('[POST /api/comments] incoming:', req.body, 'userId:', req.userId);
     try {
         const { workId, sentenceId, content } = req.body;
 
