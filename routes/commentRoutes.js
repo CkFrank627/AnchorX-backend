@@ -6,6 +6,8 @@ const Comment = require('../models/Comment');
 const Work = require('../models/Work');               // ✅ 引入作品模型
 const Notification = require('../models/Notification'); // ✅ 引入通知模型
 const jwt = require('jsonwebtoken');
+const User = require('../models/User'); // ✅ 你漏掉了这个！
+const mongoose = require('mongoose'); // ✅ 你后面用到了 mongoose.Types.ObjectId
 
 // 认证中间件
 const auth = (req, res, next) => {
