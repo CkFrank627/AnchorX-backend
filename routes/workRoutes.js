@@ -230,7 +230,14 @@ router.put('/:id', auth, async (req, res) => {
         const updatedWork = await Work.findOneAndUpdate(
             { _id: id, author: req.userId },
             // 更新内容、更新时间和字数
-            { content, updatedAt: new Date(), wordCount: newWordCount },
+            {
+    content: content.map(p => ({
+        ...p,
+        updatedAt: new Date()
+    })),
+    updatedAt: new Date(),
+    wordCount: newWordCount
+},
             { new: true, timestamps: true }
         );
 
@@ -260,9 +267,13 @@ router.patch('/:id', auth, async (req, res) => {
                 return res.status(400).json({ message: 'pages 格式不正确，需要是一个页面数组' });
             }
             // 将前端的 pages 映射到数据库模型中的 content 字段
-            updateFields.content = pages;
-            updateFields.wordCount = calculateWordCount(pages);
-            updateFields.updatedAt = new Date(); // 记录更新时间
+            updateFields.content = pages.map(p => ({
+    ...p,
+    updatedAt: new Date()
+}));
+updateFields.wordCount = calculateWordCount(pages);
+updateFields.updatedAt = new Date(); // 记录作品更新时间
+
         }
         
         // 允许同时更新 title 等其他字段
@@ -356,38 +367,33 @@ if (!work) {
         // 检查当前用户是否已点赞
         const isLikedByCurrentUser = req.userId ? work.likedBy.includes(req.userId) : false;
         
-        // 返回作品信息，并附带点赞数、浏览量和用户点赞状态
-        const responseWork = {
-            _id: work._id,
-            title: work.title,
-            author: work.author,
-            views: work.views,
-            likesCount: work.likesCount,
-            isLikedByCurrentUser: isLikedByCurrentUser,
-            // -------------------------------------------------------------
-            // 【核心修复：在返回时处理 content 字段】
-            // -------------------------------------------------------------
-            content: work.content.map(page => {
-                if (page.content && typeof page.content === 'object') {
-                    // 将 Delta 对象转换为字符串进行替换
-                    let contentString = JSON.stringify(page.content);
-                    contentString = contentString.replace(
-                        /http:\/\/api\.anchorx\.ca\/uploads/g,
-                        'https://api.anchorx.ca/uploads'
-                    );
-                    
-                    // 将替换后的字符串重新解析回对象（只替换 content 字段）
-                    try {
-                        return { ...page.toObject(), content: JSON.parse(contentString) };
-                    } catch (e) {
-                        console.error("Content replacement error:", e);
-                        return page; // 失败时返回原始页面
-                    }
-                }
+const responseWork = {
+    _id: work._id,
+    title: work.title,
+    author: work.author,
+    views: work.views,
+    likesCount: work.likesCount,
+    isLikedByCurrentUser: isLikedByCurrentUser,
+    updatedAt: work.updatedAt,        // ✅ 新增：作品更新时间
+    createdAt: work.createdAt,        // （可选）作品创建时间
+    content: work.content.map(page => {
+        if (page.content && typeof page.content === 'object') {
+            let contentString = JSON.stringify(page.content);
+            contentString = contentString.replace(
+                /http:\/\/api\.anchorx\.ca\/uploads/g,
+                'https://api.anchorx.ca/uploads'
+            );
+            try {
+                return { ...page.toObject(), content: JSON.parse(contentString) };
+            } catch (e) {
+                console.error("Content replacement error:", e);
                 return page;
-            })
-            // -------------------------------------------------------------
-        };
+            }
+        }
+        return page;
+    })
+};
+
 
         res.json(responseWork);
     } catch (error) {

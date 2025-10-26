@@ -16,6 +16,7 @@ const pageSchema = new mongoose.Schema({
     // Quill 的内容通常以 JSON (Delta) 格式存储，因此类型设为 Object
     content: { type: Object, default: {} },
     createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now } // ✅ 新增
 });
 
 const workSchema = new mongoose.Schema({

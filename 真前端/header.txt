@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnchorX 页眉</title>
+    <style>
+        /* -------------------- 整体和桌面端样式 -------------------- */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        /* 第一层页眉：欢迎语和登录/注册按钮 */
+        .header-top {
+            background-color: #0b2452;
+            color: white;
+            padding: 10px 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* 第二层页眉：主导航 */
+        .header-bottom {
+            background-color: #fff;
+            padding: 10px 0;
+            display: flex;
+            justify-content: center;
+            border-bottom: 1px solid #ddd;
+        }
+
+        /* 居中内容容器 - 第一层页眉 */
+        .header-top-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        /* 居中内容容器 - 第二层页眉 */
+        .header-bottom-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        /* 核心功能元素容器 - 居中对齐 */
+        .nav-search-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 0 auto;
+        }
+
+        /* 新增样式：让第二层页眉内容居中并紧凑 */
+        .header-bottom-content {
+            display: flex;
+            justify-content: center;
+        }
+
+        .header-logo,
+        .nav-search-container {
+            margin: 0 10px;
+        }
+
+        /* Logo链接样式 */
+        .header-logo-link {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .header-top-text {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .header-buttons a {
+            text-decoration: none;
+            color: #007bff;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 5px 12px;
+            margin-left: 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        .header-buttons a:hover {
+            background-color: #f0f0f0;
+        }
+
+        .header-logo {
+            font-size: 24px;
+            font-weight: bold;
+            font-style: italic;
+            color: #333;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* 通用按钮样式 */
+        .nav-button,
+        .main-nav-item {
+            display: inline-block;
+            padding: 10px 16px;
+            font-size: 1rem;
+            color: #333;
+            text-decoration: none;
+            background: #fff;
+            border: 1px solid #000;
+            border-radius: 4px;
+            transition: background 0.2s, border-color 0.2s;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .nav-button:hover,
+        .main-nav-item:hover {
+            background: #f5f5f5;
+            border-color: #333;
+        }
+
+        /* 搜索框 */
+        .search-container-v2 {
+            display: flex;
+            align-items: center;
+            width: 300px;
+            border-bottom: 2px solid #ccc;
+            transition: border-bottom-color 0.3s ease;
+        }
+
+        .search-container-v2:focus-within {
+            border-bottom-color: #0077cc;
+        }
+
+        .search-input-v2 {
+            flex-grow: 1;
+            padding: 8px 0;
+            border: none;
+            outline: none;
+            background-color: transparent;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .search-input-v2::placeholder {
+            color: #aaa;
+        }
+
+        .search-button-v2 {
+            background-color: transparent;
+            border: none;
+            padding: 5px;
+            cursor: pointer;
+        }
+
+        .search-button-v2 svg {
+            fill: #0077cc;
+            transition: fill 0.3s ease;
+        }
+
+        .search-button-v2:hover svg {
+            fill: #005aa7;
+        }
+
+        /* 消息箱菜单 */
+        .main-nav {
+            position: relative;
+            font-family: Arial, sans-serif;
+            display: inline-block;
+        }
+
+        .nav-item-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 12px;
+            width: 420px;
+            z-index: 100;
+        }
+
+        .main-nav:hover .nav-item-dropdown {
+            display: block;
+        }
+
+        .dropdown-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 6px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+            cursor: pointer;
+            font-size: 0.85rem;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .tab-button:hover {
+            background: #eee;
+        }
+
+        .tab-button.selected {
+            background: #0077cc;
+            color: white;
+            border-color: #0077cc;
+        }
+
+        .tab-content { min-height: 120px; }
+        .message-section { display: flex; flex-direction: column; gap: 10px; }
+        .no-message-text { font-size: 0.9rem; color: #999; text-align: center; padding: 20px 0; }
+        .message-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px; border: 1px solid #eee; border-radius: 6px; background: #fafafa; transition: background 0.2s; }
+        .message-item:hover { background: #f0f8ff; }
+        .message-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .message-info { flex: 1; }
+        .message-title { margin: 0 0 4px; font-size: 0.9rem; color: #333; }
+        .message-title span { color: #0077cc; font-weight: bold; }
+        .message-time { font-size: 0.75rem; color: #999; }
+
+        /* -------------------- 手机端样式 (响应式) -------------------- */
+        @media (max-width: 768px) {
+            .header-top-content {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0 15px;
+            }
+
+            .header-bottom-content {
+                flex-direction: column;
+                align-items: center;
+                padding: 0 15px;
+            }
+
+            /* 新增：让 logo 在手机版居左对齐 */
+            .header-logo-link {
+                width: 100%;
+                text-align: left;
+                margin-bottom: 10px;
+                order: -1;
+            }
+
+            /* 搜索框和功能按钮垂直排列 */
+            .nav-search-container {
+                width: 100%;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                margin: 0;
+            }
+
+            /* 功能按钮和消息箱在手机版水平排列 */
+            .nav-buttons-mobile {
+                display: flex;
+                width: 100%;
+                justify-content: space-around;
+                gap: 5px;
+            }
+
+            .header-top,
+            .header-bottom {
+                padding: 10px 0;
+            }
+
+            .header-buttons,
+            .search-container-v2 {
+                width: auto;
+                margin-top: 0;
+            }
+
+            .header-buttons a {
+                width: auto;
+                text-align: center;
+                margin-left: 5px;
+            }
+
+            .search-container-v2 {
+                width: 100%;
+                border-bottom: none;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 0 10px;
+            }
+
+            .search-input-v2 {
+                padding: 8px 0;
+            }
+
+            .nav-item-dropdown {
+                width: 90%;
+                right: 50%;
+                transform: translateX(50%);
+            }
+        }
+
+            /* 确保 .hidden 能覆盖 progress-overlay 的默认 display */
+        .hidden {
+            display: none !important;
+        }
+
+        /* -------------------- 进度条样式 -------------------- */
+        .progress-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9); /* 半透明白色背景 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+        }
+
+        .progress-container {
+            text-align: center;
+            padding: 20px 40px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #0077cc; /* 蓝色旋转部分 */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+#notification-badge {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-color: #0077cc; /* 蓝色 */
+    border-radius: 50%;
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    z-index: 10;
+}
+
+.main-nav-item {
+    position: relative; /* 确保 badge 定位基于按钮 */
+}
+
+.hidden {
+    display: none !important;
+}
+      
+    </style>
+</head>
+<body>
+    <div id="progress-overlay" class="progress-overlay hidden">
+        <div class="progress-container">
+            <div class="spinner"></div>
+            <p>正在转换，请稍候...</p>
+        </div>
+    </div>
+    
+    <header class="header-top">
+        <div class="header-top-content">
+            <div class="header-top-text">欢迎使用 质点安科站</div>
+            <div class="header-buttons">
+                <a id="logoutBtn" href="https://zhidianworld.com/login/" class="hidden">退出登录</a>
+                <a id="loginBtn" href="https://zhidianworld.com/login/">登录</a>
+                <a id="registerBtn" href="https://zhidianworld.com/register/">注册</a>
+            </div>
+        </div>
+    </header>
+
+    <header class="header-bottom">
+        <div class="header-bottom-content">
+            <a href="https://zhidianworld.com/" class="header-logo-link">
+                <div class="header-logo">AnchorX</div>
+            </a>
+            <div class="nav-search-container">
+                <div class="nav-buttons nav-buttons-mobile">
+                    <a href="https://zhidianworld.com/%e8%ae%a8%e8%ae%ba%e5%8c%ba/#topic-link-1" class="nav-button">讨论区</a>
+                    <a href="https://zhidianworld.com/write/" class="nav-button">创作</a>
+                    <a href="https://zhidianworld.com/home/" class="nav-button">主页面</a>
+                    <button id="lang-toggle" class="nav-button">繁/简</button>
+                    <nav class="main-nav">
+                        <div class="main-nav-item">
+    消息箱▼
+    <span id="notification-badge" class="hidden"></span>
+</div>
+                        <div class="nav-item-dropdown">
+                            <div class="dropdown-tabs">
+                                <button class="tab-button selected">赞</button>
+                                <button class="tab-button">评论</button>
+                                <button class="tab-button">系统通知</button>
+                            </div>
+                            <div class="tab-content">
+                                <p class="no-message-text">暂无消息</p>
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+
+                <div class="search-container-v2">
+                    <input type="text" class="search-input-v2" placeholder="输入关键字...">
+                    <button class="search-button-v2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 
+                            4.99L20.49 19l-4.99-5zm-6 
+                            0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 
+                            14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+<script>
+const API_URL = 'https://api.anchorx.ca/api/convert-text';
+
+document.addEventListener('DOMContentLoaded', () => {
+    // --- 登录/注册/退出按钮逻辑 ---
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const token = localStorage.getItem('token');
+
+    if (token) {
+        loginBtn.classList.add('hidden');
+        registerBtn.classList.add('hidden');
+        logoutBtn.classList.remove('hidden');
+    } else {
+        loginBtn.classList.remove('hidden');
+        registerBtn.classList.remove('hidden');
+        logoutBtn.classList.add('hidden');
+    }
+
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        localStorage.removeItem('token');
+        window.location.href = 'https://zhidianworld.com/login/';
+    });
+
+    // --- 消息箱逻辑 (代码保持不变) ---
+    const dropdownTabs = document.querySelector('.dropdown-tabs');
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContent = document.querySelector('.tab-content');
+    const API_BASE_URL = 'https://api.anchorx.ca/api/notifications';
+    let currentTab = '赞';
+
+    fetchAndRenderNotifications();
+
+    dropdownTabs.addEventListener('click', (e) => {
+        if (e.target.classList.contains('tab-button')) {
+            tabButtons.forEach(btn => btn.classList.remove('selected'));
+            e.target.classList.add('selected');
+            currentTab = e.target.textContent;
+            fetchAndRenderNotifications();
+        }
+    });
+
+    async function fetchAndRenderNotifications() {
+        tabContent.innerHTML = '<p class="no-message-text">加载中...</p>';
+        const token = localStorage.getItem('token');
+        if (!token) {
+            tabContent.innerHTML = '<p class="no-message-text">请登录后查看消息</p>';
+            return;
+        }
+
+        try {
+            const response = await fetch(API_BASE_URL, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('获取消息失败');
+            const notifications = await response.json();
+
+            let filteredNotifications;
+            if (currentTab === '赞') {
+                filteredNotifications = notifications.filter(n => n.type === 'like');
+            } else if (currentTab === '评论') {
+                filteredNotifications = notifications.filter(n => n.type === 'comment');
+            } else if (currentTab === '系统通知') {
+                filteredNotifications = notifications.filter(n => n.type === 'system');
+            } else {
+                filteredNotifications = [];
+            }
+
+            renderMessages(filteredNotifications);
+        } catch (error) {
+            console.error('获取消息出错:', error);
+            tabContent.innerHTML = '<p class="no-message-text" style="color: red;">消息加载失败</p>';
+        }
+    }
+
+async function updateNotificationBadge() {
+    const token = localStorage.getItem('token');
+    const badge = document.getElementById('notification-badge');
+
+    if (!token) {
+        badge.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const response = await fetch(API_BASE_URL, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('获取消息失败');
+
+        const notifications = await response.json();
+        const hasUnread = notifications.some(n => !n.read); // 判断是否有未读
+
+        if (hasUnread) {
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    } catch (err) {
+        console.error('检查未读消息失败:', err);
+        badge.classList.add('hidden');
+    }
+}
+
+// 初次加载和每次拉取消息后更新
+updateNotificationBadge();
+
+  document.querySelector('.main-nav-item').addEventListener('click', async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const response = await fetch(API_BASE_URL, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const notifications = await response.json();
+
+        const unreadIds = notifications.filter(n => !n.read).map(n => n._id);
+        for (const id of unreadIds) {
+            await fetch(`${API_BASE_URL}/mark-read/${id}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        }
+
+        // 更新 badge
+        updateNotificationBadge();
+        fetchAndRenderNotifications(); // 刷新下拉内容
+    } catch (err) {
+        console.error('标记已读失败', err);
+    }
+});
+
+  
+function renderMessages(notifications) {
+    tabContent.innerHTML = '';
+    const messageSection = document.createElement('div');
+    messageSection.className = 'message-section';
+
+    if (notifications.length === 0) {
+        tabContent.innerHTML = '<p class="no-message-text">暂无消息</p>';
+        return;
+    }
+
+    notifications.forEach(notification => {
+        const messageLink = document.createElement('a');
+        const messageItem = document.createElement('div');
+        messageItem.className = 'message-item';
+
+        const senderName = notification.sender?.username || '未知用户';
+        const messageTime = new Date(notification.createdAt).toLocaleString();
+
+        let messageTitle = notification.message || '';
+
+        // 🧩 如果 message 里不含用户名，则自动在前面补上
+        if (!messageTitle.includes(senderName)) {
+            messageTitle = `${senderName} ${messageTitle}`;
+        }
+
+        const safeName = senderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const finalMessage = messageTitle.replace(
+            new RegExp(safeName),
+            `<span class="sender-name">${senderName}</span>`
+        );
+
+        messageItem.innerHTML = `
+            <div class="message-info">
+                <p class="message-title">${finalMessage}</p>
+                <p class="message-time">${messageTime}</p>
+            </div>
+        `;
+
+        messageLink.appendChild(messageItem);
+        messageSection.appendChild(messageLink);
+    });
+
+    tabContent.appendChild(messageSection);
+}
+
+
+    // --- 繁简转换逻辑 (已修正) ---
+    const langToggleBtn = document.getElementById('lang-toggle');
+    const progressOverlay = document.getElementById('progress-overlay');
+
+    // **关键修改点 1: 默认语言改为 "s" (简体)**
+    if (!document.body.dataset.lang) {
+        document.body.dataset.lang = "s"; // s = 简体, t = 繁体
+    }
+    // **关键修改点 2: 按钮初始文本根据新的默认语言设置**
+    // 默认是简体(s)，所以按钮文本显示 “繁/简”，表示点击后会转换成繁体
+    langToggleBtn.textContent = document.body.dataset.lang === "t" ? "简/繁" : "繁/简";
+
+
+    langToggleBtn.addEventListener('click', async () => {
+        // 1. 显示进度条
+        progressOverlay.classList.remove('hidden');
+        
+        const currentLang = document.body.dataset.lang;
+        // 如果当前是 "s" (简体), direction 为 "s2t" (简转繁)
+        // 如果当前是 "t" (繁体), direction 为 "t2s" (繁转简)
+        const direction = currentLang === "s" ? "s2t" : "t2s"; 
+
+        function getTextNodes(node) {
+            let textNodes = [];
+            for (let child of node.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+                    // 忽略 <style> 和 <script> 里的文本节点
+                    if (node.tagName !== "STYLE" && node.tagName !== "SCRIPT") {
+                        textNodes.push(child);
+                    }
+                } else if (child.nodeType === Node.ELEMENT_NODE) {
+                    // 同样跳过不需要转换的标签
+                    if (!["STYLE", "SCRIPT", "SVG"].includes(child.tagName)) {
+                        textNodes = textNodes.concat(getTextNodes(child));
+                    }
+                }
+            }
+            return textNodes;
+        }
+
+
+        const textNodes = getTextNodes(document.body);
+        const fullText = textNodes.map(n => n.textContent).join("\n");
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: fullText, direction })
+            });
+
+            if (!response.ok) throw new Error("Conversion API request failed");
+
+            const data = await response.json();
+            const convertedText = data.convertedText.split("\n");
+
+            textNodes.forEach((node, i) => {
+                node.textContent = convertedText[i] || "";
+            });
+
+            // 更新语言状态和按钮文本
+            document.body.dataset.lang = currentLang === "s" ? "t" : "s"; // 切换语言状态
+            langToggleBtn.textContent = currentLang === "s" ? "简/繁" : "繁/简"; // 切换按钮文本
+        } catch (err) {
+            console.error("繁简转换失败:", err);
+            alert("繁简转换失败，请稍后重试。");
+        } finally {
+            // 2. 隐藏进度条
+            progressOverlay.classList.add('hidden');
+        }
+    });
+});
+</script>
+</body>
+</html>
