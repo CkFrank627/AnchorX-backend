@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <title><%= work.title %> - 安科文库</title>
+
+  <!-- ✅ SEO优化 -->
+  <meta name="description" content="<%= work.title %> - 作者：<%= work.author?.username || '匿名' %>。阅读量 <%= work.views %>。">
+  <meta property="og:title" content="<%= work.title %>">
+  <meta property="og:description" content="安科作品：<%= work.title %>">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="<%= work.coverImage || 'https://i.ibb.co/QFPHMF8T/Copilot-20250922-174349.png' %>">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif;
+      background: #f8f8f8;
+      color: #333;
+      max-width: 850px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.8;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+      color: #222;
+    }
+
+    .meta {
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .content-block {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    .content-block img {
+      max-width: 100%;
+      display: block;
+      margin: 10px auto;
+      border-radius: 8px;
+    }
+
+    footer {
+      margin-top: 50px;
+      font-size: 0.85rem;
+      color: #888;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1><%= work.title %></h1>
+    <p class="meta">
+      ✍️ 作者：<%= work.author?.username || "匿名" %>　
+      ⏰ 更新：<%= new Date(work.updatedAt).toLocaleDateString("zh-Hans") %>　
+      👁️ 阅读：<%= work.views %>　
+      ❤️ 喜欢：<%= work.likesCount %>
+    </p>
+  </header>
+
+  <% if (work.coverImage) { %>
+    <img src="<%= work.coverImage %>" alt="封面" style="width:100%;max-height:400px;object-fit:cover;border-radius:10px;margin-bottom:30px;">
+  <% } %>
+
+  <% if (Array.isArray(work.content)) { %>
+    <% work.content.forEach((page, index) => { %>
+      <section class="content-block">
+        <% if (typeof page.content === 'string') { %>
+          <div><%- page.content %></div>
+        <% } else if (typeof page.content === 'object' && Array.isArray(page.content.ops)) { %>
+          <% const text = page.content.ops.map(op => typeof op.insert === 'string' ? op.insert : '').join(''); %>
+          <p><%= text %></p>
+        <% } %>
+      </section>
+    <% }); %>
+  <% } else { %>
+    <p>暂无内容。</p>
+  <% } %>
+
+  <footer>
+    <p>📅 创建于 <%= new Date(work.createdAt).toLocaleDateString("zh-Hans") %></p>
+    <p>© 2025 安科文库 AnchorX</p>
+  </footer>
+
+  <!-- 保留原本前端交互脚本（比如评论、繁简转换等） -->
+  <script src="/vendor_assets/js/read-page.js"></script>
+</body>
+</html>
