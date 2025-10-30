@@ -110,12 +110,6 @@ app.get('/', (req, res) => {
     res.send('你的网站正在运行!');
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`服务器正在运行，请访问 http://0.0.0.0:${PORT}`);
-});
-
-
-
 // 5. 路由设置
 // ✅ 3. 定义繁简转换接口
 app.post('/api/convert-text', async (req, res) => {
