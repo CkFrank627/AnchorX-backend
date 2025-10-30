@@ -92,6 +92,13 @@ const corsOptions = {
     }
 };
 
+// 映射公共静态资源文件夹 /vendor_assets
+// 这个 URL 路径 /vendor_assets 将指向项目目录下的 public/vendor_assets 文件夹
+app.use('/vendor_assets', express.static(
+    path.join(__dirname, 'public', 'vendor_assets')
+));
+
+
 app.use(cors(corsOptions));
 
 // 使用 Express 的内置中间件来解析 JSON 格式的请求体
@@ -129,6 +136,8 @@ app.post('/api/convert-text', async (req, res) => {
   }
 });
 
+
+
 // 将所有以 '/api/users' 开头的请求，都交给 userRoutes 处理
 app.use('/api/users', userRoutes);
 
@@ -148,11 +157,6 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/topics', topicRoutes); 
 
 
-// 映射公共静态资源文件夹 /vendor_assets
-// 这个 URL 路径 /vendor_assets 将指向项目目录下的 public/vendor_assets 文件夹
-app.use('/vendor_assets', express.static(
-    path.join(__dirname, 'public', 'vendor_assets')
-));
 
 // 配置静态文件服务
 // 这会让 /uploads/some-image.jpg 指向 public/uploads/some-image.jpg 文件
