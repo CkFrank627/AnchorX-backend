@@ -185,13 +185,11 @@ app.get("/read/:id", async (req, res) => {
 // 6. 启动服务器并监听指定端口
 
 const startServer = async () => {
-    // **确保在启动前等待转换器初始化**
-    await initializeConverters(); 
-    
-    app.listen(PORT, () => {
-        console.log(`服务器正在运行，请访问 http://localhost:${PORT}`);
+    await initializeConverters();
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`服务器运行在 http://0.0.0.0:${PORT}`);
     });
-}
+};
 
 // 调用启动函数
 startServer();
