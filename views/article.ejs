@@ -2,16 +2,17 @@
 <html lang="zh-Hans">
 <head>
   <meta charset="UTF-8">
-  <title><%= work.title %> - 安科文库</title>
+  <title><%= work.title %> - 安科阅读</title>
 
   <!-- ✅ SEO优化 -->
-  <meta name="description" content="<%= work.title %> - 作者：<%= work.author?.username || '匿名' %>。阅读量 <%= work.views %>。">
+  <meta name="description" content="<%= work.content[0]?.content?.ops?.[0]?.insert?.substring(0, 100).replace(/\n/g, ' ') || work.title %>">
+  <meta name="keywords" content="安科, 小说, 同人, <%= work.title %>, <%= work.author?.username || '匿名' %>">
   <meta property="og:title" content="<%= work.title %>">
-  <meta property="og:description" content="安科作品：<%= work.title %>">
+  <meta property="og:description" content="作者：<%= work.author?.username || '匿名' %> | 阅读量 <%= work.views %>">
   <meta property="og:type" content="article">
   <meta property="og:image" content="<%= work.coverImage || 'https://i.ibb.co/QFPHMF8T/Copilot-20250922-174349.png' %>">
+  <meta property="og:url" content="https://api.anchorx.ca/read/<%= work._id %>">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
     body {
       font-family: "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif;

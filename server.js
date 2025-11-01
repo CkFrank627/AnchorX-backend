@@ -26,6 +26,7 @@ const app = express();
 // 定义服务器端口
 const PORT = process.env.PORT || 3000;
 
+
 // 3. 连接 MongoDB 数据库
 const dbURI = process.env.MONGO_URI;
 mongoose.connect(dbURI, {
@@ -78,6 +79,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 // 根路径测试
 app.get('/', (req, res) => res.send('你的网站正在运行!'));
 
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
 // 繁简转换接口
 app.post('/api/convert-text', async (req, res) => {
   try {
@@ -103,6 +107,25 @@ app.use('/api/galleries', galleryRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/topics', topicRoutes);
+
+app.get('/read/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const response = await fetch(`https://api.anchorx.ca/api/works/${id}`);
+    if (!response.ok) throw new Error("无法获取作品数据");
+    const work = await response.json();
+
+    // 确保标题和内容可用
+    if (!work || !work.title) throw new Error("无效作品数据");
+
+    // 使用 EJS 渲染完整 HTML（SEO友好）
+    res.render('article', { work });
+  } catch (err) {
+    console.error('SSR 渲染失败:', err);
+    res.status(404).send('文章不存在或加载失败');
+  }
+});
+
 
 // 启动服务器
 const startServer = async () => {
