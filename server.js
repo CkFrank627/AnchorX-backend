@@ -76,6 +76,8 @@ app.use(express.json());
 app.use('/vendor_assets', express.static(path.join(__dirname, 'public', 'vendor_assets')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
+app.use(express.static(path.join(__dirname, 'public')));
+
 // 根路径测试
 app.get('/', (req, res) => res.send('你的网站正在运行!'));
 
