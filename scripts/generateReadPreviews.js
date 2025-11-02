@@ -1,5 +1,4 @@
 require('dotenv').config();
-const User = require('./models/User'); // ✅ 关键：注册 User 模型
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
