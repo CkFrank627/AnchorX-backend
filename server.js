@@ -57,7 +57,7 @@ const allowedOrigins = [
   'https://anchorx.ca',
   'https://anchorfrontend.netlify.app',
   'http://localhost:3000',
-  'https://preview.zhidianworld.com/'
+  'https://preview.zhidianworld.com'
 ];
 
 const corsOptions = {
