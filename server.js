@@ -56,7 +56,7 @@ const allowedOrigins = [
   'https://zhidianworld.com',
   'https://anchorx.ca',
   'https://anchorfrontend.netlify.app',
-  'http://localhost:3000'
+  'http://localhost:3000',
   'https://preview.zhidianworld.com/'
 ];
 
