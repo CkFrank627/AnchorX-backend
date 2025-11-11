@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.min.js"></script>
+
+    <meta charset="UTF-8">
+    <title>共享素材库</title>
+    
+    <style>
+
+/* 新增：共享的按钮基础样式 */
+.gallery-card button {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 10;
+    opacity: 0; /* 默认隐藏 */
+}
+
+/* 悬停时显示按钮 */
+.gallery-card:hover button {
+    opacity: 1;
+}
+
+/* 删除按钮特定样式 */
+.delete-btn {
+    top: 10px;
+    right: 10px;
+    background-color: rgba(255, 0, 0, 0.7);
+    color: white; /* 确保图标为白色 */
+}
+
+.delete-btn:hover {
+    background-color: rgba(255, 0, 0, 0.9);
+    transform: scale(1.1);
+}
+
+/* 下载按钮特定样式 */
+.download-btn {
+    top: 10px;
+    right: 50px;
+    background-color: rgba(0, 119, 204, 0.7);
+    color: white;
+    opacity: 1; /* 默认可见 */
+}
+
+.download-btn:hover {
+    background-color: rgba(0, 119, 204, 0.9);
+    transform: scale(1.1);
+}
+
+      .download-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: white;
+    pointer-events: none;
+}
+
+/* 移除 .gallery-card:hover .download-btn，因为按钮不再隐藏 */
+
+        /* 隐藏类 */
+        .hidden {
+            display: none !important;
+        }
+
+        /* 整个页面容器 */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        .page-container {
+            display: flex;
+            min-height: 100vh;
+            background-color: #fff;
+        }
+
+        /* 侧边栏 */
+        .sidebar-nav {
+            flex-shrink: 0;
+            width: 250px;
+            padding: 30px 20px;
+            background-color: #f7f9fc;
+            border-right: 1px solid #eee;
+            transition: width 0.3s ease-in-out, padding 0.3s ease-in-out;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start; 
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            text-decoration: none;
+            color: #333;
+            border-radius: 6px;
+            transition: background-color 0.2s, color 0.2s, transform 0.2s;
+        }
+
+        .nav-link:hover {
+            background-color: #e6f7ff;
+            color: #0077cc;
+        }
+        
+        /* 激活状态 */
+        .nav-link.active {
+            background-color: #e6f7ff;
+            color: #0077cc;
+        }
+
+        .nav-icon {
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* 激活状态的图标颜色 */
+        .nav-link.active .nav-icon svg {
+            fill: #0077cc;
+        }
+        
+        .nav-text {
+            opacity: 1;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        /* 主内容区域 */
+        .main-content {
+            flex-grow: 1;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .header-left,
+        .header-right {
+            display: flex;
+            align-items: center;
+        }
+        
+        .header-left {
+            gap: 20px;
+        }
+        
+        .header-title {
+            display: flex;
+            align-items: center;
+        }
+        
+        .header-title h2 {
+            font-size: 1.5rem;
+            margin: 0;
+            margin-left: 10px;
+        }
+        
+        .create-button {
+            background-color: #0077cc;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .create-button:hover {
+            background-color: #005aa7;
+        }
+
+        /* === 新增弹窗样式 === */
+        .modal {
+            display: none; /* 默认隐藏 */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .modal-content h3 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #333;
+        }
+
+        #gallery-name-input {
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        #cancel-upload-btn {
+            background-color: #ccc;
+            color: #333;
+        }
+
+        #confirm-upload-btn {
+            background-color: #0077cc;
+            color: #fff;
+        }
+
+        /* 图片上传区域样式 */
+        .image-upload-area {
+            margin-top: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .image-upload-area p {
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .upload-button {
+            font-size: 4rem;
+            color: #ccc;
+            cursor: pointer;
+            display: inline-block;
+            padding: 10px;
+        }
+
+        /* 图片预览容器 */
+        .image-previews {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            justify-content: center;
+        }
+
+        /* 单个图片预览项 */
+        .image-preview-item {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid transparent; /* 默认边框 */
+            transition: border-color 0.2s ease;
+            cursor: pointer;
+        }
+
+        .image-preview-item.selected {
+            border-color: #0077cc; /* 选中时边框变蓝 */
+        }
+
+        .image-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .image-preview-item .remove-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 封面选择区域 */
+        .cover-selection-area {
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .cover-thumbnails {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        /* === 新增图库列表样式 === */
+        .gallery-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .gallery-card {
+            position: relative; /* 新增: 用于定位删除按钮 */
+            width: 250px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .gallery-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-image-container {
+            width: 100%;
+            height: 150px;
+            overflow: hidden;
+        }
+
+        .card-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .card-info {
+            padding: 15px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+            margin: 0 0 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-meta {
+            font-size: 0.9rem;
+            color: #777;
+        }
+
+        .card-meta span {
+            margin-right: 10px;
+        }
+
+      /* 新增：加载动画样式 */
+.loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+      /* 压缩进度条容器 */
+.progress-container {
+  width: 100px;
+  height: 6px;
+  background-color: #eee;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+/* 进度条主体 */
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  background-color: #0077cc;
+  transition: width 0.2s ease;
+}
+
+      
+    </style>
+</head>
+
+<body>
+    <div class="page-container">
+        <aside class="sidebar-nav" id="sidebar">
+            <a href="https://zhidianworld.com/write/" class="nav-link">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <path d="M12 12V4h6l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2h12a2 2 0 0 0
+                            2-2V12z" />
+                    </svg>
+                </div>
+                <span class="nav-text">作品列表</span>
+            </a>
+
+            <a href="#" class="nav-link active">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15H9V9h2v8zm4 0h-2V9h2v8z" />
+                    </svg>
+                </div>
+                <span class="nav-text">共享素材库</span>
+            </a>
+
+            <a href="https://zhidianworld.com/usercenter/" class="nav-link">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    </svg>
+                </div>
+                <span class="nav-text">个人中心</span>
+            </a>
+
+            <a href="https://zhidianworld.com/home/" class="nav-link">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v-8h-2v8zm4 0h-2v-8h2v8z" />
+                    </svg>
+                </div>
+                <span class="nav-text">安科阅读</span>
+            </a>
+
+            <a href="#" class="nav-link" id="logout-btn">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zm-8 4H2v2h7v-2zM4 22h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2z" />
+                    </svg>
+                </div>
+                <span class="nav-text">退出登录</span>
+            </a>
+        </aside>
+
+        <main id="main-page" class="main-content">
+           <div class="content-header">
+                <div class="header-left">
+                    <div class="header-title">
+                        <h2>共享图库</h2>
+                    </div>
+                    <button class="create-button" id="upload-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                            fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        </svg>
+                        <span>本地上传</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="upload-modal" class="modal">
+                <div class="modal-content">
+                    <h3>上传图库</h3>
+                    <input type="text" id="gallery-name-input" placeholder="请输入图库名称" maxlength="30">
+                    
+                    <div class="image-upload-area">
+                        <p>点击或拖拽图片到此区域</p>
+                        <div class="image-previews" id="image-previews">
+                            </div>
+                        <label for="file-input" class="upload-button">+</label>
+                        <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
+                    </div>
+
+                  <!-- ✅ 全局压缩进度栏 -->
+<div id="global-progress-container" style="display:none; margin-top:8px; text-align:center;">
+  <div id="global-progress-text" style="font-size:0.9rem; color:#555;">压缩中：0 / 0 (0%)</div>
+  <div style="width:80%; margin:5px auto; background:#eee; border-radius:6px; height:8px; overflow:hidden;">
+    <div id="global-progress-bar" style="width:0%; height:100%; background:#0077cc; transition:width 0.2s ease;"></div>
+  </div>
+  <button id="cancel-compress-btn" style="
+      margin-top:6px;
+      font-size:0.8rem;
+      color:#c00;
+      background:none;
+      border:1px solid #c00;
+      border-radius:4px;
+      padding:2px 8px;
+      cursor:pointer;">取消上传</button>
+</div>
+
+
+                    <div class="cover-selection-area">
+                        <p>选择封面:</p>
+                        <div id="cover-thumbnails" class="cover-thumbnails">
+                            </div>
+                    </div>
+
+                    <div class="modal-buttons">
+                        <button id="cancel-upload-btn">取消</button>
+                        <button id="confirm-upload-btn">确定</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="gallery-list-container" class="gallery-list">
+                </div>
+        </main>
+    </div>
+  <!-- ✅ 全局下载进度条 -->
+<div id="download-progress-container" style="
+  display:none;
+  position:fixed;
+  top:40%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  width:320px;
+  background:#fff;
+  border:1px solid #ccc;
+  box-shadow:0 4px 10px rgba(0,0,0,0.2);
+  border-radius:8px;
+  text-align:center;
+  padding:20px;
+  z-index:2000;
+">
+  <p id="download-progress-text" style="margin:0 0 8px; font-size:0.9rem; color:#555;">正在下载：0 / 0 (0%)</p>
+  <div style="width:90%; margin:0 auto; height:8px; background:#eee; border-radius:5px; overflow:hidden;">
+    <div id="download-progress-bar" style="width:0%; height:100%; background:#0077cc; transition:width 0.2s ease;"></div>
+  </div>
+</div>
+</body>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const uploadBtn = document.getElementById('upload-btn');
+    const uploadModal = document.getElementById('upload-modal');
+    const galleryNameInput = document.getElementById('gallery-name-input');
+    const fileInput = document.getElementById('file-input');
+    const imageUploadArea = document.querySelector('.image-upload-area');
+    const imagePreviewsContainer = document.getElementById('image-previews');
+    const cancelUploadBtn = document.getElementById('cancel-upload-btn');
+  const cancelCompressBtn = document.getElementById('cancel-compress-btn');
+    const confirmUploadBtn = document.getElementById('confirm-upload-btn');
+    const coverThumbnailsContainer = document.getElementById('cover-thumbnails');
+    const galleryListContainer = document.getElementById('gallery-list-container');
+
+    let uploadedFiles = [];
+    let selectedCoverIndex = 0;
+  let cancelRequested = false; // 是否用户请求取消
+let totalFiles = 0;          // 当前批次文件总数
+let processedCount = 0;      // 已完成压缩的数量
+
+
+    // TODO: 请将 YOUR_HEROKU_APP_URL 替换为你实际的 Heroku 应用域名
+    const API_BASE_URL = 'https://api.anchorx.ca';
+
+    // 修复：将 handleDelete 函数移到全局作用域
+    async function handleDelete(event) {
+        event.stopPropagation(); // 防止事件冒泡到卡片上
+        const galleryId = event.target.dataset.id;
+        const confirmDelete = window.confirm('确定要删除这个图库吗？此操作不可逆。');
+
+        if (confirmDelete) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/galleries/${galleryId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                alert('图库删除成功！');
+                await fetchGalleries(); // 重新加载图库列表
+            } catch (error) {
+                console.error('删除图库失败:', error);
+                alert('删除失败，请稍后重试。');
+            }
+        }
+    }
+
+    // 渲染图库列表的函数
+// 渲染图库列表的函数
+function renderGalleries() {
+    galleryListContainer.innerHTML = '';
+    if (allGalleries.length === 0) {
+        galleryListContainer.innerHTML = '<p style="text-align: center; color: #999; margin-top: 50px;">素材库内容待添加...</p>';
+        return;
+    }
+
+    allGalleries.forEach(gallery => {
+        const card = document.createElement('div');
+        card.className = 'gallery-card';
+        card.dataset.id = gallery._id;
+
+        // 点击整个卡片时跳转
+        card.addEventListener('click', () => {
+            window.location.href = `https://zhidianworld.com/picshare/?id=${gallery._id}`;
+        });
+
+        // 修改：新增下载按钮的HTML
+        card.innerHTML = `
+            <div class="card-image-container">
+                <img src="${gallery.cover_url}" alt="${gallery.title} 封面">
+            </div>
+            <div class="card-info">
+                <div class="card-title">${gallery.title}</div>
+                <div class="card-meta">
+                    <span>图片数量：${gallery.image_count}</span>
+                    <span>作者：${gallery.author}</span>
+                </div>
+            </div>
+            <button class="delete-btn" data-id="${gallery._id}">&times;</button>
+<button class="download-btn" data-id="${gallery._id}" data-title="${gallery.title}">⬇️</button>
+
+        `;
+        galleryListContainer.appendChild(card);
+    });
+
+    // 新增：为每个删除按钮和下载按钮添加事件监听器
+    document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', handleDelete);
+    });
+    document.querySelectorAll('.download-btn').forEach(button => {
+        button.addEventListener('click', handleDownload);
+    });
+}
+
+async function handleDownload(event) {
+    event.stopPropagation();
+    const galleryId = event.target.dataset.id;
+    const galleryTitle = event.target.dataset.title || 'images';
+    const button = event.target.closest('.download-btn');
+    const originalContent = button.innerHTML;
+
+    button.disabled = true;
+    button.innerHTML = '<span class="loading-spinner"></span>';
+
+    // 🟦 获取进度条 DOM
+    const progressContainer = document.getElementById('download-progress-container');
+    const progressText = document.getElementById('download-progress-text');
+    const progressBar = document.getElementById('download-progress-bar');
+    progressContainer.style.display = 'block';
+    progressText.textContent = '正在准备下载...';
+    progressBar.style.width = '0%';
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/galleries/${galleryId}`);
+        if (!response.ok) throw new Error('获取图库数据失败。');
+        const gallery = await response.json();
+
+        if (!gallery.images || gallery.images.length === 0) {
+            alert('该图库没有图片可以下载。');
+            progressContainer.style.display = 'none';
+            return;
+        }
+
+        const zip = new JSZip();
+        const totalImages = gallery.images.length;
+        let downloadedCount = 0;
+
+        for (const image of gallery.images) {
+            const imageUrl = image.url;
+            const imageResponse = await fetch(imageUrl);
+            const blob = await imageResponse.blob();
+            const filename = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+            zip.file(filename, blob, { binary: true });
+
+            downloadedCount++;
+            const percent = Math.round((downloadedCount / totalImages) * 100);
+            progressText.textContent = `正在下载图片：${downloadedCount} / ${totalImages} (${percent}%)`;
+            progressBar.style.width = `${percent}%`;
+        }
+
+        progressText.textContent = '正在打包 ZIP 文件...';
+        progressBar.style.width = '100%';
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        saveAs(content, `${galleryTitle}.zip`);
+
+        progressText.textContent = '下载已完成！';
+        progressBar.style.background = '#4caf50';
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            progressBar.style.background = '#0077cc';
+        }, 1500);
+
+    } catch (error) {
+        console.error('下载图库失败:', error);
+        alert('下载失败，请稍后重试。');
+        progressContainer.style.display = 'none';
+    } finally {
+        button.disabled = false;
+        button.innerHTML = originalContent;
+    }
+}
+
+
+    // 新增：异步函数，用于从后端获取所有图库数据
+    async function fetchGalleries() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/galleries`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            // 使用 let 来重新赋值 allGalleries
+            allGalleries = await response.json();
+            renderGalleries();
+        } catch (error) {
+            console.error('获取图库数据失败:', error);
+            galleryListContainer.innerHTML = '<p style="text-align: center; color: #999; margin-top: 50px;">加载图库失败，请稍后重试。</p>';
+        }
+    }
+    
+    // 在页面加载时调用，立即从后端获取数据
+    fetchGalleries();
+
+    // 1. 监听“本地上传”按钮点击，打开弹窗
+    uploadBtn.addEventListener('click', () => {
+        uploadModal.style.display = 'flex';
+        galleryNameInput.value = '';
+        imagePreviewsContainer.innerHTML = '';
+        coverThumbnailsContainer.innerHTML = '';
+        uploadedFiles = [];
+        selectedCoverIndex = 0;
+    });
+
+fileInput.addEventListener('change', async (event) => {
+    const files = event.target.files;
+    if (files.length === 0) return;
+
+    if (uploadedFiles.length + files.length > 100) {
+        alert('单个图库最多只能上传 100 张图片。');
+        return;
+    }
+
+    // 初始化进度状态
+    cancelRequested = false;
+    totalFiles = files.length;
+    processedCount = 0;
+
+    const globalContainer = document.getElementById('global-progress-container');
+    const globalBar = document.getElementById('global-progress-bar');
+    const globalText = document.getElementById('global-progress-text');
+    const cancelBtn = document.getElementById('cancel-compress-btn');
+    globalContainer.style.display = 'block';
+    globalBar.style.width = '0%';
+    globalText.textContent = `压缩中：0 / ${totalFiles} (0%)`;
+
+    cancelBtn.onclick = () => {
+        cancelRequested = true;
+        cancelBtn.textContent = '已取消';
+        cancelBtn.disabled = true;
+        cancelBtn.style.opacity = '0.6';
+    };
+
+    confirmUploadBtn.disabled = true;
+    confirmUploadBtn.textContent = '正在压缩图片...';
+
+    const concurrency = 3;
+    const queue = Array.from(files);
+    const compressedFiles = [];
+    let active = 0;
+
+    async function processNext() {
+        if (cancelRequested || queue.length === 0) return;
+        const file = queue.shift();
+        const index = compressedFiles.length;
+
+        active++;
+        try {
+            const options = {
+                maxSizeMB: 0.5,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+                onProgress: (progress) => {
+                    // 可选：单文件压缩时局部进度
+                }
+            };
+
+            const compressedFile = await imageCompression(file, options);
+            compressedFiles.push(compressedFile);
+            processedCount++;
+
+            const percent = Math.round((processedCount / totalFiles) * 100);
+            globalBar.style.width = `${percent}%`;
+            globalText.textContent = `压缩中：${processedCount} / ${totalFiles} (${percent}%)`;
+
+            console.log(`✅ 压缩完成: ${file.name} (${(file.size/1024).toFixed(1)}KB → ${(compressedFile.size/1024).toFixed(1)}KB)`);
+
+        } catch (err) {
+            console.error(`❌ 压缩失败: ${file.name}`, err);
+        } finally {
+            active--;
+            if (!cancelRequested && queue.length > 0) processNext();
+        }
+    }
+
+// 同时启动 3 个任务
+for (let i = 0; i < concurrency; i++) {
+    if (i < queue.length) {
+        processNext();
+    } else {
+        break;
+    }
+}
+
+    // 等待全部完成
+    const waitUntilDone = () =>
+        new Promise(resolve => {
+            const check = setInterval(() => {
+                if (cancelRequested || (queue.length === 0 && active === 0)) {
+                    clearInterval(check);
+                    resolve();
+                }
+            }, 200);
+        });
+    await waitUntilDone();
+
+    // 结束处理
+    if (cancelRequested) {
+        globalText.textContent = '已取消上传';
+        globalBar.style.background = '#ccc';
+        confirmUploadBtn.disabled = false;
+        confirmUploadBtn.textContent = '重新选择';
+        return; // 不继续上传
+    }
+
+    uploadedFiles = [...uploadedFiles, ...compressedFiles];
+  renderPreviews(); // ✅ 立即刷新预览区域
+    globalText.textContent = '压缩完成';
+    confirmUploadBtn.disabled = false;
+    confirmUploadBtn.textContent = '确定';
+    setTimeout(() => (globalContainer.style.display = 'none'), 1000);
+});
+
+    // 3. 监听拖拽事件，实现拖拽上传
+    imageUploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        imageUploadArea.style.borderColor = '#0077cc';
+    });
+
+    imageUploadArea.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        imageUploadArea.style.borderColor = '#ddd';
+    });
+
+imageUploadArea.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    imageUploadArea.style.borderColor = '#ddd';
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+
+    if (uploadedFiles.length + files.length > 100) {
+        alert('单个图库最多只能上传 100 张图片。');
+        return;
+    }
+
+    confirmUploadBtn.disabled = true;
+    confirmUploadBtn.textContent = '正在压缩图片...';
+
+    const compressedFiles = [];
+    for (const file of files) {
+        try {
+            const compressed = await imageCompression(file, {
+                maxSizeMB: 0.5,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+                initialQuality: 0.7
+            });
+            compressedFiles.push(compressed);
+        } catch (err) {
+            console.error('拖拽压缩失败:', err);
+        }
+    }
+
+    uploadedFiles = [...uploadedFiles, ...compressedFiles];
+    renderPreviews();
+
+    confirmUploadBtn.disabled = false;
+    confirmUploadBtn.textContent = '确定';
+});
+
+
+    // 4. 渲染图片预览和封面缩略图
+    function renderPreviews() {
+        imagePreviewsContainer.innerHTML = '';
+        coverThumbnailsContainer.innerHTML = '';
+        uploadedFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const imgUrl = e.target.result;
+                const previewItem = createPreviewItem(imgUrl, index);
+                imagePreviewsContainer.appendChild(previewItem);
+                const coverThumbnail = createThumbnailItem(imgUrl, index);
+                coverThumbnailsContainer.appendChild(coverThumbnail);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // 辅助函数：创建单个图片预览项
+    function createPreviewItem(imgUrl, index) {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'image-preview-item';
+        if (index === selectedCoverIndex) {
+            previewItem.classList.add('selected');
+        }
+        previewItem.innerHTML = `<img src="${imgUrl}" alt="预览">
+                                 <button class="remove-btn" data-index="${index}">&times;</button>`;
+        previewItem.addEventListener('click', () => {
+            selectedCoverIndex = index;
+            renderPreviews();
+        });
+        const removeBtn = previewItem.querySelector('.remove-btn');
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            uploadedFiles.splice(index, 1);
+            if (index === selectedCoverIndex) {
+                selectedCoverIndex = uploadedFiles.length > 0 ? 0 : -1;
+            } else if (index < selectedCoverIndex) {
+                selectedCoverIndex--;
+            }
+            renderPreviews();
+        });
+        return previewItem;
+    }
+
+    // 辅助函数：创建单个封面缩略图项
+    function createThumbnailItem(imgUrl, index) {
+        const coverThumbnail = document.createElement('div');
+        coverThumbnail.className = 'image-preview-item';
+        if (index === selectedCoverIndex) {
+            coverThumbnail.classList.add('selected');
+        }
+        coverThumbnail.innerHTML = `<img src="${imgUrl}" alt="封面">`;
+        coverThumbnail.addEventListener('click', () => {
+            selectedCoverIndex = index;
+            renderPreviews();
+        });
+        return coverThumbnail;
+    }
+
+async function uploadFileToImgBB(file) {
+  try {
+    // 压缩逻辑
+    const compressedFile = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1920, useWebWorker: true });
+    console.log(`上传压缩版: ${file.name} (${(file.size / 1024).toFixed(1)} KB → ${(compressedFile.size / 1024).toFixed(1)} KB)`);
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Image = reader.result.split(',')[1];
+        const formData = new FormData();
+        formData.append('image', base64Image);
+        try {
+          const response = await fetch('https://api.imgbb.com/1/upload?key=040dbc9e6e680f321e09d9e05f447094', {
+            method: 'POST',
+            body: formData
+          });
+          const data = await response.json();
+          if (data.success) {
+            resolve(data.data.url);
+          } else {
+            reject(new Error('图床上传失败: ' + data.error.message));
+          }
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.readAsDataURL(compressedFile);
+    });
+  } catch (err) {
+    console.error('图片压缩失败或上传到ImgBB失败:', err);
+    throw err;
+  }
+}
+
+
+    // 5. 监听“确定”按钮点击
+    confirmUploadBtn.addEventListener('click', async () => {
+        const galleryName = galleryNameInput.value.trim();
+
+        if (galleryName === '') {
+            alert('请输入图库名称！');
+            return;
+        }
+
+        if (uploadedFiles.length === 0) {
+            alert('请至少上传一张图片！');
+            return;
+        }
+
+        confirmUploadBtn.disabled = true;
+        confirmUploadBtn.textContent = '正在上传...';
+
+        try {
+            const uploadedImageUrls = await Promise.all(
+                uploadedFiles.map(file => uploadFileToImgBB(file))
+            );
+
+            console.log('图库名称:', galleryName);
+            console.log('上传文件数量:', uploadedFiles.length);
+            console.log('上传成功的图片URL:', uploadedImageUrls);
+
+            let coverImageUrl = '';
+            if (selectedCoverIndex !== -1 && uploadedImageUrls.length > 0) {
+                coverImageUrl = uploadedImageUrls[selectedCoverIndex];
+            } else if (uploadedImageUrls.length > 0) {
+                coverImageUrl = uploadedImageUrls[0];
+            }
+            
+            const newGallery = {
+                title: galleryName,
+                author: '匿名用户',
+                images: uploadedImageUrls,
+                coverUrl: coverImageUrl
+            };
+
+            const postResponse = await fetch(`${API_BASE_URL}/api/galleries`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newGallery)
+            });
+            
+            if (!postResponse.ok) {
+                throw new Error('Failed to save gallery to backend.');
+            }
+
+            alert('图库已成功上传并保存！');
+
+            // 成功后，重新从后端获取最新列表并渲染
+            await fetchGalleries();
+
+            // 关闭弹窗
+            uploadModal.style.display = 'none';
+
+        } catch (error) {
+            alert('上传或保存失败：' + error.message);
+            console.error(error);
+        } finally {
+            confirmUploadBtn.disabled = false;
+            confirmUploadBtn.textContent = '确定';
+        }
+    });
+
+    // 6. 监听“取消”按钮点击
+    cancelUploadBtn.addEventListener('click', () => {
+        uploadModal.style.display = 'none';
+    });
+});
+</script>
+</html>

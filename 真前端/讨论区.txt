@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>网站讨论区</title>
+    <style>
+        /* =================== */
+        /* === 整体容器样式 === */
+        /* =================== */
+        .discussion-board-container {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            max-width: 900px; /* 讨论区可以稍微宽一些 */
+            margin: 30px auto;
+            font-family: Arial, sans-serif;
+        }
+
+        /* =================== */
+        /* === 头部与按钮样式 === */
+        /* =================== */
+        .discussion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .header-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .new-post-button {
+            padding: 8px 16px;
+            background-color: #4d3129; /* 使用你背景图中的深色系 */
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background-color 0.2s ease;
+            white-space: nowrap;
+        }
+        .new-post-button:hover {
+            background-color: #6a493e;
+        }
+
+        /* =================== */
+        /* === 列表样式 (类似你的推荐列表) === */
+        /* =================== */
+        .discussion-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0; /* 移除容器间隙，使用条目自身的 padding/border */
+        }
+
+        /* =================== */
+        /* === 单个讨论主题项样式 === */
+        /* =================== */
+        .topic-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s ease;
+        }
+        .topic-item:last-child {
+            border-bottom: none;
+        }
+        .topic-item:hover {
+            background: #fcfcfc;
+        }
+
+        /* 标题和摘要部分 */
+        .topic-main-content {
+            flex: 1;
+            padding-right: 20px;
+        }
+
+        /* 标题链接样式 */
+        .topic-title-link {
+            text-decoration: none;
+        }
+        .topic-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+            transition: color 0.2s ease;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap; /* 确保标题在一行 */
+            display: block; /* 确保a标签填充宽度 */
+        }
+        .topic-title-link:hover .topic-title {
+            color: #0077cc;
+            text-decoration: underline;
+        }
+
+        /* 摘要/作者/时间 */
+        .topic-meta {
+            font-size: 0.85rem;
+            color: #666;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .topic-summary {
+            font-style: italic;
+            margin-top: 5px;
+            max-width: 80%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .topic-meta span {
+            display: inline-flex;
+            align-items: center;
+        }
+        .topic-meta .icon {
+            margin-right: 4px;
+        }
+
+        /* 状态/统计信息 (在右侧) */
+        .topic-stats {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end; /* 右对齐数字 */
+            text-align: right;
+            gap: 5px;
+        }
+        .stats-item {
+            font-size: 0.9rem;
+            color: #555;
+            min-width: 60px; /* 保持宽度一致 */
+        }
+        .stats-label {
+            font-size: 0.75rem;
+            color: #999;
+            margin-top: 2px;
+        }
+        .stats-replies {
+            font-weight: bold;
+            color: #0077cc;
+        }
+
+        /* 移动设备适配 (可选) */
+        @media (max-width: 600px) {
+            .discussion-board-container {
+                padding: 15px;
+                margin: 15px auto;
+            }
+            .discussion-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .topic-item {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 10px 0;
+            }
+            .topic-main-content {
+                width: 100%;
+                padding-right: 0;
+                margin-bottom: 10px;
+            }
+            .topic-summary {
+                max-width: 100%;
+            }
+            .topic-stats {
+                flex-direction: row;
+                justify-content: space-between;
+                width: 100%;
+                text-align: left;
+            }
+        }
+        
+        /* 分页器样式 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 0.9rem;
+        }
+        .pagination button:hover:not(:disabled) {
+            background-color: #eee;
+        }
+        .pagination button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .pagination-info {
+            font-size: 0.9rem;
+            color: #666;
+        }
+      /* =================== */
+/* === 新增：模态弹窗样式 === */
+/* =================== */
+.modal-overlay {
+    /* 全屏遮罩 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none; /* 默认隐藏 */
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* 确保在最上层 */
+}
+
+.new-topic-modal {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 600px; /* 弹窗最大宽度 */
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    overflow: hidden;
+}
+
+/* 弹窗头部 */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #333;
+    flex-grow: 1;
+}
+
+.title-input-container {
+    padding: 10px 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.topic-title-input {
+    flex-grow: 1;
+    border: none;
+    font-size: 1.1rem;
+    padding: 5px 0;
+    outline: none;
+    font-weight: bold;
+    max-width: calc(100% - 70px);
+}
+.title-char-count {
+    font-size: 0.8rem;
+    color: #999;
+    flex-shrink: 0;
+}
+
+/* 弹窗内容区 */
+.modal-body {
+    flex-grow: 1;
+    padding: 0 20px 20px 20px;
+    overflow-y: auto; /* 允许内容区滚动 */
+}
+.modal-body textarea {
+    width: 100%;
+    min-height: 200px;
+    border: none;
+    resize: none;
+    padding: 10px 0;
+    box-sizing: border-box;
+    font-size: 1rem;
+    outline: none;
+}
+
+/* 底部操作栏 */
+.modal-footer {
+    padding: 10px 20px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end; /* 按钮靠右 */
+    align-items: center;
+}
+
+.modal-publish-btn {
+    padding: 8px 20px;
+    background-color: #4d3129;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.modal-publish-btn:hover {
+    background-color: #6a493e;
+}
+
+.close-btn, .close-icon {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #999;
+    line-height: 1;
+    padding: 0 5px;
+    transition: color 0.2s;
+}
+.close-btn:hover {
+    color: #333;
+}
+.section-placeholder {
+    padding: 10px 0;
+    color: #0077cc;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 10px;
+}
+
+/* 错误和提示信息 */
+#topicStatusMessage {
+    color: red;
+    font-size: 0.9rem;
+    margin-right: auto;
+    padding-right: 15px;
+}
+
+      /* =================== */
+/* === 新增：分区选择器样式 === */
+/* =================== */
+.topic-section-select {
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: #f9f9f9;
+}
+
+/* =================== */
+/* === 新增：点赞按钮样式 === */
+/* =================== */
+.like-control {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #666;
+    transition: color 0.2s;
+}
+
+.like-control:hover {
+    color: #0077cc;
+}
+
+.like-control .icon {
+    font-size: 1.1rem;
+    margin-right: 5px;
+}
+
+/* 区分已点赞状态 */
+.like-control.liked {
+    color: #ff4500; /* 暖色调表示已点赞 */
+    font-weight: bold;
+}
+.like-control.liked .icon {
+    content: "❤️"; /* 替换为实心心形 */
+}
+      
+    </style>
+</head>
+<body>
+
+<div class="discussion-board-container">
+    <div class="discussion-header">
+        <h2 class="header-title">📜 社区讨论区</h2>
+        <a href="/new-topic" id="newPostBtn" class="new-post-button">发布新主题</a>
+    </div>
+
+  <div class="section-filter" style="margin-bottom: 20px; padding: 10px; background: #f7f7f7; border-radius: 4px; display: flex; align-items: center; gap: 15px;">
+    <label for="sectionFilter" style="font-weight: bold; color: #333;">筛选分区:</label>
+    <select id="sectionFilter" class="topic-section-select" style="min-width: 150px;">
+        <option value="">全部主题</option>
+        <option value="讨论区">讨论区</option>
+        <option value="创作交流">创作交流</option>
+        <option value="斗魂竞技场">斗魂竞技场</option>
+        <option value="站务">站务</option>
+        </select>
+</div>
+
+    <div class="discussion-list" id="discussionList">
+        <p id="loadingMessage" style="text-align: center; color: #999; padding: 50px;">正在加载讨论主题...</p>
+        </div>
+    
+    <div class="pagination" id="paginationContainer" style="display: none;">
+        <button id="prevPageBtn" disabled>上一页</button>
+        <span id="pageInfo" class="pagination-info"></span>
+        <button id="nextPageBtn" disabled>下一页</button>
+    </div>
+    
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // -------------------------------------------------------------------
+    // --- 配置部分 (请根据你的实际部署情况修改) ---
+    // -------------------------------------------------------------------
+    const API_BASE_URL = 'https://api.anchorx.ca/api/topics'; // TODO: 替换为你的服务器域名
+    const TOPIC_DETAIL_PAGE_BASE_URL = '/topic/'; // TODO: 替换为你实际的主题详情页URL前缀
+    const POSTS_PER_PAGE = 10; // 每页显示的主题数量
+
+  // 新增：分区筛选 DOM
+    const sectionFilterSelect = document.getElementById('sectionFilter');
+    
+    // 弹窗相关 DOM (新增分区选择框)
+    // const modalOverlay = document.getElementById('newTopicModalOverlay'); // 保持原样
+    // ... 其他 modal DOM
+    const topicSectionSelect = document.getElementById('topicSectionSelect'); // <-- 新增
+    
+    /**
+     * TODO: 获取用户登录 Token 的函数
+     * 在你的实际应用中，你需要从 LocalStorage 或 Cookie 中获取 JWT。
+     */
+/**
+ * ✅ 修正后的 Token 获取函数
+ */
+function getAuthToken() {
+    // 假设 token 存储在 localStorage 中，且键名是 'token'
+    const token = localStorage.getItem('token'); 
+    
+    if (!token) {
+        console.warn('警告：无法获取到本地存储中的用户 Token。');
+    }
+    
+    // 返回真实的 Token 字符串，而不是演示占位符
+    return token; 
+}
+
+    // -------------------------------------------------------------------
+    // --- DOM 元素获取 ---
+    // -------------------------------------------------------------------
+    const discussionList = document.getElementById('discussionList');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const paginationContainer = document.getElementById('paginationContainer');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const pageInfoSpan = document.getElementById('pageInfo');
+    const newPostBtn = document.getElementById('newPostBtn'); // 发布新主题按钮
+
+    // 弹窗相关 DOM
+    const modalOverlay = document.getElementById('newTopicModalOverlay');
+    const closeModalIcon = document.getElementById('closeModalIcon');
+    const topicTitleInput = document.getElementById('topicTitleInput');
+    const topicContentTextarea = document.getElementById('topicContentTextarea');
+    const titleCharCountSpan = document.getElementById('titleCharCount');
+    const publishTopicBtn = document.getElementById('publishTopicBtn');
+    const topicStatusMessage = document.getElementById('topicStatusMessage');
+    
+    let currentPage = 1;
+    let totalPages = 1;
+
+    // -------------------------------------------------------------------
+    // --- 模态弹窗控制函数 ---
+    // -------------------------------------------------------------------
+
+    function openModal() {
+        // 检查用户是否登录
+        if (!getAuthToken()) {
+            alert('请先登录才能发布新主题！');
+            // TODO: 在实际应用中，这里应该跳转到登录页面
+            return;
+        }
+
+        // 重置表单
+        topicTitleInput.value = '';
+        topicContentTextarea.value = '';
+        topicStatusMessage.textContent = '';
+        titleCharCountSpan.textContent = '0';
+        publishTopicBtn.disabled = false;
+
+      // 新增：重置分区选择
+        topicSectionSelect.value = ''; 
+        
+        modalOverlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    }
+
+    function closeModal() {
+        modalOverlay.style.display = 'none';
+        document.body.style.overflow = ''; // 恢复背景滚动
+    }
+
+    // -------------------------------------------------------------------
+    // --- 发布主题逻辑 ---
+    // -------------------------------------------------------------------
+    
+async function publishTopic() {
+        const title = topicTitleInput.value.trim();
+        const content = topicContentTextarea.value.trim();
+        const section = topicSectionSelect.value; // <-- 新增：获取选中的分区
+        const token = getAuthToken();
+
+        if (!title || !content) {
+            topicStatusMessage.textContent = '标题和内容都是必填的！';
+            return;
+        }
+        
+        if (!section) { // <-- 必填校验
+            topicStatusMessage.textContent = '请选择主题分区！';
+            return;
+        }
+
+        if (title.length > 30) {
+             topicStatusMessage.textContent = '标题不能超过30个字符！';
+            return;
+        }
+
+        publishTopicBtn.disabled = true;
+        topicStatusMessage.textContent = '正在发布...';
+
+        try {
+            const response = await fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                // 修改：发送 section 字段
+                body: JSON.stringify({ title, content, section }) 
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                topicStatusMessage.textContent = '发布成功！正在刷新列表...';
+                
+                // 成功后关闭弹窗并刷新列表
+                setTimeout(() => {
+                    closeModal();
+                    fetchAndRenderTopics(1); // 刷新到第一页查看新帖子
+                }, 1000);
+
+            } else {
+                // 后端返回的错误信息
+                topicStatusMessage.textContent = `发布失败: ${result.message || result.error || '未知错误'}`;
+                publishTopicBtn.disabled = false;
+            }
+
+        } catch (error) {
+            console.error('发布主题时发生网络错误:', error);
+            topicStatusMessage.textContent = '发布失败: 网络连接或服务器错误。';
+            publishTopicBtn.disabled = false;
+        }
+    }
+
+
+    // -------------------------------------------------------------------
+    // --- 列表加载辅助函数 (与之前相同) ---
+    // -------------------------------------------------------------------
+
+    function formatDate(dateString) {
+        if (!dateString) return '未知日期';
+        try {
+            return new Date(dateString).toLocaleDateString('zh-CN');
+        } catch (e) {
+            return '日期错误';
+        }
+    }
+
+function renderTopics(topics) {
+    discussionList.innerHTML = ''; 
+    loadingMessage.style.display = 'none';
+
+    if (!topics || topics.length === 0) {
+        discussionList.innerHTML =
+            '<p style="text-align: center; color: #999; padding: 50px;">暂无讨论主题。</p>';
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    const currentUserId = // TODO: 在这里获取当前登录用户的 ID
+        // 确保你有一个函数或方法能获取当前用户的 ID
+        // 假设你的 auth token 中包含了 userId，或者你可以通过另一个 API 获取
+        getUserIdFromToken(getAuthToken()) || null; 
+
+    topics.forEach(topic => {
+        const authorName = topic.author ? topic.author.username : '👤 匿名用户';
+        const lastReplyUserName = topic.lastRepliedBy ? topic.lastRepliedBy.username : '无';
+        const lastReplyTime = topic.lastReplyAt ? formatDate(topic.lastReplyAt) : '无';
+
+        // ⭐ 核心修复：确保 topic.likedBy 存在且是数组，再调用 .includes()
+        const isLiked = currentUserId && Array.isArray(topic.likedBy) && topic.likedBy.includes(currentUserId);
+        const likeClass = isLiked ? 'liked' : '';
+        const likeText = isLiked ? '❤️' : '🤍'; // 使用心形图标
+        
+        let summary = '暂无摘要内容...';
+        if (topic.content && typeof topic.content === 'string') {
+            summary = topic.content.substring(0, 100) + (topic.content.length > 100 ? '...' : '');
+        } 
+
+        const itemHtml = `
+            <article class="topic-item" data-topic-id="${topic._id}">
+                <div class="topic-main-content">
+                    <span style="display: inline-block; margin-right: 10px; padding: 2px 8px; font-size: 0.75rem; color: #0077cc; background: #e6f7ff; border-radius: 3px; font-weight: bold;">
+                        [${topic.section || '未分区'}]
+                    </span>
+                    
+                    <a href="${TOPIC_DETAIL_PAGE_BASE_URL}?id=${topic._id}" class="topic-title-link">
+                        <h4 class="topic-title" style="display: inline;">${topic.title}</h4>
+                    </a>
+                    
+                    <p class="topic-meta">
+                        <span class="info-author">👤 ${authorName} 发布</span>
+                        <span class="info-date">🔄 ${lastReplyTime} 最新回复（${lastReplyUserName}）</span>
+                        <span class="info-views">👀 ${topic.viewsCount || 0} 浏览</span>
+                        <span class="like-control ${likeClass}" data-id="${topic._id}" data-type="topic">
+                            <span class="icon">${likeText}</span>
+                            <span class="like-count">${topic.likesCount || 0}</span>
+                        </span>
+                    </p>
+                    <p class="topic-summary">${summary}</p>
+                </div>
+                <div class="topic-stats">
+                    <div class="stats-item stats-replies">${topic.repliesCount || 0}</div>
+                    <div class="stats-label">回复</div>
+                </div>
+            </article>
+        `;
+        discussionList.insertAdjacentHTML('beforeend', itemHtml);
+    });
+    
+    paginationContainer.style.display = 'flex';
+    updatePaginationUI();
+}
+      
+    
+    function updatePaginationUI() {
+        prevPageBtn.disabled = currentPage === 1;
+        nextPageBtn.disabled = currentPage === totalPages || totalPages === 0;
+        pageInfoSpan.textContent = `第 ${currentPage} / ${totalPages} 页`;
+    }
+
+async function fetchAndRenderTopics(page = 1, section = '') { // <-- 新增 section 参数
+        loadingMessage.style.display = 'block';
+        discussionList.innerHTML = '';
+        paginationContainer.style.display = 'none';
+        
+        let url = `${API_BASE_URL}?page=${page}&limit=${POSTS_PER_PAGE}`;
+        
+        // 新增：如果 section 存在，则添加到 URL
+        if (section) {
+            url += `&section=${encodeURIComponent(section)}`;
+        }
+        
+        try {
+            const response = await fetch(url, { method: 'GET' });
+            if (!response.ok) {
+                throw new Error(`网络请求失败，状态码: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            currentPage = data.currentPage;
+            totalPages = data.totalPages;
+
+            renderTopics(data.topics);
+            
+        } catch (error) {
+            console.error('获取主题列表失败:', error);
+            discussionList.innerHTML =
+                '<p style="text-align: center; color: red; padding: 50px;">加载失败，请检查 API 地址和网络连接。</p>';
+            loadingMessage.style.display = 'none';
+        }
+    }
+
+
+  /**
+     * 辅助函数：尝试从 JWT Token 中解析出用户 ID
+     * 这是一个简化示例，实际应用中你可能需要一个更健壮的实现
+     */
+    function getUserIdFromToken(token) {
+        if (!token) return null;
+        try {
+            // JWT 结构通常是 header.payload.signature
+            const payload = token.split('.')[1];
+            const decoded = JSON.parse(atob(payload));
+            return decoded.userId || null; // 假设用户 ID 存储在 token payload 的 userId 字段
+        } catch (e) {
+            console.error("无法解析 token:", e);
+            return null;
+        }
+    }
+    
+    // -------------------------------------------------------------------
+    // --- 新增：点赞/取消点赞 主题 或 回复 的通用逻辑 ---
+    // -------------------------------------------------------------------
+
+    async function toggleLike(id, type) {
+        const token = getAuthToken();
+        if (!token) {
+            alert('请先登录才能点赞！');
+            // TODO: 跳转到登录页面
+            return;
+        }
+
+        const url = (type === 'topic') 
+            ? `${API_BASE_URL}/${id}/like`
+            : `${API_BASE_URL}/replies/${id}/like`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}` 
+                }
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // 更新 UI
+                const likeControl = document.querySelector(`.like-control[data-id="${id}"][data-type="${type}"]`);
+                if (likeControl) {
+                    const likeCountSpan = likeControl.querySelector('.like-count');
+                    const likeIconSpan = likeControl.querySelector('.icon');
+                    
+                    if (result.isLiked) {
+                        likeControl.classList.add('liked');
+                        likeIconSpan.textContent = '❤️';
+                    } else {
+                        likeControl.classList.remove('liked');
+                        likeIconSpan.textContent = '🤍';
+                    }
+                    likeCountSpan.textContent = result.likesCount;
+                }
+                
+            } else {
+                alert(`点赞失败: ${result.message || '服务器错误'}`);
+            }
+
+        } catch (error) {
+            console.error('点赞操作发生网络错误:', error);
+            alert('点赞失败: 网络连接错误。');
+        }
+    }
+
+  
+    // -------------------------------------------------------------------
+    // --- 事件绑定 ---
+    // -------------------------------------------------------------------
+
+  
+    // 1. 列表分页按钮 (修改：传递当前选中的筛选分区)
+    prevPageBtn.addEventListener('click', () => {
+        const currentSection = sectionFilterSelect.value;
+        if (currentPage > 1) {
+            fetchAndRenderTopics(currentPage - 1, currentSection); // <-- 传递 section
+            window.scrollTo(0, 0); 
+        }
+    });
+
+    nextPageBtn.addEventListener('click', () => {
+        const currentSection = sectionFilterSelect.value;
+        if (currentPage < totalPages) {
+            fetchAndRenderTopics(currentPage + 1, currentSection); // <-- 传递 section
+            window.scrollTo(0, 0); 
+        }
+    });
+
+     // 2. 新增：分区筛选器事件监听
+    sectionFilterSelect.addEventListener('change', () => {
+        const selectedSection = sectionFilterSelect.value;
+        fetchAndRenderTopics(1, selectedSection); // 重新从第一页加载
+    });
+    
+    // 3. 新增：主题点赞事件委托
+    discussionList.addEventListener('click', (e) => {
+        const likeControl = e.target.closest('.like-control');
+        if (likeControl) {
+            const id = likeControl.dataset.id;
+            const type = likeControl.dataset.type; // topic 或 reply
+            
+            if (id && type === 'topic') {
+                toggleLike(id, type);
+            }
+            // TODO: 如果你希望在列表页的回复中也支持点赞，需要修改这里
+        }
+    });
+
+    // 2. “发布新主题”按钮 - 打开模态窗
+    newPostBtn.addEventListener('click', (e) => {
+        e.preventDefault(); // 阻止默认的链接跳转行为
+        openModal();
+    });
+
+    // 3. 模态窗关闭按钮
+    closeModalIcon.addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', (e) => {
+        // 点击遮罩层关闭
+        if (e.target === modalOverlay) {
+            closeModal();
+        }
+    });
+    
+    // 4. 标题字数统计
+    topicTitleInput.addEventListener('input', () => {
+        const count = topicTitleInput.value.length;
+        titleCharCountSpan.textContent = count;
+        // 可选：添加超限提示
+        topicStatusMessage.textContent = count > 30 ? '标题超过限制！' : '';
+    });
+
+    // 5. “发表”按钮 - 提交主题
+    publishTopicBtn.addEventListener('click', publishTopic);
+
+   // 初始加载主题列表
+    // 初始加载时获取筛选器的值
+    const initialSection = sectionFilterSelect.value;
+    fetchAndRenderTopics(currentPage, initialSection); 
+}); // 结束 DOMContentLoaded 监听器
+</script>
+  <div class="modal-overlay" id="newTopicModalOverlay">
+    <div class="new-topic-modal">
+        <div class="modal-header">
+            <span class="modal-title">发布新主题</span>
+            <button type="button" class="close-btn" id="closeModalIcon">×</button>
+        </div>
+
+        <div class="title-input-container">
+            <input type="text" id="topicTitleInput" class="topic-title-input" placeholder="标题 (必填)" maxlength="30">
+            <span class="title-char-count"><span id="titleCharCount">0</span>/30</span>
+        </div>
+        
+        <div class="title-input-container" style="justify-content: flex-start; padding-top: 15px; padding-bottom: 15px;">
+    <select id="topicSectionSelect" class="topic-section-select">
+        <option value="" disabled selected>请选择分区 (必填)</option>
+        <option value="讨论区">讨论区</option>
+        <option value="创作交流">创作交流</option>
+        <option value="斗魂竞技场">斗魂竞技场</option>
+        <option value="站务">站务</option>
+    </select>
+</div>
+
+        <div class="modal-body">
+            <textarea id="topicContentTextarea" placeholder="请输入文字，开始创作吧~"></textarea>
+        </div>
+
+        <div class="modal-footer">
+            <span id="topicStatusMessage"></span>
+            <button type="button" class="modal-publish-btn" id="publishTopicBtn">发表</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

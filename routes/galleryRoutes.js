@@ -36,15 +36,13 @@ router.get('/', async (req, res) => {
   try {
     const allGalleries = await Gallery.find({}).sort({ createdAt: -1 });
 
-    const formattedGalleries = allGalleries.map(gallery => ({
-      _id: gallery._id, // 新增：返回图库的唯一ID
-      title: gallery.title,
-      author: gallery.author,
-      // 从 images 数组中获取图片数量
-      image_count: gallery.images.length,
-      // 使用第一张图片的 URL 作为封面 URL
-      cover_url: gallery.images[0]?.url || ''
-    }));
+const formattedGalleries = allGalleries.map(gallery => ({
+  _id: gallery._id,
+  title: gallery.title,
+  author: gallery.author || '匿名用户', // ✅ 这里增加容错
+  image_count: gallery.images.length,
+  cover_url: gallery.images[0]?.url || ''
+}));
     
     res.json(formattedGalleries);
   } catch (err) {

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>推荐列表示例</title>
+    <style>
+        /* 整个推荐区块：白色背景，圆角+阴影 */
+        .recommend-list {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            padding: 16px;
+            max-width: 800px;
+            margin: 20px auto;
+            font-family: Arial, sans-serif;
+        }
+
+        /* 单个推荐条目：底部分隔线 */
+        .recommend-item {
+            padding: 16px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .recommend-item:last-child {
+            border-bottom: none;
+        }
+
+        /* 标题：加粗、hover 下划线 */
+        .recommend-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        .recommend-title:hover {
+            text-decoration: underline;
+            color: #0077cc;
+        }
+
+        /* 作者、更新时间、浏览量 */
+        .recommend-info {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 8px;
+            display: flex; /* 确保所有信息在同一行 */
+            flex-wrap: wrap; /* 空间不足时自动换行 */
+            align-items: center; /* 垂直居中对齐 */
+        }
+        .recommend-info span {
+            margin-right: 15px; /* 增加每个信息项之间的间隔 */
+        }
+        .info-stats {
+            display: inline-flex;
+            align-items: center;
+        }
+        .info-stats .icon {
+            margin-right: 4px; /* 图标与数字之间的间隔 */
+        }
+
+        /* 内容区：文字 + 封面图 */
+        .recommend-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .content-text {
+            flex: 1;
+            font-size: 0.95rem;
+            color: #444;
+            line-height: 1.5;
+        }
+        .content-image {
+            max-width: 200px; /* 设定一个你想要的图片最大宽度 */
+            max-height: 200px; /* 设定一个你想要的图片最大高度 */
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 6px;
+        }
+
+        /* 底部：字数 & 标签 */
+        .recommend-bottom {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #555;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .ankou-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .ankou-tags .tag {
+            background-color: #f3f3f3;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: #333;
+        }
+        
+        /* 【✅ 新增：发布状态标签样式】 */
+        .tag-published {
+            background-color: #4CAF50; /* 绿色 */
+            color: white;
+            font-weight: bold;
+        }
+        .tag-draft {
+            background-color: #ff9800; /* 橙色 */
+            color: white;
+        }
+        /* ------------------------------- */
+    </style>
+</head>
+<body>
+
+<section class="recommend-list">
+    <p style="text-align: center; color: #999; margin-top: 50px;">正在加载作品...</p>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const recommendList = document.querySelector('.recommend-list');
+    const API_BASE_URL = 'https://api.anchorx.ca/api/works/all';
+
+    /**
+     * 获取作品的最新更新时间。
+     * 优先使用内容中最新一页的创建时间，其次使用作品本身的 updatedAt。
+     * @param {object} work - 作品数据对象
+     * @returns {string|null} - ISO 格式的日期字符串或 null
+     */
+    function getLatestUpdateTime(work) {
+        // 1. 优先使用作品内容中最新一页的创建时间
+        if (Array.isArray(work.content) && work.content.length > 0) {
+            const lastPage = work.content[work.content.length - 1];
+            if (lastPage && lastPage.createdAt) {
+                return lastPage.createdAt;
+            }
+        }
+        
+        // 2. 回退到作品本身的 updatedAt
+        if (work.updatedAt) {
+            return work.updatedAt;
+        }
+
+        return null;
+    }
+
+    async function fetchAndRenderWorks() {
+        try {
+            const response = await fetch(API_BASE_URL, { method: 'GET' });
+            if (!response.ok) throw new Error('网络请求失败');
+
+            const works = await response.json();
+            recommendList.innerHTML = '';
+
+            if (!works || works.length === 0) {
+                recommendList.innerHTML =
+                    '<p style="text-align: center; color: #999; margin-top: 50px;">暂无作品。</p>';
+                return;
+            }
+
+        // 【✅ 新增：前端过滤未发布作品】
+        const publishedWorks = works.filter(work => work.isPublished === true);
+        // ------------------------------------
+
+        if (publishedWorks.length === 0) {
+             recommendList.innerHTML =
+                    '<p style="text-align: center; color: #999; margin-top: 50px;">暂无已发布的作品。</p>';
+                return;
+        }
+
+        // -------------------------------------------------------------------
+        // 【根据最新更新时间排序】使用过滤后的列表
+        // -------------------------------------------------------------------
+        publishedWorks.sort((a, b) => {
+            const timeA = getLatestUpdateTime(a);
+            const timeB = getLatestUpdateTime(b);
+
+            if (!timeA) return 1; 
+            if (!timeB) return -1; 
+
+            return new Date(timeB) - new Date(timeA);
+        });
+        // -------------------------------------------------------------------
+
+
+            publishedWorks.forEach(work => { // 【✅ 使用过滤后的列表】
+                const authorName = work.author ? work.author.username : '✍️用户';
+                
+                // 使用新的函数来获取更新时间
+                const latestDateString = getLatestUpdateTime(work);
+                const date = latestDateString ? new Date(latestDateString).toLocaleDateString() : '未知';
+
+                // === 字数统计 & 摘要（前端计算）===
+                let wordCount = 0;
+                let snippet = '';
+
+                if (Array.isArray(work.content) && work.content.length > 0) {
+                    // 遍历所有页统计字数
+                    wordCount = work.content.reduce((sum, p) => {
+                        if (!p.content) return sum;
+                        if (typeof p.content === 'string') {
+                            return sum + p.content.length;
+                        } else if (typeof p.content === 'object' && Array.isArray(p.content.ops)) {
+                            // 提取纯文本并计算长度，忽略图片等非文字内容
+                            const text = p.content.ops.map(op => {
+                                // 如果是图片，op.insert 是一个对象，我们忽略它
+                                return typeof op.insert === 'string' ? op.insert : '';
+                            }).join('');
+                            // 排除图片和换行符等非文字内容
+                            const cleanText = text.replace(/[\n\r\t\s\u200B-\u200D\uFEFF]/g, '');
+                            return sum + cleanText.length;
+                        }
+                        return sum;
+                    }, 0);
+
+                    // 摘要 = 第一页前100字
+                    const firstPage = work.content[0];
+                    if (firstPage && firstPage.content) {
+                        let text = '';
+                        if (typeof firstPage.content === 'string') {
+                            text = firstPage.content;
+                        } else if (typeof firstPage.content === 'object' && Array.isArray(firstPage.content.ops)) {
+                            text = firstPage.content.ops.map(op => typeof op.insert === 'string' ? op.insert : '').join('');
+                        }
+                        // 移除 Markdown 标记和换行符，取前 100 字
+                        const cleanSnippet = text.replace(/[\n\r\t\u200B-\u200D\uFEFF#*`]/g, '').trim();
+                        snippet = cleanSnippet.substring(0, 100) + (cleanSnippet.length > 100 ? '...' : '');
+                    }
+                } else {
+                    snippet = '已发布安科小说的摘要内容...';
+                }
+
+                // === 封面 ===
+                const coverImageSrc = work.coverImage
+                    ? work.coverImage
+                    : "https://i.ibb.co/QFPHMF8T/Copilot-20250922-174349.png";
+
+                // 【✅ 根据 isPublished 决定标签】
+                const statusTagHtml = work.isPublished
+                    ? '<span class="tag tag-published">✅ 已发布</span>'
+                    : '<span class="tag tag-draft">✏️ 草稿</span>';
+                // -------------------------------
+
+                // === 生成 HTML ===
+                const newItemHtml = `
+                    <article class="recommend-item" data-id="${work._id}">
+                        <a href="https://zhidianworld.com/read/?id=${work._id}" class="work-title-link">
+                            <h4 class="recommend-title">${work.title}</h4>
+                        </a>
+                        <p class="recommend-info">
+                            <span class="info-author">✍️ ${authorName}</span>
+                            <span class="info-update">⏰ ${date}更新</span>
+                            <span class="info-stats">
+                                <span class="info-views"><span class="icon">&#x1F441;</span>${work.views || 0}</span>
+                                <span class="info-likes"><span class="icon">&#x2764;</span>${work.likesCount || 0}</span>
+                            </span>
+                        </p>
+                        <div class="recommend-content">
+                            <p class="content-text">${snippet}</p>
+                            <img src="${coverImageSrc}" alt="安科封面" class="content-image">
+                        </div>
+                        <div class="recommend-bottom">
+                            <span class="word-count">安科·${wordCount}字</span>
+                            <div class="ankou-tags">
+                                <span class="tag">安科</span>
+                                ${statusTagHtml} </div>
+                        </div>
+                    </article>
+                `;
+                recommendList.insertAdjacentHTML('beforeend', newItemHtml);
+            });
+        } catch (error) {
+            console.error('获取作品列表失败:', error);
+            recommendList.innerHTML =
+                '<p style="text-align: center; color: red; margin-top: 50px;">加载失败，请刷新页面。</p>';
+        }
+    }
+
+    fetchAndRenderWorks();
+});
+</script>
+</body>
+</html>
