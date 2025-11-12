@@ -53,7 +53,7 @@ router.post('/mark-read/:id', auth, async (req, res) => {
 // ✅ 批量标记当前用户的所有通知为已读
 router.post('/mark-read/all', auth, async (req, res) => {
   try {
-    const userId = req.userData?.userId || req.user?._id;
+    const userId = req.userData ? req.userData.userId : null;
     if (!userId) {
       return res.status(401).json({ message: '用户身份验证失败' });
     }
