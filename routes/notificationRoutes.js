@@ -50,29 +50,32 @@ router.post('/mark-read/:id', auth, async (req, res) => {
     }
 });
 
-// ✅ 批量标记当前用户的所有通知为已读
 router.post('/mark-read/all', auth, async (req, res) => {
   try {
+    console.log('🪶 [mark-read/all] 触发，req.userData =', req.userData);
+
     const userId = req.userData ? req.userData.userId : null;
     if (!userId) {
+      console.warn('⚠️ 无法识别 userId');
       return res.status(401).json({ message: '用户身份验证失败' });
     }
 
-    // 确认 recipient 字段存在
     const result = await Notification.updateMany(
       { recipient: userId, read: false },
       { $set: { read: true } }
     );
 
-    return res.json({
+    console.log('✅ [mark-read/all] 更新结果:', result);
+    res.json({
       message: '所有消息已标记为已读',
       modifiedCount: result.modifiedCount
     });
   } catch (error) {
-    console.error('批量标记错误:', error);
+    console.error('❌ [mark-read/all] 批量标记错误详情:', error);
     res.status(500).json({ message: '批量标记失败', error: error.message });
   }
 });
+
 
 
 
