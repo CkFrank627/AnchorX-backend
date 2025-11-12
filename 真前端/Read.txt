@@ -1,0 +1,1864 @@
+ <!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>作品阅读</title>
+    <link href="https://api.anchorx.ca/vendor_assets/quill.snow.css" rel="stylesheet">
+  
+    <style>
+        /* ===================
+        Quill 默认样式覆盖
+        =================== */
+        #book-content .ql-editor {
+            padding: 0;
+            /* 新增: 强制长文本换行 */
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+          /* 【修改点 1：增大行间距】 1.8 倍通常非常舒适 */
+        line-height: 1.8; 
+        
+        /* 【修改点 2：设置字体样式】优先使用系统默认的衬线/无衬线中文字体 */
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+        
+        #book-content .ql-container.ql-snow {
+            border: none !important;
+        }
+        #book-content .ql-toolbar.ql-snow {
+            display: none !important;
+        }
+        /* 隐藏 Quill 默认的空内容提示 */
+        #book-content .ql-editor.ql-blank::before {
+            content: none !important;
+            display: none !important;
+        }
+
+        /* ===================
+        阅读页整体样式
+        =================== */
+        .book-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 100%;
+            margin: 20px auto; /* 居中 */
+        }
+
+        .book-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .book-header h1 {
+            font-size: 2.2rem;
+            color: #222;
+            margin: 0 0 10px;
+        }
+        .book-header p {
+            font-size: 0.9rem;
+            color: #888;
+            margin: 0;
+        }
+
+        .book-content {
+            line-height: 1.8;
+            font-size: 1.1rem;
+            color: #333;
+        }
+
+        /* 右侧评论区容器 */
+        .comment-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 350px; /* 评论区宽度 */
+            height: 100%;
+            background-color: #f8f9fa;
+            box-shadow: -2px 0 6px rgba(0,0,0,0.1);
+            transform: translateX(100%); /* 默认隐藏在右侧 */
+            transition: transform 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        .comment-panel.show {
+            transform: translateX(0); /* 显示时滑入 */
+        }
+        /* 专门用于折叠的类 */
+        .collapsed {
+            display: none !important;
+        }
+        /* 评论区头部 */
+        .comment-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .comment-panel-header h4 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #333;
+        }
+        #close-comment-panel-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+        /* 评论列表 */
+        .comment-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        .comment-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* 新增：评论点赞和回复样式 */
+        .comment-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            color: #888;
+        }
+        .like-btn, .reply-link {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0;
+            color: #888;
+        }
+        .like-btn.liked {
+            color: #e53e3e; /* 点赞后变红色 */
+        }
+        .reply-link {
+            text-decoration: underline;
+            font-size: 0.85rem;
+        }
+        .like-count {
+            margin-left: -5px;
+        }
+          
+        .comment-item:last-child {
+            border-bottom: none;
+        }
+        .comment-item strong {
+            color: #0077cc;
+        }
+        .no-comments-tip {
+            text-align: center;
+            color: #999;
+            margin-top: 20px;
+        }
+        /* 输入区 */
+        .comment-input-area {
+            padding: 15px;
+            border-top: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #comment-textarea {
+            width: 100%;
+            height: 80px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: none;
+        }
+        #submit-comment-btn {
+            padding: 8px 15px;
+            background-color: #0077cc;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            align-self: flex-end;
+        }
+
+        .floor {
+            border: 1px solid #ccc;
+            margin: 20px auto;
+            padding: 20px;
+            max-width: 800px;
+            border-radius: 6px;
+            background: #fff;
+        }
+/* ------------------------------------------- */
+/* 局部代码修改和新增 */
+/* ------------------------------------------- */
+
+/* 修改 .floor-header 以支持定位右上角的按钮 */
+.floor-header {
+    font-weight: bold;
+    margin-bottom: 10px;
+    display: flex; /* 新增: 启用 Flexbox */
+    justify-content: space-between; /* 新增: 分散内容 */
+    align-items: center; /* 新增: 垂直居中 */
+}
+
+/* 楼层/翻页模式下的评论按钮样式 */
+.comment-view-btn {
+    background: none;
+    border: none;
+    color: #0077cc; /* 使用主题色 */
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0 5px;
+    white-space: nowrap;
+    transition: color 0.2s;
+}
+
+.comment-view-btn:hover {
+    color: #005fa3;
+}
+
+/* 翻页模式下，页脚需要一个定位基点来放置按钮 */
+.page-footer {
+    /* 原有样式不变，但确保它是定位上下文 */
+    position: relative; /* 确保它能作为 .page-view-comment-btn 的定位父级 */
+    text-align: center;
+    margin-top: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* 翻页模式下评论按钮的定位 (右上角) */
+.page-view-comment-btn {
+    position: absolute;
+    /* 调整 top 和 right，使其位于 30px padding 区域内，看起来更贴合边角 */
+    right: 15px;  
+    top: 15px; 
+    /* 移除原有居中定位属性 */
+    transform: none; 
+    z-index: 10; /* 确保按钮在文字内容之上 */
+}
+
+/* ------------------------------------------- */
+/* B. 新增：禁用评论输入区样式 */
+/* ------------------------------------------- */
+
+/* 禁用评论输入区样式 (Viewer Mode) */
+.comment-panel.viewer-mode .comment-input-area {
+    /* 视觉上禁用 */
+    background-color: #e9ecef; 
+    opacity: 0.7;
+    pointer-events: none; /* 彻底禁用所有交互 */
+}
+
+/* 确保夜间模式下的禁用样式也生效 */
+.comment-panel.dark-mode.viewer-mode .comment-input-area {
+    background-color: #33363b;
+    opacity: 0.7;
+}
+.page-view {
+            word-wrap: break-word;
+            max-width: 100%;         /* 不允许超出容器宽度 */
+            border: 1px solid #ccc;
+            margin: 20px auto;
+            padding: 30px;
+            max-width: 800px;
+            border-radius: 6px;
+            background: #fff;
+
+          word-break: break-all;   /* 中文、英文长串都强制换行 */
+    overflow-wrap: anywhere; /* 现代浏览器推荐 */
+    /*white-space: pre-wrap;*/   /* 既保留换行，又允许折行 */
+        }
+
+
+/* ------------------------------------------- */
+/* 通用部分：侧边栏折叠逻辑 + 按钮样式 */
+/* ------------------------------------------- */
+
+/* 侧边栏折叠时整体左移隐藏 */
+#sidebar.collapsed {
+    transform: translateX(-100%);
+}
+
+/* 侧边栏固定样式（保持原来位置） */
+#sidebar {
+    position: fixed;
+    left: calc(50% - 400px - 70px - 50px);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 70px;
+    background: #f5f5f5;
+    border-radius: 0 8px 8px 0;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    z-index: 1000;
+    transition: transform 0.3s ease-in-out, left 0.3s ease-in-out;
+}
+
+/* 桌面端：按钮紧贴侧边栏顶部 */
+#sidebar-toggle-container {
+    position: fixed;
+    /* 与侧边栏保持相同 left 基准，只需略微居中 */
+    left: calc(50% - 400px - 70px - 50px + 35px);
+    top: calc(50% - 70px / 2); /* 精确对齐：侧边栏中心往上 侧边栏一半高度 + 微调 */
+  transform: translateY(-470%); /* 让按钮刚好顶在侧边栏上方 */
+    z-index: 1001;
+
+    background: #f5f5f5;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
+    padding: 4px 6px;
+    transition: left 0.3s ease-in-out, top 0.3s ease-in-out;
+}
+
+/* 按钮样式 */
+#sidebar-toggle-btn {
+    padding: 0;
+    border: none;
+    background-color: transparent;
+    color: #333;
+    font-size: 1.4rem;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#sidebar-toggle-btn:hover {
+    color: #0077cc;
+}
+
+/* ------------------------------------------- */
+/* 手机端适配：按钮浮在左上角，侧边栏覆盖全屏左侧 */
+/* ------------------------------------------- */
+
+@media (max-width: 1050px) {
+    /* 让侧边栏成为左滑菜单 */
+    #sidebar {
+        top: 0;
+        left: 0;
+        transform: translateX(-100%);
+        width: 240px; /* 移动端宽度 */
+        height: 100vh;
+        border-radius: 0;
+        justify-content: flex-start;
+        padding-top: 60px;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+        transition: transform 0.3s ease-in-out;
+    }
+
+    #sidebar.show {
+        transform: translateX(0);
+    }
+
+    /* 按钮固定在左上角 */
+    #sidebar-toggle-container {
+        position: fixed;
+        top: 120px;
+        left: 12px;
+        transform: none;
+        z-index: 1200;
+        background: rgba(245, 245, 245, 0.95);
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        padding: 6px 8px;
+    }
+
+    #sidebar-toggle-btn {
+        font-size: 1.6rem;
+        color: #333;
+    }
+
+    /* 折叠时按钮样式变化 */
+    #sidebar-toggle-btn[aria-expanded="false"] {
+        color: #0077cc;
+    }
+}
+
+
+      .page-view, .floor-body, #book-content .ql-editor {
+    word-break: break-all;   /* 中文、英文长串都强制换行 */
+    overflow-wrap: anywhere; /* 现代浏览器推荐 */
+    white-space: pre-wrap;   /* 既保留换行，又允许折行 */
+}
+          
+        .sidebar-btn-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-radius: 6px;
+        }
+        .sidebar-btn-group:hover {
+            background-color: #e0e0e0;
+        }
+        .sidebar-btn-group button {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border: none;
+            background-color: transparent;
+            color: #333;
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .sidebar-btn-group span {
+            font-size: 0.75rem;
+            color: #666;
+            line-height: 1;
+        }
+        .like-counter {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: -5px;
+            line-height: 1;
+            text-align: center;
+        }
+        .like-icon.liked {
+            color: #e53e3e;
+        }
+          
+        .nav-toggle-icon {
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+          
+
+        /* 导航网格浮窗 */
+        .nav-grid-popup {
+            position: fixed;
+            left: 70px; /* 紧贴侧边栏 */
+            top: 50%;
+            transform: translateY(-50%);
+            width: 250px;
+            max-height: 400px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1010;
+            display: none; /* 默认隐藏 */
+            flex-wrap: wrap;
+            gap: 10px;
+            overflow-y: auto;
+        }
+        .nav-grid-popup.show {
+            display: flex;
+        }
+        .nav-cell {
+            flex-grow: 1;
+            flex-basis: 40px;
+            min-width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #f0f2f5;
+            color: #333;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .nav-cell:hover {
+            background: #e9ecef;
+        }
+      
+/* ------------------------------------------- */
+/* 修正：彻底的夜间模式样式 (DARK MODE) */
+/* ------------------------------------------- */
+
+/* 1. 全局背景和默认文字颜色 */
+body.dark-mode {
+    /* 核心：最深的背景色 */
+    background-color: #1a1a1a; 
+    color: #c9d1d9; 
+}
+
+/* 2. 主要内容容器 (Book Container) */
+.book-container.dark-mode {
+    background-color: #2d3035 !important; 
+    /* 关键修正: 使用深色阴影，防止边缘出现浅色光晕 */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); 
+    /* 修正: 边框改为深色 */
+    border: 1px solid #444 !important; 
+}
+
+/* 3. 楼层/翻页模式容器 (Floor / Page View) */
+.floor.dark-mode, 
+.page-view.dark-mode {
+    background: #2d3035 !important; /* 强制深色背景 */
+    /* 关键修正: 覆盖普通模式下的浅色边框 */
+    border: 1px solid #444 !important; 
+    color: #c9d1d9; 
+    /* 翻页/楼层模式可能没有阴影，但如果有，确保其被覆盖 */
+    box-shadow: none; 
+}
+
+/* 4. 左侧操作栏（#sidebar） */
+#sidebar.dark-mode { 
+    background: #2d3035;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.4);
+    /* 修正: 移除侧边栏默认的白色背景或边框 */
+    border: none; 
+    border-right: 1px solid #444; /* 保留分隔线 */
+}
+.sidebar-btn-group.dark-mode {
+    background-color: transparent; 
+}
+.sidebar-btn-group.dark-mode:hover {
+    background-color: #3d4147;
+}
+.sidebar-btn-group.dark-mode button {
+    color: #c9d1d9;
+}
+.sidebar-btn-group.dark-mode span {
+    color: #aaa;
+}
+
+
+/* 5. 评论区（Comment Panel） */
+.comment-panel.dark-mode {
+    background-color: #22252a; 
+    box-shadow: -2px 0 6px rgba(0,0,0,0.4);
+    border-left: 1px solid #444;
+}
+/* 评论列表项、输入区和边框 */
+.comment-item.dark-mode {
+    border-bottom: 1px solid #444;
+    color: #c9d1d9;
+}
+.comment-panel.dark-mode .comment-input-area,
+.comment-panel.dark-mode #comment-textarea {
+    background-color: #2d3035;
+    border: 1px solid #444;
+    color: #c9d1d9;
+}
+.comment-panel-header.dark-mode {
+    border-bottom: 1px solid #444;
+}
+.comment-panel.dark-mode .comment-list {
+    border-top: 1px solid #444;
+}
+
+
+/* 6. 导航浮窗 (Nav Grid Popup) */
+.nav-grid-popup.dark-mode {
+    background-color: #2d3035;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.nav-cell.dark-mode {
+    background-color: #33363b;
+    /* 修正: 覆盖浅色边框 */
+    border: 1px solid #444 !important; 
+    color: #c9d1d9;
+}
+.nav-cell.dark-mode:hover {
+    background: #444;
+}
+
+/* 7. Quill 内容覆盖（确保内容区内部无白色） */
+/* 关键覆盖 1：确保 Quill 容器和主内容区的背景是深色 */
+.book-container.dark-mode #book-content,
+.book-container.dark-mode .floor-body {
+    background-color: #2d3035 !important; 
+    color: #c9d1d9;
+}
+
+/* 关键覆盖 2：针对 Quill 编辑器核心 (ql-editor) */
+.book-container.dark-mode #book-content .ql-editor {
+    color: #c9d1d9 !important; 
+    background-color: transparent !important; 
+}
+
+/* 关键覆盖 3：针对 Quill 内部的元素 */
+.book-container.dark-mode .ql-editor p,
+.book-container.dark-mode .ql-editor h1,
+.book-container.dark-mode .ql-editor h2,
+.book-container.dark-mode .ql-editor li,
+.book-container.dark-mode .ql-editor blockquote {
+    color: #c9d1d9 !important;  
+    background-color: transparent !important; 
+    border-color: #444 !important; 
+}
+
+/* 关键覆盖 4：确保 Quill Snow 主题的外部容器不会是白色 */
+.book-container.dark-mode .ql-container.ql-snow {
+    background-color: transparent !important;
+}
+
+/* ... 保持其他如 Page Footer 和 Spoiler/Secret 的 dark-mode 规则不变 ... */
+
+/* 8. 翻页按钮 (Page Footer) */
+.page-footer.dark-mode {
+    background-color: transparent;  
+}
+.page-footer.dark-mode button {
+    background-color: #444;
+    color: #c9d1d9;
+    border: 1px solid #666;
+}
+.page-footer.dark-mode button:hover:not(:disabled) {
+    background-color: #555;
+}
+.page-footer.dark-mode #page-indicator {
+    color: #c9d1d9;
+}
+
+/* 9. 剧透和暗骰样式 (Spoiler/Secret) */
+body.dark-mode .ql-editor .spoiler-hidden {
+    background-color: #33363b;  
+    color: #33363b;  
+}
+body.dark-mode .ql-editor .spoiler-hidden[data-mode="spoiler"]:hover {
+    color: #c9d1d9;
+    background-color: transparent;
+}
+body.dark-mode .ql-editor .spoiler-hidden[data-mode="secret"],
+body.dark-mode .ql-editor .spoiler-hidden[data-mode="secret"]:hover {
+    background-color: #4a0000;
+    color: #4a0000;
+    border: 1px solid #666;
+}
+
+      #quill-page-view .ql-editor {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+      /* ------------------------------------------- */
+/* 新增：隐藏文字 (Spoiler) Blot的阅读端CSS */
+/* ------------------------------------------- */
+
+/* Base style for both modes */
+.ql-editor .spoiler-hidden {
+    /* 默认隐藏样式：白底藏白字，确保在阅读端看起来像默认文本 */
+    background-color: #000; 
+    color: #000; 
+    padding: 0 4px; 
+    border-radius: 2px;
+    transition: color 0.3s, background-color 0.3s;
+}
+
+/* 模式 1: 剧透模式 (鼠标悬停即显示) */
+.ql-editor .spoiler-hidden[data-mode="spoiler"] {
+    cursor: pointer;
+}
+.ql-editor .spoiler-hidden[data-mode="spoiler"]:hover {
+    color: #000; /* 悬停时显示文字为黑色 */
+    background-color: transparent; /* 背景透明 */
+}
+
+/* 模式 2: 暗骰模式 (在阅读器内始终隐藏) */
+.ql-editor .spoiler-hidden[data-mode="secret"] {
+    background-color: #6a0000; /* 使用特殊的暗色区分 */
+    color: #6a0000;
+    cursor: default; 
+    border: 1px solid #999;
+}
+
+/* 确保暗骰在阅读端保持隐藏 */
+.ql-editor .spoiler-hidden[data-mode="secret"]:hover {
+    color: #6a0000;
+    background-color: #6a0000;
+}
+
+/* 夜间模式覆盖 */
+body.dark-mode .ql-editor .spoiler-hidden {
+    background-color: #33363b; 
+    color: #33363b; 
+}
+body.dark-mode .ql-editor .spoiler-hidden[data-mode="spoiler"]:hover {
+    color: #c9d1d9; 
+    background-color: transparent;
+}
+body.dark-mode .ql-editor .spoiler-hidden[data-mode="secret"],
+body.dark-mode .ql-editor .spoiler-hidden[data-mode="secret"]:hover {
+    background-color: #4a0000;
+    color: #4a0000;
+    border: 1px solid #666;
+}
+
+/* ------------------------------------------- */
+/* 新增：图片最大显示范围限制机制 */
+/* ------------------------------------------- */
+
+/* 针对 #book-content 容器内的所有图片进行限制 */
+#book-content img {
+    /* 1. 限制宽度和高度，确保图片不会超出阅读区 */
+    max-width: 100%; /* 图片最大宽度不能超过其父元素（阅读内容区）的宽度 */
+    max-height: 80vh; /* 限制图片的最大高度为视口高度的 80% (例如，防止超长图片霸屏) */
+    
+    /* 2. 保持图片的宽高比 */
+    height: auto; 
+    width: auto; /* 通常 max-width: 100% 已经保证了等比例缩放 */
+    
+    /* 可选: 确保图片在页面中居中显示 */
+    display: block;
+    margin: 10px auto; 
+    
+    /* 可选: 增加过渡效果，使图片调整更平滑 */
+    transition: max-width 0.3s, max-height 0.3s; 
+}
+
+/* 新增：句末评论标识样式 */
+.comment-indicator {
+    margin-left: 5px;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #0077cc; /* 使用主题色 */
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    user-select: none; /* 防止被选中 */
+    white-space: nowrap; /* 避免换行 */
+}
+
+.comment-indicator:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+/* 默认显示 emoji + 文字 */
+.comment-indicator::before {
+    content: "💬"; 
+}
+
+/* 点击句子后，高亮当前评论目标 */
+.active-comment-target {
+    background-color: rgba(0, 119, 204, 0.1); /* 浅蓝色背景高亮 */
+    padding: 2px 0;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+  /* =============== 修复隐藏文字样式不生效的问题 =============== */
+/* 让非 Quill 容器（如楼层/翻页内容）中的隐藏文字也能显示效果 */
+.floor-body .spoiler-hidden,
+.page-view .spoiler-hidden,
+.book-content .spoiler-hidden {
+    background-color: #000;
+    color: #000;
+    padding: 0 4px;
+    border-radius: 2px;
+    transition: color 0.3s, background-color 0.3s;
+}
+
+/* 模式1：剧透（hover 显示） */
+.floor-body .spoiler-hidden[data-mode="spoiler"],
+.page-view .spoiler-hidden[data-mode="spoiler"],
+.book-content .spoiler-hidden[data-mode="spoiler"] {
+    cursor: pointer;
+}
+.floor-body .spoiler-hidden[data-mode="spoiler"]:hover,
+.page-view .spoiler-hidden[data-mode="spoiler"]:hover,
+.book-content .spoiler-hidden[data-mode="spoiler"]:hover {
+    color: #000;
+    background-color: transparent;
+}
+
+/* 模式2：暗骰（始终隐藏） */
+.floor-body .spoiler-hidden[data-mode="secret"],
+.page-view .spoiler-hidden[data-mode="secret"],
+.book-content .spoiler-hidden[data-mode="secret"] {
+    background-color: #6a0000;
+    color: #6a0000;
+    border: 1px solid #999;
+}
+
+/* 夜间模式覆盖 */
+body.dark-mode .floor-body .spoiler-hidden,
+body.dark-mode .page-view .spoiler-hidden,
+body.dark-mode .book-content .spoiler-hidden {
+    background-color: #33363b;
+    color: #33363b;
+}
+body.dark-mode .floor-body .spoiler-hidden[data-mode="spoiler"]:hover,
+body.dark-mode .page-view .spoiler-hidden[data-mode="spoiler"]:hover,
+body.dark-mode .book-content .spoiler-hidden[data-mode="spoiler"]:hover {
+    color: #c9d1d9;
+    background-color: transparent;
+}
+body.dark-mode .floor-body .spoiler-hidden[data-mode="secret"],
+body.dark-mode .page-view .spoiler-hidden[data-mode="secret"],
+body.dark-mode .book-content .spoiler-hidden[data-mode="secret"] {
+    background-color: #4a0000;
+    color: #4a0000;
+    border: 1px solid #666;
+}
+
+/* ===================
+翻页模式下“查看评论”按钮定位
+=================== */
+.book-content {
+    position: relative; /* 关键：建立定位上下文 */
+}
+
+.page-view-comment-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 20;
+    background-color: #0077cc;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.page-view-comment-btn:hover {
+    background-color: #005fa3;
+}
+
+/* 夜间模式适配（可选） */
+body.dark-mode .page-view-comment-btn {
+    background-color: #444;
+    color: #c9d1d9;
+}
+body.dark-mode .page-view-comment-btn:hover {
+    background-color: #555;
+}     
+    </style>
+
+    <div class="book-container">
+        <div class="book-header">
+            <h1 id="work-title">正在加载...</h1>
+            <p id="work-info">作者：<span id="work-author">未知</span> | 更新时间：<span id="work-date">未知</span></p>
+        </div>
+        <div class="book-content" id="book-content">
+          <!-- ✅ 新增查看评论按钮 -->
+        <button class="page-view-comment-btn" id="open-comment-panel-btn">查看评论</button>
+            <p>作品内容正在加载中...</p>
+        </div>
+    </div>
+
+  <div id="sidebar-toggle-container">
+    <button id="sidebar-toggle-btn" aria-expanded="true" title="收起侧边栏">
+        <span id="sidebar-toggle-icon">⮝</span>
+    </button>
+</div>
+
+    <aside id="sidebar">
+        <div class="sidebar-btn-group" id="scroll-mode-btn">
+            <button>&#x1F4DC;</button>
+            <span>楼层模式</span>
+        </div>
+        <div class="sidebar-btn-group" id="page-mode-btn">
+            <button>&#x1F4D6;</button>
+            <span>翻页模式</span>
+        </div>
+        <div class="sidebar-btn-group" id="nav-toggle-btn">
+            <button class="nav-toggle-icon">&#8635;</button>
+            <span>导航</span>
+        </div>
+        <div class="sidebar-btn-group" id="light-switch-btn">
+            <button>&#x1F311;</button>
+            <span>夜间模式</span>
+        </div>
+        <div class="sidebar-btn-group" id="like-work-btn">
+            <button class="like-icon">❤</button>
+            <span class="like-counter">0</span>
+            <span>点赞</span>
+        </div>
+    </aside>
+
+    <aside id="comment-panel" class="comment-panel">
+        <div class="comment-panel-header">
+            <h4>评论</h4>
+            <button id="close-comment-panel-btn">×</button>
+        </div>
+        <div id="comment-list" class="comment-list">
+            <p class="no-comments-tip">暂无评论</p>
+        </div>
+        <div class="comment-input-area">
+            <textarea id="comment-textarea" placeholder="写下你的评论..."></textarea>
+            <button id="submit-comment-btn">发表</button>
+        </div>
+    </aside>
+
+    <div class="nav-grid-popup" id="nav-grid-popup"></div>
+
+     <script src="https://api.anchorx.ca/vendor_assets/quill.js"></script>
+    <script>
+  /* ---------- 1. 注册自定义 Blot（插件） - 确保阅读端能解析 HiddenTextBlot ---------- */
+    // 导入 Quill 核心 Blot 类
+    const Inline = Quill.import('blots/inline');
+
+    /* 隐藏文字（Inline Blot） */
+    class HiddenTextBlot extends Inline {
+        static blotName = 'hiddenText';
+        static tagName = 'span';
+        static className = 'spoiler-hidden';
+
+        // 静态方法：从 DOM 节点解析出格式值
+        static formats(node) {
+            const mode = node.getAttribute('data-mode') || 'spoiler';
+            return { mode };
+        }
+
+        // 静态方法：创建 DOM 节点 (在阅读端 setContents 时使用)
+static create(value) {
+    const node = super.create(value);
+    let mode = 'spoiler'; // 默认模式
+
+    // ✅ 优化: 精简判断逻辑
+    if (value && typeof value === 'object' && value.mode) {
+        mode = value.mode;
+    }
+
+    // 设置自定义属性和可能的特定 class
+    node.setAttribute('data-mode', mode);
+    if (mode === 'secret') {
+        node.classList.add('secret-dice');
+    } else {
+        node.classList.remove('secret-dice');
+    }
+    return node;
+}
+
+        // 实例方法：更新格式属性 (在阅读端 readOnly=true, 仅供完整性保留)
+        format(name, value) {
+            if (name === 'hiddenText' && value && value.mode) {
+                this.domNode.setAttribute('data-mode', value.mode);
+                if (value.mode === 'secret') {
+                    this.domNode.classList.add('secret-dice');
+                } else {
+                    this.domNode.classList.remove('secret-dice');
+                }
+            } else {
+                super.format(name, value);
+            }
+        }
+    }
+
+    // 注册自定义 Blot
+    Quill.register(HiddenTextBlot);
+      
+    document.addEventListener('DOMContentLoaded', () => {
+        // DOM 元素
+        const workTitle = document.getElementById('work-title');
+        const workAuthor = document.getElementById('work-author');
+        const workDate = document.getElementById('work-date');
+        const bookContent = document.getElementById('book-content');
+        const commentPanel = document.getElementById('comment-panel');
+        const closeCommentBtn = document.getElementById('close-comment-panel-btn');
+        const commentList = document.getElementById('comment-list');
+        const commentTextarea = document.getElementById('comment-textarea');
+        const submitCommentBtn = document.getElementById('submit-comment-btn');
+        const likeWorkBtn = document.getElementById('like-work-btn');
+        const likeCounter = likeWorkBtn.querySelector('.like-counter');
+        const likeIcon = likeWorkBtn.querySelector('.like-icon');
+        const sidebar = document.getElementById('sidebar');
+
+      // 【新增代码】：侧边栏折叠按钮
+        const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+        const sidebarToggleIcon = document.getElementById('sidebar-toggle-icon');
+
+        const API_WORKS = 'https://api.anchorx.ca/api/works';
+        const API_COMMENTS = 'https://api.anchorx.ca/api/comments';
+
+
+        // 全局状态
+        let activeWork = null;      // 完整 work 对象
+        let activePages = [{content: {ops: []}}]; // array of pages
+        let currentMode = 'scroll';  // 'scroll' | 'page'
+        let currentPageIndex = 0;
+        let activeSentenceEl = null; // 被点击用于评论的段落元素
+        let pageQuill = null;        // 在翻页模式下动态创建的 Quill 实例
+        let rendererQuill = null;    // 隐藏的 Quill 用于 Delta -> HTML 转换
+
+          let contentIndexCounter = 0; // 全局计数器，用于生成唯一ID
+
+      // 【新增核心状态】
+let allComments = [];                 // 存储作品所有评论 (用于过滤)
+let commentedSentenceIds = new Set(); // 存储所有有评论的 sentenceId (用于标记)
+let currentViewingSentenceId = null;  // 当前评论区显示的特定句子 ID
+let currentViewingPageSentenceIds = null; // 当前评论区显示的页面句子 ID 列表
+
+        // 局部修改: 关闭评论区时，同时取消“查看模式”
+closeCommentBtn.addEventListener('click', () => {
+    commentPanel.classList.remove('show');
+    disableCommentInputArea(false); // <--- 新增: 恢复评论功能
+    commentPanel.querySelector('h4').textContent = `评论`; // <--- 恢复标题
+});
+
+        // 如果需要 token（发表评论/点赞）
+        function getAuthHeader() {
+            const token = localStorage.getItem('token');
+            return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+
+        /* ---------- 初始化隐藏的 renderer Quill（用于把 Delta 转为 HTML） ---------- */
+        (function initRendererQuill() {
+            const r = document.createElement('div');
+            r.style.position = 'absolute';
+            r.style.left = '-9999px';
+            r.style.top = '-9999px';
+            r.style.width = '10px';
+            r.style.height = '10px';
+            document.body.appendChild(r);
+            // readOnly 不影响 setContents 的输出
+            rendererQuill = new Quill(r, { theme: 'snow', modules: { toolbar: false }, readOnly: true });
+        })();
+
+// Delta -> HTML（安全降级：如果传入的是字符串就直接返回字符串）
+function deltaToHtml(deltaOrHtml) {
+    try {
+        if (!deltaOrHtml) return '<p>（空白）</p>';
+if (typeof deltaOrHtml === 'string') {
+    // 检测字符串是否是 JSON 格式的 Delta
+    try {
+        const maybeDelta = JSON.parse(deltaOrHtml);
+        if (maybeDelta && maybeDelta.ops) {
+            rendererQuill.setContents(maybeDelta);
+            return rendererQuill.root.innerHTML;
+        }
+    } catch {}
+    // 否则直接当 HTML 使用，不做 escape
+    return deltaOrHtml;
+}
+        
+        rendererQuill.setContents(deltaOrHtml);
+        const contentHtml = rendererQuill.root.innerHTML;
+
+        // 💥 关键修改：检测是否已有 .ql-editor 容器，防止嵌套
+// ✅ 修改后：不再包裹 .ql-editor，以免嵌套
+if (/<div class="ql-editor">/i.test(contentHtml)) {
+    return contentHtml; 
+}
+
+// 直接返回生成的 HTML，不再添加 .ql-editor 容器
+return contentHtml;
+        
+    } catch (e) {
+        console.warn('deltaToHtml fallback', e);
+        return '<p>（无法显示此内容）</p>';
+    }
+}
+
+/* ---------- 加载作品（统一使用 pages / 兼容 content） ---------- */
+async function loadWorkContentById(id) {
+    if (!id) return displayError('作品ID无效，请返回主页。');
+
+    try {
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const res = await fetch(`${API_WORKS}/${id}`, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status} - 获取作品失败`);
+
+        const work = await res.json();
+
+        // 保存 activeWork
+        activeWork = work;
+
+        // 获取作品的所有评论（假设你有这个函数）
+        await fetchAllWorkComments(work.workId || id);
+
+        // 处理 pages 的来源：优先 work.pages，再 fallback work.content，如果都没有则默认空页
+        if (Array.isArray(work.pages) && work.pages.length > 0) {
+            activePages = work.pages;
+        } else if (Array.isArray(work.content) && work.content.length > 0) {
+            activePages = work.content;
+        } else {
+            activePages = [{ content: { ops: [] } }];
+        }
+
+        // 更新页面基本信息
+        document.title = (work.title || '作品') + ' - 作品详情';
+        workTitle.textContent = work.title || '未命名';
+        workAuthor.textContent = work.author ? (work.author.username || '作者') : '未知';
+
+      // ✅ 新增：显示更新时间
+if (work.updatedAt) {
+    workDate.textContent = `更新时间：${new Date(work.updatedAt).toLocaleString()}`;
+} else {
+    workDate.textContent = `更新时间：未知`;
+}
+
+        // -------------------------
+        // 处理每页内容，注入 data-sentence-id 并处理 Delta / 图片 URL
+        // -------------------------
+        let sentenceIndex = 0;
+
+activePages.forEach(page => {
+    if (!page.content) page.content = { ops: [] };
+
+    let html = '';
+
+    if (typeof page.content === 'object' && page.content.ops) {
+        // 使用隐藏的 Quill 渲染 Delta → HTML
+        rendererQuill.setContents(page.content);
+        const rawHtml = rendererQuill.root.innerHTML; // ✅ 移到这里
+        console.log("✅ Quill 生成 HTML:", rawHtml.slice(0, 200));
+
+        // 🔥 修复点：一定要缓存 HTML，否则渲染器拿不到内容
+        const { element: tempDiv, nextIndex } = segmentContentAndAddIds(rawHtml, work._id, sentenceIndex);
+        sentenceIndex = nextIndex;
+        page.segmentedHtml = tempDiv.innerHTML;
+    } else {
+        html = page.content || '<p>（空白页面）</p>';
+        const { element: tempDiv, nextIndex } = segmentContentAndAddIds(html, work._id, sentenceIndex);
+        sentenceIndex = nextIndex;
+        page.segmentedHtml = tempDiv.innerHTML;
+    }
+});
+
+
+
+        // -------------------------
+        // 渲染页面（你原来的渲染模式）
+        // -------------------------
+        renderCurrentMode();
+
+    } catch (err) {
+        console.error('loadWorkContentById 错误:', err);
+        displayError(`加载作品失败: ${err.message}`);
+    }
+}
+
+function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = rawHtmlContent;
+  let counter = startIndex;
+  Array.from(tempDiv.children).forEach(el => {
+    if (el.nodeType === 1 && el.tagName !== 'SCRIPT' && el.textContent.trim() !== '') {
+      if (!el.hasAttribute('data-sentence-id')) {
+        const sentenceId = `s_${workId}_${counter++}`;
+        el.setAttribute('data-sentence-id', sentenceId);
+      }
+    }
+  });
+
+  console.log("🧩 segmentContentAndAddIds 生成的 ID:", 
+      Array.from(tempDiv.querySelectorAll('[data-sentence-id]')).map(el => el.dataset.sentenceId)
+  );
+
+  return { element: tempDiv, nextIndex: counter };
+}
+
+
+
+      // 【新增函数】：获取作品所有评论，并更新全局状态
+async function fetchAllWorkComments(workId) {
+  try {
+    const headers = getAuthHeader();
+    const commentsRes = await fetch(`${API_COMMENTS}/work/${workId}`, { headers });
+    if (!commentsRes.ok) throw new Error('获取所有作品评论失败');
+    allComments = await commentsRes.json();
+    commentedSentenceIds = new Set(allComments.map(c => c.sentenceId));
+
+    console.log("🧩 allComments 示例：", allComments.slice(0, 5));
+    console.log("🧩 commentedSentenceIds 示例：", Array.from(commentedSentenceIds).slice(0, 5));
+    console.log(`作品共有 ${allComments.length} 条评论，分布在 ${commentedSentenceIds.size} 个句子上。`);
+  } catch (error) {
+    console.error('加载评论数据失败:', error);
+  }
+}
+
+
+        /* ---------- displayError（不要操作 Quill 的 DOM） ---------- */
+        function displayError(message) {
+            // 统一把错误直接写入 bookContent（我们不在这里绑定 Quill 到 bookContent）
+            bookContent.innerHTML = `<p style="color:red;text-align:center;">${escapeHtml(message)}</p>`;
+            workTitle.textContent = '错误';
+        }
+
+        function escapeHtml(text) {
+            const map = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' };
+            return String(text || '').replace(/[&<>"']/g, m => map[m]);
+        }
+
+ // ...
+/* ---------- 渲染器：楼层（滚动）模式 ---------- */
+function renderScrollMode() {
+    // 1. 清理环境
+    destroyPageModeQuill();
+    bookContent.innerHTML = ''; // bookContent 不再是 quill 的 container
+
+    // 2. 遍历并渲染所有楼层
+    activePages.forEach((page, pageIndex) => {
+        const floorDiv = document.createElement('div');
+        floorDiv.className = 'floor';
+        floorDiv.dataset.pageIndex = String(pageIndex);
+
+        const header = document.createElement('div');
+        header.className = 'floor-header';
+        
+        // 1. 左侧：楼层信息
+        const updatedAt = page.updatedAt 
+    ? new Date(page.updatedAt).toLocaleString()
+    : (activeWork.updatedAt 
+        ? new Date(activeWork.updatedAt).toLocaleString() 
+        : '未知');
+        const leftText = document.createElement('span');
+        leftText.textContent = `第 ${pageIndex + 1} 楼 · 更新时间：${updatedAt}`;
+
+        // 2. 右侧：查看评论按钮
+        const commentBtn = document.createElement('button');
+        commentBtn.className = 'comment-view-btn';
+        // 假设 page.commentsCount 字段存在
+        const commentCount = getCommentsCountForPage(pageIndex);
+        commentBtn.textContent = `查看评论 (${commentCount})`; 
+        commentBtn.dataset.pageIndex = String(pageIndex);
+        
+        commentBtn.addEventListener('click', () => {
+            // 点击时以查看模式打开该楼层的所有评论
+            openCommentPanelForPage(pageIndex); 
+        });
+
+        header.appendChild(leftText);
+        header.appendChild(commentBtn); 
+
+        const body = document.createElement('div');
+        body.className = 'floor-body';
+        
+        // 【核心修改】：直接使用缓存的带有 ID 的 HTML
+        // ID 注入和计数器更新已经在 loadWorkContentById 中完成
+        body.innerHTML = page.segmentedHtml || ''; 
+
+        floorDiv.appendChild(header);
+        floorDiv.appendChild(body);
+        
+        bookContent.appendChild(floorDiv);
+    });
+
+
+    // 4. 渲染左侧楼层导航
+    renderSidebar(activePages.length, 'floor');
+  processContentForSentenceIds(bookContent);
+
+}
+
+        /* ---------- 渲染器：翻页（单页）模式 ---------- */
+        function destroyPageModeQuill() {
+            // 如果之前存在 pageQuill，需要删除它的容器并释放引用
+            if (pageQuill) {
+                const container = pageQuill.root && pageQuill.root.parentElement;
+                try { pageQuill.disable(); } catch(e) {}
+                pageQuill = null;
+                if (container && container.parentNode) container.parentNode.removeChild(container);
+            }
+        }
+
+function renderPageMode() {
+    // 1. 清理环境
+    destroyPageModeQuill();
+    bookContent.innerHTML = '';
+    const pageDiv = document.createElement('div');
+    pageDiv.className = 'page-view';
+    // container for Quill
+    const quillContainer = document.createElement('div');
+    quillContainer.id = 'quill-page-view';
+    quillContainer.style.minHeight = '200px';
+    pageDiv.appendChild(quillContainer);
+
+    // 2. 页脚（包含评论按钮）
+    const footer = document.createElement('div');
+    footer.className = 'page-footer';
+    
+    // 增加评论按钮的 HTML 结构
+    footer.innerHTML = `
+        <button id="prev-page">上一页</button>
+        <span id="page-indicator">第 ${currentPageIndex + 1} / ${activePages.length}</span>
+        <button id="next-page">下一页</button>
+         
+    `;
+
+    pageDiv.appendChild(footer);
+    bookContent.appendChild(pageDiv); // 💥 此时按钮已进入 DOM
+
+    // 3. 初始化 Quill
+    pageQuill = new Quill('#quill-page-view', { theme: 'snow', readOnly: true, modules: { toolbar: false } });
+
+    // 4. 加载当前页内容
+    loadPageIntoPageQuill(currentPageIndex);
+
+    // 5. 绑定翻页按钮
+    document.getElementById('prev-page')?.addEventListener('click', () => { // 增加 ?. 检查
+        if (currentPageIndex > 0) {
+            currentPageIndex--;
+            loadPageIntoPageQuill(currentPageIndex);
+            window.scrollTo(0,0);
+        }
+    });
+    document.getElementById('next-page')?.addEventListener('click', () => { // 增加 ?. 检查
+        if (currentPageIndex < activePages.length - 1) {
+            currentPageIndex++;
+            loadPageIntoPageQuill(currentPageIndex);
+            window.scrollTo(0,0);
+        }
+    });
+
+    // 6. 绑定翻页模式下的评论按钮事件 (修复重复绑定 + 健壮性)
+    
+    // 💥 修复重复绑定：用克隆节点替换自身，以清除旧监听器
+    let commentBtn = document.getElementById('page-view-comment-btn');
+    
+    // 💥 关键健壮性检查: 如果按钮不存在，则停止后续操作
+    if (!commentBtn) {
+         console.error('评论按钮元素未找到，无法绑定事件。');
+         return; 
+    }
+    
+    const newCommentBtn = commentBtn.cloneNode(true);
+    commentBtn.replaceWith(newCommentBtn); // 替换旧元素，清除旧监听器
+
+    // 绑定事件到新的按钮上
+    newCommentBtn.addEventListener('click', () => {
+        // 翻页模式下，直接使用当前的 currentPageIndex 作为 pageIndex
+        openCommentPanelForPage(currentPageIndex);
+    });
+
+    // 7. 渲染左侧页码导航
+    renderSidebar(activePages.length, 'page');
+
+  const pageCommentBtn = document.getElementById('page-view-comment-btn');
+if (pageCommentBtn) {
+    const commentCount = getCommentsCountForPage(pageIndex);
+    pageCommentBtn.textContent = `查看评论 (${commentCount})`;
+}
+processContentForSentenceIds(bookContent);
+}
+
+        // 【修改 script.txt: 91-96 行附近，在 loadPageIntoPageQuill 函数体内部】
+function loadPageIntoPageQuill(pageIndex) {
+    if (!pageQuill) return;
+    const pageObj = activePages[pageIndex] || { content: { ops: [] } };
+    
+    let contentHtml = '';
+    
+    // 1. 获取原始内容（通常是 Delta 或 HTML）
+    try {
+        if (typeof pageObj.content === 'object') {
+            // 将 Delta 转换为 HTML
+            contentHtml = deltaToHtml(pageObj.content); 
+        } else {
+            // 如果后端存的是 html 字符串，直接使用
+            contentHtml = pageObj.content || '<p>（空白）</p>';
+        }
+    } catch (e) {
+        console.warn('loadPageIntoPageQuill deltaToHtml fallback', e);
+        contentHtml = '<p>（无法显示）</p>';
+    }
+    
+    // 【核心修改】：使用缓存的起始索引重新注入 SentenceId
+    // 2. 确定该页面的起始索引（已在 loadWorkContentById 中缓存）
+    const pageStartIndex = pageObj.sentenceStartIndex ?? 0;
+    
+    // 3. 调用无副作用的 ID 注入函数，使用固定的起始索引
+    // 注意：不更新全局 contentIndexCounter
+    const result = segmentContentAndAddIds(contentHtml, activeWork._id, pageStartIndex);
+    
+    // 4. 将带有 ID 的 HTML 注入到 Quill 的根元素中 (绕过 setContents 导致的 ID 丢失)
+    // ⚠️ 必须直接操作 root.innerHTML
+    pageQuill.root.innerHTML = result.element.innerHTML;
+
+    // 更新页码指示
+    const indicator = document.getElementById('page-indicator');
+    if (indicator) indicator.textContent = `第 ${pageIndex + 1} / ${activePages.length}`;
+    
+    // 5. 标记内容并绑定事件 (绑定句末评论标识和句子点击事件)
+const pageCommentBtn = document.getElementById('page-view-comment-btn');
+if (pageCommentBtn) {
+    const commentCount = getCommentsCountForPage(pageIndex);
+    pageCommentBtn.textContent = `查看评论 (${commentCount})`;
+}
+  processContentForSentenceIds(pageQuill.root);
+
+}
+
+// 【修改 script.txt: 87 行附近，在 renderPageMode 函数体内部】
+    // 新增: 绑定翻页模式下的评论按钮事件
+const pageContainer = document.getElementById('page-container'); // 按钮的父容器
+if (pageContainer) {
+    pageContainer.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'page-view-comment-btn') {
+            openCommentPanelForPage(currentPageIndex);
+        }
+    });
+}
+
+
+    // 【删除或注释掉旧的 addCommentListenersToContainer 调用】
+    // addCommentListenersToContainer(pageQuill.root, currentPageIndex); [cite: 88]
+        
+
+/* ---------- 渲染左侧导航（楼层或页码） ---------- */
+function renderSidebar(total, type) {
+    // 模式切换按钮和夜间模式按钮已在 HTML 中写死
+    // 我们只在 JS 中为它们绑定事件监听器
+    // 🚨 移除了 scrollBtnGroup 和 pageBtnGroup 的获取和监听器绑定
+    const navToggleBtnGroup = document.getElementById('nav-toggle-btn');
+    const navToggleIcon = navToggleBtnGroup.querySelector('button');
+
+    // 更新导航按钮的图标
+    navToggleIcon.innerHTML = type === 'floor' ? '&#8635;' : '&#x2194;';
+
+    // 🚨 移除了 navToggleBtnGroup 的事件监听器绑定
+    /*
+    // 原来的 scroll/page/navToggleBtnGroup.addEventListener('click', ...) 代码已移除
+    // 这些事件监听器只需要在页面加载时绑定一次
+    */
+
+    // 重新创建导航网格浮窗（这部分是正确的，需要保留）
+    const navPopup = document.getElementById('nav-grid-popup');
+    navPopup.innerHTML = '';
+    for (let i = 0; i < total; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'nav-cell';
+        cell.textContent = i + 1;
+        cell.dataset.targetIndex = String(i);
+        cell.addEventListener('click', () => {
+            if (type === 'floor') {
+                const el = document.querySelector(`[data-page-index="${i}"]`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                currentPageIndex = i;
+                currentMode = 'page';
+                // 这里调用 renderCurrentMode 是正确的，因为它只更新主体内容
+                renderCurrentMode(); 
+                window.scrollTo(0, 0);
+            }
+            // 点击后关闭浮窗
+            navPopup.classList.remove('show');
+        });
+        navPopup.appendChild(cell);
+    }
+}
+
+   // 切换夜间模式
+function toggleDarkMode() {
+    const isDarkMode = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('darkMode', isDarkMode ? 'true' : 'false');
+    // 同时更新其他元素
+    document.querySelector('.book-container').classList.toggle('dark-mode', isDarkMode);
+    document.querySelector('.comment-panel').classList.toggle('dark-mode', isDarkMode);
+    document.getElementById('nav-grid-popup').classList.toggle('dark-mode', isDarkMode);
+    document.querySelectorAll('.floor, .page-view').forEach(el => el.classList.toggle('dark-mode', isDarkMode));
+    document.querySelectorAll('.sidebar-btn-group').forEach(el => el.classList.toggle('dark-mode', isDarkMode));
+    // 💥 关键修正: 确保 #sidebar 本身获得 dark-mode 类
+    document.getElementById('sidebar').classList.toggle('dark-mode', isDarkMode);
+    
+    // 💥 新增: 遍历所有已存在的评论项并更新类
+    document.querySelectorAll('.comment-item').forEach(el => el.classList.toggle('dark-mode', isDarkMode));
+    // 💥 新增: 更新翻页按钮的 dark-mode 类 (如果存在)
+    document.querySelector('.page-footer')?.classList.toggle('dark-mode', isDarkMode);
+}
+
+// 初始化夜间模式
+function initDarkMode() {
+    const isDarkMode = localStorage.getItem('darkMode') === 'true';
+    if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+        document.querySelector('.book-container').classList.add('dark-mode');
+        document.querySelector('.comment-panel').classList.add('dark-mode');
+        document.getElementById('nav-grid-popup').classList.add('dark-mode');
+        document.querySelectorAll('.floor, .page-view').forEach(el => el.classList.add('dark-mode'));
+        document.querySelectorAll('.sidebar-btn-group').forEach(el => el.classList.add('dark-mode'));
+        // 💥 关键修正: 确保 #sidebar 本身获得 dark-mode 类
+        document.getElementById('sidebar').classList.add('dark-mode');
+        // 💥 新增: 更新翻页按钮的 dark-mode 类 (如果存在)
+        document.querySelector('.page-footer')?.classList.add('dark-mode');
+    }
+}
+
+// 【新增函数】：设置评论列表的事件委托（只需要在页面加载时调用一次）
+function setupCommentDelegation() {
+    // 1. 回复（点击 comment-item）和点赞（点击 .like-btn）的事件委托
+    commentList.addEventListener('click', (e) => {
+        const item = e.target.closest('.comment-item');
+        const btn = e.target.closest('.like-btn');
+
+        if (btn) {
+            // --- 点赞逻辑 ---
+            e.stopPropagation(); 
+            const token = localStorage.getItem('token');
+            if (!token) { alert('请先登录才能点赞。'); return; }
+            
+            const commentItem = btn.closest('.comment-item');
+            const commentId = commentItem.dataset.commentId;
+            
+            // 异步执行点赞操作
+            (async () => {
+                try {
+                    const res = await fetch(`${API_COMMENTS}/${commentId}/like`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error('点赞失败');
+                    const data = await res.json();
+                    
+                    // 更新 UI
+                    const countSpan = commentItem.querySelector('.like-count');
+                    countSpan.textContent = data.likesCount;
+                    btn.classList.toggle('liked', data.isLikedByCurrentUser);
+                } catch (err) {
+                    console.error('like error', err);
+                    alert('点赞失败，请稍后重试。');
+                }
+            })();
+
+        } else if (item) {
+            // --- 回复逻辑 ---
+            const author = item.querySelector('.comment-author')?.textContent || '匿名';
+            commentTextarea.value = `@${author} `;
+            commentTextarea.focus();
+        }
+    });
+}
+      
+        /* ---------- 评论：渲染 & 操作 ---------- */
+        function renderComments(comments) {
+            commentList.innerHTML = '';
+            if (!comments || comments.length === 0) {
+                commentList.innerHTML = '<p class="no-comments-tip">暂无评论，快来发表第一条评论吧！</p>';
+                return;
+            }
+            comments.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'comment-item';
+                item.dataset.commentId = c._id;
+                const author = escapeHtml(c.author || '匿名');
+                const content = escapeHtml(c.content || '');
+                const likes = Number(c.likesCount || 0);
+                const likedClass = c.isLikedByCurrentUser ? 'liked' : '';
+                item.innerHTML = `
+                    <strong class="comment-author">${author}</strong>
+                    <p class="comment-content">${content}</p>
+                    <div class="comment-actions">
+                        <button class="like-btn ${likedClass}">❤</button>
+                        <span class="like-count">${likes}</span>
+                    </div>
+                `;
+                commentList.appendChild(item);
+            });
+            // 绑定动作
+            //addCommentActionListeners(); （帮我检查一遍，不再需要这个了是吧？）
+        }
+
+
+      // ... 紧接在 submitComment 函数之前
+function disableCommentInputArea(disable) {
+    const commentPanel = document.getElementById('comment-panel');
+    // viewer-mode 样式应负责隐藏评论输入框
+    commentPanel.classList.toggle('viewer-mode', disable);
+}
+
+      // 【新增函数：在 renderComments 或 fetchPageComments 附近插入】
+
+function openCommentPanelForPage(pageIndex) {
+    const pageObj = activePages[pageIndex];
+    if (!pageObj) return;
+    
+    const pageTitle = `第 ${pageIndex + 1} 楼/页`;
+    const commentPanel = document.getElementById('comment-panel');
+    const header = commentPanel.querySelector('h4');
+    
+    disableCommentInputArea(true);
+    activeSentenceEl = null;
+
+    // ✅ 改动点：直接使用已缓存的 HTML，而不是再跑 deltaToHtml
+    const htmlContent = pageObj.segmentedHtml || '<p>（空白）</p>';
+
+    // 临时解析 HTML，提取所有句子 ID
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    const pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
+        .map(el => el.getAttribute('data-sentence-id'));
+
+    // 过滤出该页的所有评论
+    const commentsForPage = allComments.filter(c => pageSentenceIds.includes(c.sentenceId));
+    
+    renderComments(commentsForPage);
+    header.textContent = `${pageTitle} 的所有评论 (${commentsForPage.length} 条)`;
+    
+    commentPanel.classList.add('show');
+}
+
+
+// 【新增函数】：打开评论区并加载/过滤评论 (句子级别：统一入口)
+function openCommentPanelForSentence(sentenceId, isNewCommentMode = false) {
+    const panel = document.getElementById('comment-panel');
+    const header = panel.querySelector('h4');
+    
+    // 1. 过滤评论：只保留目标句子ID的评论
+  console.log("🧩 打开句子评论面板:", sentenceId);
+  const filteredComments = allComments.filter(c => c.sentenceId === sentenceId);
+  console.log("🧩 当前句子对应的评论:", filteredComments);
+    
+    // 2. 渲染评论列表
+    renderComments(filteredComments);
+
+    // 3. 切换评论区状态
+    if (isNewCommentMode) {
+        header.textContent = `评论目标句子`;
+        disableCommentInputArea(false); // 启用输入区 (撰写模式)
+        
+        // 更新全局状态，供 submitComment 使用
+        activeSentenceEl = document.querySelector(`[data-sentence-id="${sentenceId}"]`);
+    } else {
+        header.textContent = `句子评论 (${filteredComments.length} 条)`;
+        disableCommentInputArea(true); // 禁用输入区 (仅查看模式)
+        activeSentenceEl = null; 
+    }
+
+    // 4. 高亮当前句子
+    // 移除所有高亮
+    document.querySelectorAll('.active-comment-target').forEach(el => el.classList.remove('active-comment-target'));
+    // 为目标句子元素添加高亮
+    const targetEl = document.querySelector(`[data-sentence-id="${sentenceId}"]`);
+    if (targetEl) {
+        targetEl.classList.add('active-comment-target');
+    }
+
+    // 5. 显示评论区
+    panel.classList.add('show');
+}
+
+// 【新增函数】：处理渲染后的内容，添加评论标识和事件 (注：请帮我看看这边是否和上面的有重复，因此需要删除)
+function processContentForSentenceIds(containerEl) {
+    // 确保移除旧的高亮和标识
+    document.querySelectorAll('.active-comment-target').forEach(el => el.classList.remove('active-comment-target'));
+    containerEl.querySelectorAll('.comment-indicator').forEach(el => el.remove());
+
+    const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
+    
+    sentenceElements.forEach(el => {
+        const sentenceId = el.getAttribute('data-sentence-id');
+        
+        // 1. 添加句末评论标识 (如果该句子有评论)
+        if (commentedSentenceIds.has(sentenceId)) {
+            const indicator = document.createElement('span');
+            indicator.className = 'comment-indicator';
+            indicator.setAttribute('data-sentence-id', sentenceId);
+            
+            // 将标识添加到句子内容的末尾
+            el.appendChild(indicator);
+            
+            // 监听点击事件：展开评论区并过滤到该句子 (仅查看模式)
+            indicator.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止事件冒泡到父级
+                openCommentPanelForSentence(sentenceId, false); 
+            });
+        }
+
+        // 2. 监听整个句子的点击事件（用于发表新评论）
+        el.addEventListener('click', (e) => {
+            // 如果点击的是评论标识，则跳过
+            if (e.target.classList.contains('comment-indicator')) {
+                return;
+            }
+            // 切换目标句子的激活状态 & 开启评论区，进入撰写评论模式
+            openCommentPanelForSentence(sentenceId, true); 
+        });
+    });
+}
+
+// 【修改 openCommentPanelForViewerMode 函数体，约 附近】
+// 用新的函数替换旧的复杂逻辑
+async function openCommentPanelForViewerMode(workId, pageIndex) {
+    openCommentPanelForPage(pageIndex);
+}
+
+
+// 提交评论 async function submitComment() { ... (保持不变)
+      
+        // 提交评论
+        async function submitComment() {
+            const token = localStorage.getItem('token');
+            if (!token) { alert('请先登录才能发表评论。'); return; }
+            if (!activeWork || !activeWork._id || !activeSentenceEl) { alert('评论目标未选中。'); return; }
+            const sentenceId = activeSentenceEl.dataset.sentenceId;
+            if (!sentenceId) { alert('该段落无法评论。'); return; }
+            const content = commentTextarea.value.trim();
+            if (!content) { alert('评论内容不能为空。'); return; }
+            try {
+                const res = await fetch(API_COMMENTS, {
+                    method: 'POST',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader()),
+                    body: JSON.stringify({
+  workId: activeWork._id || activeWork.workId,
+  sentenceId,
+  content
+})
+
+                });
+                if (!res.ok) {
+                    const errJson = await res.json().catch(()=>null);
+                    throw new Error(errJson?.message || '发表评论失败');
+                }
+                alert('评论发表成功！');
+                commentTextarea.value = '';
+                // 【新增】：成功后，重新获取并标记内容
+                await fetchAllWorkComments(activeWork._id); // 重新获取数据
+                // 刷新当前模式的 UI (重新运行标记逻辑)
+                renderCurrentMode(); 
+                // 重新加载并显示当前句子的评论列表，保持撰写模式
+                openCommentPanelForSentence(sentenceId, true);
+            } catch (err) {
+                console.error('submitComment error', err);
+                alert('发表评论失败：' + (err.message || err));
+            }
+        }
+        submitCommentBtn.addEventListener('click', submitComment);
+
+        /* ---------- 切换/渲染当前模式 ---------- */
+function renderCurrentMode() {
+    if (!activeWork) return;
+    if (currentMode === 'scroll') {
+        renderScrollMode();
+    } else {
+        renderPageMode();
+    }
+
+    // ✅ 延迟绑定，确保 Quill/HTML 完全渲染后再执行
+    setTimeout(() => {
+        const root = currentMode === 'scroll' ? bookContent : (pageQuill?.root || bookContent);
+        if (root) {
+            processContentForSentenceIds(root);
+            console.log('✅ 评论句子点击绑定完成');
+        }
+    }, 50);
+}
+
+        /* ---------- 作品点赞功能 ---------- */
+        async function toggleWorkLike() {
+            if (!activeWork || !activeWork._id) return;
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('请先登录才能点赞作品。');
+                return;
+            }
+            try {
+                const res = await fetch(`${API_WORKS}/${activeWork._id}/like`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('点赞失败');
+                const data = await res.json();
+                updateLikeStatus(data.likesCount, data.isLikedByCurrentUser);
+            } catch (err) {
+                console.error('work like error', err);
+                alert('点赞操作失败，请稍后重试。');
+            }
+        }
+
+        function updateLikeStatus(likesCount, isLiked) {
+            likeCounter.textContent = likesCount;
+            likeIcon.classList.toggle('liked', isLiked);
+        }
+
+        likeWorkBtn.addEventListener('click', toggleWorkLike);
+        
+        // 绑定夜间模式切换按钮
+        document.getElementById('light-switch-btn').addEventListener('click', toggleDarkMode);
+
+
+        /* ---------- 启动：从 URL 获取 ID 并加载作品 ---------- */
+        function getWorkIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
+
+          // 💥 新增：只需调用一次，设置评论列表的事件委托
+      setupCommentDelegation();
+
+        const workId = getWorkIdFromUrl();
+        loadWorkContentById(workId);
+
+
+        initDarkMode();
+
+      // 🚨 VVVV 修复模式切换重复绑定 VVVV
+
+        // 仅在 DOM 加载时绑定一次模式切换和导航浮窗开关的事件监听器
+        const scrollBtnGroup = document.getElementById('scroll-mode-btn');
+        const pageBtnGroup = document.getElementById('page-mode-btn');
+        const navToggleBtnGroup = document.getElementById('nav-toggle-btn');
+
+        scrollBtnGroup.addEventListener('click', () => {
+            currentMode = 'scroll';
+            renderCurrentMode();
+            // 关闭导航浮窗
+            const navPopup = document.getElementById('nav-grid-popup');
+            if (navPopup) navPopup.classList.remove('show');
+        });
+
+        pageBtnGroup.addEventListener('click', () => {
+            currentMode = 'page';
+            renderCurrentMode();
+            const navPopup = document.getElementById('nav-grid-popup');
+            if (navPopup) navPopup.classList.remove('show');
+        });
+
+        navToggleBtnGroup.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const navPopup = document.getElementById('nav-grid-popup');
+            if (navPopup) {
+                navPopup.classList.toggle('show');
+            }
+        });
+
+                              console.log(sidebarToggleBtn);  
+
+      sidebarToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isMobile = window.matchMedia("(max-width: 1050px)").matches;
+
+    if (isMobile) {
+        const isShown = sidebar.classList.toggle('show');
+        sidebarToggleIcon.textContent = isShown ? '⮟' : '⮝'; // 左右箭头
+        sidebarToggleBtn.setAttribute('aria-expanded', isShown ? 'true' : 'false');
+        sidebarToggleBtn.setAttribute('title', isShown ? '收起侧边栏' : '展开侧边栏');
+    } else {
+        const isCollapsed = sidebar.classList.toggle('collapsed');
+        sidebarToggleIcon.textContent = isCollapsed ? '⮝' : '⮟';
+        sidebarToggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        sidebarToggleBtn.setAttribute('title', isCollapsed ? '展开侧边栏' : '收起侧边栏');
+    }
+});
+
+function getCommentsCountForPage(pageIndex) {
+  const pageObj = activePages[pageIndex];
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = pageObj.segmentedHtml || '';
+  const pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]')).map(el => el.getAttribute('data-sentence-id'));
+  const commentsForPage = allComments.filter(c => pageSentenceIds.includes(c.sentenceId));
+  
+  console.log(`🧩 Page ${pageIndex + 1} 的句子IDs:`, pageSentenceIds);
+  console.log(`🧩 Page ${pageIndex + 1} 匹配的评论数:`, commentsForPage.length);
+  
+  return commentsForPage.length;
+}
+
+
+
+      const container = document.getElementById('book-content');
+console.log(container);
+
+      
+    }); // 结束 DOMContentLoaded 监听器
+
+
+// 注意：原有的 navToggleBtnGroup.addEventListener('click', ...) 已经有了 e.stopPropagation()
+// 这一步很重要，它可以防止点击按钮时，该全局监听器立即将浮窗关闭。
+    </script>
+</html>

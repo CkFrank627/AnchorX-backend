@@ -1,22 +1,32 @@
-// authMiddleware.js
 const jwt = require('jsonwebtoken');
 
 const auth = (req, res, next) => {
-    try {
-        // 从请求头的 Authorization 字段中获取 JWT
-        // 格式通常是 "Bearer TOKEN_STRING"
-        const token = req.headers.authorization.split(' ')[1];
-        if (!token) {
-            return res.status(401).json({ message: '授权失败：没有提供令牌' });
-        }
-
-        // 验证令牌
-        const decoded = jwt.verify(token, 'YOUR_SECRET_KEY'); // 这里的秘钥要和生成时的一致
-        req.userData = decoded; // 将解码后的用户信息添加到请求对象中
-        next(); // 继续执行下一个中间件或路由处理器
-    } catch (error) {
-        return res.status(401).json({ message: '授权失败：令牌无效' });
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ message: '授权失败：缺少 Authorization 头' });
     }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ message: '授权失败：未提供 Token' });
+    }
+
+    // ✅ 用你的实际秘钥替换
+    const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
+
+    // ✅ 兼容不同 token 结构
+    req.userData = {
+      userId: decoded.userId || decoded._id || decoded.id,
+      username: decoded.username,
+      email: decoded.email
+    };
+
+    next();
+  } catch (error) {
+    console.error('JWT 验证失败:', error.message);
+    return res.status(401).json({ message: '授权失败：令牌无效' });
+  }
 };
 
 module.exports = auth;
