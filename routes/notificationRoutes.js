@@ -26,30 +26,6 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
-
-router.post('/mark-read/:id', auth, async (req, res) => {
-    try {
-        const userId = req.userData ? req.userData.userId : null;
-        if (!userId) {
-            return res.status(401).json({ message: '用户身份验证失败' });
-        }
-
-        const notification = await Notification.findOneAndUpdate(
-            { _id: req.params.id, recipient: userId },  // ✅ 改为 userId
-            { read: true },
-            { new: true }
-        );
-
-        if (!notification) {
-            return res.status(404).json({ message: '消息不存在或无权修改' });
-        }
-
-        res.json(notification);
-    } catch (error) {
-        res.status(500).json({ message: '标记已读失败', error: error.message });
-    }
-});
-
 router.post('/mark-read/all', auth, async (req, res) => {
   try {
     console.log('🪶 [mark-read/all] 触发，req.userData =', req.userData);
@@ -77,6 +53,28 @@ router.post('/mark-read/all', auth, async (req, res) => {
 });
 
 
+router.post('/mark-read/:id', auth, async (req, res) => {
+    try {
+        const userId = req.userData ? req.userData.userId : null;
+        if (!userId) {
+            return res.status(401).json({ message: '用户身份验证失败' });
+        }
+
+        const notification = await Notification.findOneAndUpdate(
+            { _id: req.params.id, recipient: userId },  // ✅ 改为 userId
+            { read: true },
+            { new: true }
+        );
+
+        if (!notification) {
+            return res.status(404).json({ message: '消息不存在或无权修改' });
+        }
+
+        res.json(notification);
+    } catch (error) {
+        res.status(500).json({ message: '标记已读失败', error: error.message });
+    }
+});
 
 
 module.exports = router;
