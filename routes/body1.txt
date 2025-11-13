@@ -1,0 +1,359 @@
+<body>
+    <div class="page-container">
+
+        <div id="create-modal" class="modal">
+            <div class="modal-content">
+                <h3>作品名</h3>
+                <input type="text" id="work-title-input" placeholder="请輸入作品名" maxlength="100">
+                <div class="modal-buttons">
+                    <button id="cancel-btn">取消</button>
+                    <button id="confirm-btn">确定</button>
+                </div>
+                <p id="create-message" style="color:red; font-size: 0.9em; margin-top: 10px;"></p>
+            </div>
+        </div>
+
+        <div id="delete-modal" class="modal">
+            <div class="modal-content menu-modal-content">
+                <h3>确认刪除？</h3>
+                <p>此操作不可恢復。</p>
+                <div class="modal-buttons">
+                    <button id="delete-cancel-btn">否</button>
+                    <button id="delete-confirm-btn">是</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="bulk-delete-modal" class="modal">
+            <div class="modal-content">
+                <h3>选择要刪除的作品</h3>
+                <p style="color: #dc3545; font-size: 0.9em;">警告：刪除后无法恢复！</p>
+                <div class="delete-list"></div>
+                <div class="delete-buttons">
+                    <button id="bulk-delete-cancel-btn" class="back-button">取消</button>
+                    <button id="bulk-delete-confirm-btn" class="back-button">确认刪除</button>
+                </div>
+            </div>
+        </div>
+
+        <aside class="sidebar-nav" id="sidebar">
+            <a href="#" class="nav-link active">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <path d="M12 12V4h6l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2h12a2 2 0 0 0 2-2V12z" />
+                    </svg>
+                </div>
+                <span class="nav-text">作品列表</span>
+            </a>
+
+            <a href="https://zhidianworld.com/pictureshare/" class="nav-link">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15H9V9h2v8zm4 0h-2V9h2v8z" />
+                    </svg>
+                </div>
+                <span class="nav-text">共享素材库</span>
+            </a>
+
+            <a href="https://zhidianworld.com/usercenter/" class="nav-link">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    </svg>
+                </div>
+                <span class="nav-text">个人中心</span>
+            </a>
+
+            <a href="https://zhidianworld.com/home/" class="nav-link">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v-8h-2v8zm4 0h-2v-8h2v8z" />
+                    </svg>
+                </div>
+                <span class="nav-text">安科阅读</span>
+            </a>
+
+            <a href="#" class="nav-link" id="logout-btn">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zm-8 4H2v2h7v-2zM4 22h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2z" />
+                    </svg>
+                </div>
+                <span class="nav-text">退出登錄</span>
+            </a>
+        </aside>
+
+        <main id="main-page" class="main-content">
+            <div class="content-header">
+                <div class="header-left">
+                    <div class="header-title">
+                        <span class="icon-plane">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                                fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M21 12l-18-9v18l18-9z" />
+                            </svg>
+                        </span>
+                        <h2>作品列表 (<span id="work-count">0</span>)</h2>
+                    </div>
+                    <button id="create-btn" class="create-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                            fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        </svg>
+                        <span>新建作品</span>
+                    </button>
+                    <button id="bulk-delete-btn" class="create-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                            fill="currentColor" viewBox="0 0 24 24">
+                            <path
+                                d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm2.46-7.88l1.06-1.06L12 12.94l2.48-2.48 1.06 1.06L13.06 14l2.48 2.48-1.06 1.06L12 15.06l-2.48 2.48-1.06-1.06L10.94 14l-2.48-2.48zM15.5 4l-.71-.71c-.18-.18-.44-.29-.7-.29H9.91c-.26 0-.52.11-.7.29L8.5 4H6v2h12V4h-2.5z" />
+                        </svg>
+                        <span>刪除作品</span>
+                    </button>
+                </div>
+                <div class="header-right">
+                    <div class="sort-dropdown">
+                        <button class="sort-button">
+                            <span>最近打开</span>
+                            <span class="sort-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                                    fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M7 10l5 5 5-5z" />
+                                </svg>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="work-list">
+                <p style="text-align: center; color: #999; margin-top: 50px;">正在加载作品...</p>
+            </div>
+        </main>
+
+        <main id="editor-page" class="main-content hidden">
+            <div class="editor-toolbar-container">
+                <div class="editor-toolbar">
+                    <button class="back-button" id="backBtn">返回</button>
+                    <div class="editor-title" id="editorTitle"></div>
+                    <div class="page-controls">
+                        <div class="page-current" id="pageCurrentDisplay">
+                            第 <span id="currentPage">1</span> 页（展开）
+                        </div>
+                        <div class="page-select-dropdown hidden" id="pageDropdown">
+                            <ul id="pageList">
+                            </ul>
+                            <button class="add-page-btn" id="addPageBtn">新增页面</button>
+                            <button class="delete-page-btn" id="deletePageBtn">刪除页面</button> </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="back-button" id="saveBtn">保存草稿</button>
+                
+                        <button class="back-button" id="publishBtn">发布</button>
+                    </div>
+                </div>
+
+                <div id="toolbar-quill" class="ql-toolbar ql-snow">
+    <span class="ql-formats">
+        <button class="ql-undo">
+            <svg viewBox="0 0 18 18">
+                <path d="M6 10l-4-4 4-4v3h7v2H6v3z"></path>
+            </svg>
+        </button>
+        <button class="ql-redo">
+            <svg viewBox="0 0 18 18">
+                <path d="M12 10v-3H5V5h7V2l4 4-4 4z"></path>
+            </svg>
+        </button>
+    </span>
+
+    <span class="ql-formats">
+        <button id="hiddenTextBtn" title="隐藏文本设置（剧透/暗骰）">隐藏文本</button>
+    </span>
+    
+    <button class="ql-bold back-button">B</button>
+    <button class="ql-italic back-button">I</button>
+    <button class="ql-underline back-button">U</button>
+    <button class="ql-strike"></button>
+    <select class="ql-color"></select>
+    <select class="ql-background"></select>
+    
+    <span class="ql-formats">
+        <select class="ql-header">
+            <option value="1"></option>
+            <option value="2"></option>
+            <option selected></option>
+        </select>
+        <button id="diceBtn">🎲</button>
+        <button class="ql-list" value="ordered"></button>
+        <button class="ql-list" value="bullet"></button>
+    </span>
+    <button class="back-button" id="listBtn">L10</button>
+    <button id="insertThemeTriggerBtn" title="插入主题切换标记">🎨</button>
+    
+    <span class="ql-formats">
+        <button id="uploadImageBtn">🖼️</button>
+        <input type="file" id="uploadImageInput" accept="image/*" style="display:none;">
+    </span>
+</div>
+            <div class="editor-main full-screen">
+                <div class="editor-container">
+                    <div class="editor-main">
+                        <div id="editor"></div>
+                        <textarea id="plainEditor" class="hidden"></textarea>
+                    </div>
+                    <aside id="rightSidebar" class="right-sidebar">
+                        <div class="tool-section">
+                            <h3>工具</h3>
+
+                            <div class="dropdown-container">
+                                <div class="dropdown-header" id="roleDropdownHeader">
+                                    <span>角色</span>
+                                    <span class="arrow">&gt;</span>
+                                </div>
+                                <div class="dropdown-content" id="roleDropdownContent">
+                                    <ul class="role-list" id="roleList">
+                                    </ul>
+                                    <button class="add-role-btn" id="addRoleBtn">添加角色</button>
+                                </div>
+                            </div>
+
+                            <div class="dropdown-container">
+                                <div class="dropdown-header" id="historyDropdownHeader">
+                                    <span>历史记录</span>
+                                    <span class="arrow">&gt;</span>
+                                </div>
+                                <div class="dropdown-content" id="historyDropdownContent">
+                                    <ul id="historyList"></ul>
+                                </div>
+                            </div>
+
+                            <div class="dropdown-container">
+                                <div class="dropdown-header" id="diceLogDropdownHeader">
+                                    <span>🎲 骰子记录</span>
+                                    <span class="arrow">&gt;</span>
+                                </div>
+                                <div class="dropdown-content open" id="diceLogDropdownContent">
+                                    <ul class="role-list" id="diceLogList"
+                                        style="list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto;">
+                                    </ul>
+                                </div>
+                            </div>
+
+                        </div>
+                    </aside>
+                    <div id="rightSidebarToggle" class="right-sidebar-toggle"></div>
+                </div>
+            </div>
+        </main>
+        <div id="roleModal" class="modal">
+            <div class="modal-content">
+                <h3>添加/编辑角色</h3>
+                <label for="roleNameInput">名称</label>
+                <input type="text" id="roleNameInput" placeholder="请輸入角色名称">
+
+                <label for="roleNotesTextarea">备注</label>
+                <textarea id="roleNotesTextarea" rows="4" placeholder="请輸入角色备注"></textarea>
+
+                <div class="color-picker-wrapper">
+                    <label for="roleColorPicker">选取颜色</label>
+                    <input type="color" id="roleColorPicker" class="color-picker" value="#000000">
+                </div>
+
+                <div class="modal-buttons">
+                    <button class="cancel" id="cancelRoleBtn">取消</button>
+                    <button class="confirm" id="confirmRoleBtn">确认</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="galleryModal" class="modal">
+            <div class="modal-content">
+                <h3>编辑图库</h3>
+                <div class="gallery-image-list" id="galleryImageList">
+                    <label for="imageUploadInput" class="add-image-btn">
+                        <span>+</span>
+                        <input type="file" id="imageUploadInput" accept="image/*" multiple style="display:none;">
+                    </label>
+                </div>
+                <div class="modal-buttons">
+                    <button class="cancel" id="cancelGalleryBtn">取消</button>
+                    <button class="confirm" id="confirmGalleryBtn">确认</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="hiddenTextModal" class="modal hidden">
+            <div class="modal-content hidden-text-modal-content">
+                <h3>请选择隐藏模式</h3>
+                <p>您选中的文本将以隐藏样式显示：</p>
+
+                <button id="hiddenTextSpoilerOption" class="btn btn-primary">
+                    1. 💬 剧透模式 (鼠标悬停即显示)
+                </button>
+
+                <button id="hiddenTextSecretOption" class="btn btn-warning">
+                    2. 🎲 暗骰模式 (需点击并警告后才显示)
+                </button>
+
+                <button id="hiddenTextCloseBtn" class="btn btn-secondary close-btn">取消</button>
+            </div>
+        </div>
+    </div>
+
+<button class="floating-sidebar-btn" id="toggleSidebarBtn">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 7h-3a3 3 0 0 0-3-3V1M4 7h3a3 3 0 0 1 3-3V1M7 7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-3M7 16v4a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-4"/>
+    </svg>
+</button>
+
+<div class="floating-sidebar" id="floatingSidebar">
+  <button class="close-btn" id="closeSidebarBtn">✕</button>
+  <h3>工具栏</h3>
+  <hr>
+
+  <div class="dropdown-container">
+    <div class="dropdown-header" id="roleDropdownHeader">
+      角色
+      <span class="arrow">▶</span>
+    </div>
+    <div class="dropdown-content" id="roleDropdownContent">
+      <ul class="role-list" id="roleList">
+        </ul>
+      <div class="add-role-btn" id="addRoleBtn">+ 新增角色</div>
+    </div>
+  </div>
+
+  <div class="dropdown-container" style="margin-top: 15px;">
+    <div class="dropdown-header" id="diceLogDropdownHeader">
+      骰子日志
+      <span class="arrow">▶</span>
+    </div>
+    <div class="dropdown-content" id="diceLogDropdownContent">
+      <ul class="role-list" id="diceLogList">
+        </ul>
+    </div>
+  </div>
+
+  <div class="dropdown-container" style="margin-top: 15px;">
+    <div class="dropdown-header" id="historyDropdownHeader">
+      编辑历史
+      <span class="arrow">▶</span>
+    </div>
+    <div class="dropdown-content" id="historyDropdownContent">
+      <ul class="role-list" id="historyList">
+        </ul>
+    </div>
+  </div>
+  
+  </div>
+
+  
+    </body>

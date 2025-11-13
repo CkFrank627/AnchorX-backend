@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <meta charset="UTF-8">
+    <title>个人中心</title>
+
+    <style>
+        /* 新增：共享的按钮基础样式 */
+        .gallery-card button {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            line-height: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 10;
+            opacity: 0; /* 默认隐藏 */
+        }
+
+        .gallery-card:hover button {
+            opacity: 1;
+        }
+
+        .delete-btn {
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255, 0, 0, 0.7);
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background-color: rgba(255, 0, 0, 0.9);
+            transform: scale(1.1);
+        }
+
+        .download-btn {
+            top: 10px;
+            right: 50px;
+            background-color: rgba(0, 119, 204, 0.7);
+            color: white;
+            opacity: 1;
+        }
+
+        .download-btn:hover {
+            background-color: rgba(0, 119, 204, 0.9);
+            transform: scale(1.1);
+        }
+
+        .download-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: white;
+            pointer-events: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        .page-container {
+            display: flex;
+            min-height: 100vh;
+            background-color: #fff;
+        }
+
+        .sidebar-nav {
+            flex-shrink: 0;
+            width: 250px;
+            padding: 30px 20px;
+            background-color: #f7f9fc;
+            border-right: 1px solid #eee;
+            transition: width 0.3s ease-in-out, padding 0.3s ease-in-out;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            text-decoration: none;
+            color: #333;
+            border-radius: 6px;
+            transition: background-color 0.2s, color 0.2s, transform 0.2s;
+        }
+
+        .nav-link:hover {
+            background-color: #e6f7ff;
+            color: #0077cc;
+        }
+
+        .nav-link.active {
+            background-color: #e6f7ff;
+            color: #0077cc;
+        }
+
+        .nav-icon {
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .nav-link.active .nav-icon svg {
+            fill: #0077cc;
+        }
+
+        .nav-text {
+            opacity: 1;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        .main-content {
+            flex-grow: 1;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header-left,
+        .header-right {
+            display: flex;
+            align-items: center;
+        }
+
+        .header-left {
+            gap: 20px;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+        }
+
+        .header-title h2 {
+            font-size: 1.5rem;
+            margin: 0;
+            margin-left: 10px;
+        }
+
+        /* === 个人中心页面特有样式 === */
+        .user-profile {
+            background-color: #f7f9fc;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .user-profile h3 {
+            font-size: 1.8rem;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .profile-info {
+            font-size: 1.2rem;
+            color: #555;
+            margin-bottom: 30px;
+        }
+
+        .profile-info span {
+            font-weight: bold;
+            color: #0077cc;
+        }
+
+        .password-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .password-section label {
+            font-size: 1rem;
+            color: #666;
+        }
+
+        .password-section input {
+            padding: 10px;
+            width: 100%;
+            max-width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        .password-section button {
+            background-color: #0077cc;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+
+        .password-section button:hover {
+            background-color: #005aa7;
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {transform: rotate(0deg);}
+            100% {transform: rotate(360deg);}
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page-container">
+        <aside class="sidebar-nav" id="sidebar">
+            <a href="https://zhidianworld.com/write/" class="nav-link">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor"
+                        viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <path
+                            d="M12 12V4h6l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2h12a2 2 0 0 0
+                            2-2V12z" />
+                    </svg>
+                </div>
+                <span class="nav-text">作品列表</span>
+            </a>
+
+            <a href="https://zhidianworld.com/pictureshare/" class="nav-link">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15H9V9h2v8zm4 0h-2V9h2v8z" />
+                    </svg>
+                </div>
+                <span class="nav-text">共享素材库</span>
+            </a>
+
+            <a href="#" class="nav-link active">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    </svg>
+                </div>
+                <span class="nav-text">个人中心</span>
+            </a>
+
+            <a href="https://zhidianworld.com/home/" class="nav-link">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v-8h-2v8z" />
+                    </svg>
+                </div>
+                <span class="nav-text">安科阅读</span>
+            </a>
+
+            <a href="#" class="nav-link" id="logout-btn">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                        fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zm-8 4H2v2h7v-2zM4 22h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2z" />
+                    </svg>
+                </div>
+                <span class="nav-text">退出登录</span>
+            </a>
+        </aside>
+
+        <main id="main-page" class="main-content">
+            <div class="content-header">
+                <div class="header-title">
+                    <h2>該模塊仍在開發中，敬請期待！</h2>
+                </div>
+            </div>
+
+
+    <script>
+        // // 获取 token
+        // const token = localStorage.getItem('token');
+
+        // // 页面加载时获取用户资料
+        // async function loadProfile() {
+        //     if (!token) {
+        //         alert("请先登录！");
+        //         window.location.href = "/login";
+        //         return;
+        //     }
+        //     try {
+        //         const res = await fetch('/api/users/profile', {
+        //             headers: {'Authorization': `Bearer ${token}`}
+        //         });
+        //         if (!res.ok) throw new Error("无法获取用户信息");
+        //         const data = await res.json();
+        //         const username = data.user.username;
+        //         document.getElementById('welcome-message').textContent = username;
+        //         document.getElementById('username-display').textContent = username;
+        //     } catch (err) {
+        //         console.error(err);
+        //         alert("加载用户资料失败，请重新登录");
+        //     }
+        // }
+
+        // // 修改密码
+        // document.getElementById("change-password-btn").addEventListener("click", async () => {
+        //     const oldPassword = document.getElementById("old-password").value.trim();
+        //     const newPassword = document.getElementById("new-password").value.trim();
+        //     const confirmPassword = document.getElementById("confirm-new-password").value.trim();
+        //     if (!oldPassword || !newPassword || !confirmPassword) {
+        //         alert("请填写完整信息！");
+        //         return;
+        //     }
+        //     if (newPassword !== confirmPassword) {
+        //         alert("两次输入的新密码不一致！");
+        //         return;
+        //     }
+        //     try {
+        //         const res = await fetch('/api/users/change-password', {
+        //             method: "PATCH",
+        //             headers: {
+        //                 "Content-Type": "application/json",
+        //                 "Authorization": `Bearer ${token}`
+        //             },
+        //             body: JSON.stringify({ oldPassword, newPassword })
+        //         });
+        //         const data = await res.json();
+        //         if (res.ok) {
+        //             alert("密码修改成功，请重新登录");
+        //             localStorage.removeItem("token");
+        //             window.location.href = "/login";
+        //         } else {
+        //             alert(data.message || "修改失败");
+        //         }
+        //     } catch (err) {
+        //         console.error(err);
+        //         alert("请求失败，请稍后重试");
+        //     }
+        // });
+
+        // // 页面初始化
+        // loadProfile();
+    </script>
+</body>
+</html>

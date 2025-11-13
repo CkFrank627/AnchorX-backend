@@ -255,6 +255,14 @@ router.put('/:id', auth, async (req, res) => {
 // 前端使用 PATCH /api/works/:id 发送 { pages: newPages }
 router.patch('/:id', auth, async (req, res) => {
     try {
+        // ⭐ 如果 effectsDraft / effectsPublished 以字符串形式传入，则解析为 JSON
+if (typeof req.body.effectsDraft === 'string') {
+    req.body.effectsDraft = JSON.parse(req.body.effectsDraft);
+}
+if (typeof req.body.effectsPublished === 'string') {
+    req.body.effectsPublished = JSON.parse(req.body.effectsPublished);
+}
+
         const { id } = req.params;
         // 从请求体中解构出前端可能发送的字段
         const { pages, title, ...otherFields } = req.body; 

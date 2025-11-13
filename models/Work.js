@@ -44,11 +44,26 @@ const workSchema = new mongoose.Schema({
     },
     // ----------------------
     
-    // 【✅ 新增：作品发布状态】
-    isPublished: {
-        type: Boolean,
-        default: false // 默认未发布
+isPublished: {
+    type: Boolean,
+    default: false
+},
+
+// ⭐ 新增：特效草稿
+effectsDraft: [
+    {
+        lineIndex: { type: Number, required: true },
+        effectType: { type: String, required: true }
     }
+],
+
+// ⭐ 新增：特效发布
+effectsPublished: [
+    {
+        lineIndex: { type: Number, required: true },
+        effectType: { type: String, required: true }
+    }
+],
     // ----------------------
 }, {
     timestamps: true

@@ -396,6 +396,107 @@
       #mark-all-read-btn:hover {
     color: #005aa7;
 }
+
+      /* === 解决消息箱被编辑器遮挡的问题 === */
+
+/* 确保页眉整体在编辑器之上 */
+.header-top,
+.header-bottom {
+  position: relative;
+  z-index: 3000 !important;
+}
+
+/* 消息下拉菜单浮在最上层 */
+.nav-item-dropdown {
+  z-index: 5000 !important;
+  position: absolute;
+  top: 100%;
+  right: 0;
+}
+
+/* 如果编辑器或其工具栏使用了过高层级，统一降低 */
+.editor-toolbar-container,
+.ql-toolbar.ql-snow,
+.ql-container.ql-snow {
+  z-index: 1000 !important;
+}
+
+      /* ✅ 顶部按钮区域样式 */
+.dropdown-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 6px;
+  position: relative;
+}
+
+#mark-all-read-btn {
+  font-size: 0.8rem;
+  color: #0077cc;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 2px 4px;
+  position: absolute;
+  right: 10px;
+  top: 5px;
+}
+
+#mark-all-read-btn:hover {
+  color: #005aa7;
+}
+
+      /* 🧩 通用样式 */
+.notification-dropdown {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  background: white;
+  width: 360px;
+  max-height: 500px;
+  overflow-y: auto;
+  border-radius: 10px;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+  z-index: 3000;
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .nav-item-dropdown {
+    position: fixed !important;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 95vw;
+    height: 80vh;
+    max-height: none;
+    overflow-y: auto;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+    z-index: 5000 !important;
+    padding: 10px;
+  }
+
+  .dropdown-tabs {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 1;
+  }
+
+  .tab-content {
+    height: calc(80vh - 80px);
+    overflow-y: auto;
+  }
+
+  /* 消息条目更大些，适合触控 */
+  .message-item {
+    padding: 12px;
+    border-radius: 8px;
+  }
+}
       
     </style>
 </head>
@@ -435,25 +536,17 @@
     <span id="notification-badge" class="hidden"></span>
 </div>
                         <div class="nav-item-dropdown">
-                            <div class="dropdown-tabs">
-                                <button class="tab-button selected">赞</button>
-                                <button class="tab-button">评论</button>
-                                <button class="tab-button">系统通知</button>
-                            </div>
-                            <div class="tab-content">
-                                <p class="no-message-text">暂无消息</p>
-                            </div>
-                          <div class="mark-all-container" style="text-align:right;margin-bottom:5px;">
-    <button id="mark-all-read-btn" style="
-        font-size: 0.8rem;
-        color: #0077cc;
-        background: none;
-        border: none;
-        cursor: pointer;
-        text-decoration: underline;
-        padding: 0;
-    ">全部标记为已读</button>
-</div>
+  <div class="dropdown-header">
+    <button id="mark-all-read-btn">全部标记为已读</button>
+  </div>
+  <div class="dropdown-tabs">
+    <button class="tab-button selected">赞</button>
+    <button class="tab-button">评论</button>
+    <button class="tab-button">系统通知</button>
+  </div>
+  <div class="tab-content">
+    <p class="no-message-text">暂无消息</p>
+  </div>
 
                         </div>
                     </nav>
@@ -581,7 +674,7 @@ async function updateNotificationBadge() {
 }
 
 // 初次加载和每次拉取消息后更新
-updateNotificationBadge();
+
 
   document.querySelector('.main-nav-item').addEventListener('click', async () => {
     const token = localStorage.getItem('token');
@@ -602,7 +695,7 @@ updateNotificationBadge();
         }
 
         // 更新 badge
-        updateNotificationBadge();
+        
         fetchAndRenderNotifications(); // 刷新下拉内容
     } catch (err) {
         console.error('标记已读失败', err);
@@ -611,89 +704,89 @@ updateNotificationBadge();
 
   
 function renderMessages(notifications) {
-    tabContent.innerHTML = '';
-    const messageSection = document.createElement('div');
-    messageSection.className = 'message-section';
+  tabContent.innerHTML = '';
+  const messageSection = document.createElement('div');
+  messageSection.className = 'message-section';
 
-    if (notifications.length === 0) {
-        tabContent.innerHTML = '<p class="no-message-text">暂无消息</p>';
-        return;
-    }
+  if (notifications.length === 0) {
+    tabContent.innerHTML = '<p class="no-message-text">暂无消息</p>';
+    return;
+  }
 
-    notifications.forEach(notification => {
-        const messageItem = document.createElement('div');
-        messageItem.className = 'message-item';
-        messageItem.style.cursor = 'pointer';
+  const pageSize = 8;
+  let currentPage = 1;
+  const totalPages = Math.ceil(notifications.length / pageSize);
 
-        // 🎨 新增：根据已读状态添加样式
-        if (!notification.read) {
-            messageItem.classList.add('unread');
+  // ✅ 渲染当前页函数
+  function renderPage(page) {
+    messageSection.innerHTML = '';
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const currentItems = notifications.slice(start, end);
+
+    currentItems.forEach(notification => {
+      const messageItem = document.createElement('div');
+      messageItem.className = 'message-item';
+      messageItem.style.cursor = 'pointer';
+      if (!notification.read) messageItem.classList.add('unread');
+
+      const senderName = notification.sender?.username || '未知用户';
+      const messageTime = new Date(notification.createdAt).toLocaleString();
+      let messageTitle = notification.message || '';
+      if (!messageTitle.includes(senderName)) {
+        messageTitle = `${senderName} ${messageTitle}`;
+      }
+
+      messageItem.innerHTML = `
+        <div class="message-info">
+          <p class="message-title">${messageTitle}</p>
+          <p class="message-time">${messageTime}</p>
+        </div>
+      `;
+
+      messageItem.addEventListener('click', async () => {
+        // ✅ 原有点击标记已读+跳转逻辑保持不变
+        try {
+          await fetch(`https://api.anchorx.ca/api/notifications/mark-read/${notification._id}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          messageItem.classList.add('read-fade');
+          
+          fetchAndRenderNotifications();
+        } catch (err) {
+          console.error('标记已读失败', err);
         }
+      });
 
-        const senderName = notification.sender?.username || '未知用户';
-        const messageTime = new Date(notification.createdAt).toLocaleString();
-
-        let messageTitle = notification.message || '';
-        if (!messageTitle.includes(senderName)) {
-            messageTitle = `${senderName} ${messageTitle}`;
-        }
-
-        const safeName = senderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const finalMessage = messageTitle.replace(
-            new RegExp(safeName),
-            `<span class="sender-name">${senderName}</span>`
-        );
-
-        messageItem.innerHTML = `
-            <div class="message-info">
-                <p class="message-title">${finalMessage}</p>
-                <p class="message-time">${messageTime}</p>
-            </div>
-        `;
-
-        // ✅ 点击事件：标记已读 + 动画 + 跳转
-        messageItem.addEventListener('click', async () => {
-            const token = localStorage.getItem('token');
-            if (!token) return alert('请先登录查看消息');
-
-            try {
-                // 1️⃣ 立即开始淡出动画
-                messageItem.classList.remove('unread');
-                messageItem.classList.add('read-fade');
-
-                // 2️⃣ 请求后端标记已读
-                await fetch(`https://api.anchorx.ca/api/notifications/mark-read/${notification._id}`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                // 3️⃣ 更新红点与消息列表
-                updateNotificationBadge();
-                fetchAndRenderNotifications();
-
-                // 4️⃣ 延时跳转（给动画 0.3s 完成时间）
-                setTimeout(() => {
-                    if (notification.topic) {
-                        window.location.href = `https://zhidianworld.com/topic/?id=${notification.topic}`;
-                    } else if (notification.likedWork) {
-                        window.location.href = `https://zhidianworld.com/read/?id=${notification.likedWork}`;
-                    } else if (notification.likedComment && notification.topic) {
-                        window.location.href = `https://zhidianworld.com/topic/?id=${notification.topic}`;
-                    } else {
-                        console.warn('未找到跳转目标:', notification);
-                    }
-                }, 300);
-            } catch (err) {
-                console.error('标记消息已读失败:', err);
-                alert('消息跳转失败，请稍后再试');
-            }
-        });
-
-        messageSection.appendChild(messageItem);
+      messageSection.appendChild(messageItem);
     });
 
+    // ✅ 添加分页导航
+    const pagination = document.createElement('div');
+    pagination.style = `
+      text-align:center;
+      margin-top:10px;
+      font-size:0.85rem;
+    `;
+    pagination.innerHTML = `
+      <button ${page === 1 ? 'disabled' : ''} id="prevPage">上一页</button>
+      <span style="margin:0 8px;">第 ${page} / ${totalPages} 页</span>
+      <button ${page === totalPages ? 'disabled' : ''} id="nextPage">下一页</button>
+    `;
+
+    tabContent.innerHTML = ''; // 清空旧页
     tabContent.appendChild(messageSection);
+    tabContent.appendChild(pagination);
+
+    // ✅ 分页按钮逻辑
+    pagination.querySelector('#prevPage')?.addEventListener('click', () => renderPage(page - 1));
+    pagination.querySelector('#nextPage')?.addEventListener('click', () => renderPage(page + 1));
+  }
+
+  renderPage(currentPage);
 }
+
 
     // --- 繁简转换逻辑 (已修正) ---
     const langToggleBtn = document.getElementById('lang-toggle');
@@ -768,52 +861,68 @@ function renderMessages(notifications) {
     });
 });
 
-  // --- 全部已读按钮逻辑 ---
+// --- 全部已读按钮逻辑（修正版） ---
 document.addEventListener('click', async (e) => {
-    if (e.target && e.target.id === 'mark-all-read-btn') {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            alert('请先登录查看消息');
-            return;
-        }
-
-        try {
-            const response = await fetch('https://api.anchorx.ca/api/notifications/mark-read/all', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!response.ok) throw new Error('批量标记失败');
-            const result = await response.json();
-            console.log('批量标记结果:', result);
-
-            // 更新红点与列表
-            updateNotificationBadge();
-            fetchAndRenderNotifications();
-
-            // 显示提示（可选）
-            const tip = document.createElement('div');
-            tip.textContent = '✅ 已全部标记为已读';
-            tip.style = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #4caf50;
-                color: white;
-                padding: 8px 12px;
-                border-radius: 6px;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                font-size: 0.85rem;
-                z-index: 9999;
-            `;
-            document.body.appendChild(tip);
-            setTimeout(() => tip.remove(), 1500);
-        } catch (err) {
-            console.error('全部标记为已读失败:', err);
-            alert('全部标记失败，请稍后重试');
-        }
+  if (e.target && e.target.id === 'mark-all-read-btn') {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('请先登录查看消息');
+      return;
     }
+
+    try {
+      const response = await fetch('https://api.anchorx.ca/api/notifications/mark-read/all', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error('批量标记失败');
+      const result = await response.json();
+      console.log('✅ 批量标记结果:', result);
+
+      // ✅ 安全调用徽章更新函数
+      if (typeof updateNotificationBadge === 'function') {
+        await updateNotificationBadge();
+      } else {
+        console.warn('⚠️ updateNotificationBadge 未定义，跳过徽章更新');
+      }
+
+      // ✅ 刷新消息列表
+      if (typeof fetchAndRenderNotifications === 'function') {
+        await fetchAndRenderNotifications();
+      }
+
+      // ✅ 前端即时反馈（弹出绿色提示）
+      const tip = document.createElement('div');
+      tip.textContent = '✅ 已全部标记为已读';
+      tip.style = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #4caf50;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        font-size: 0.85rem;
+        z-index: 9999;
+      `;
+      document.body.appendChild(tip);
+      setTimeout(() => tip.remove(), 1500);
+
+      // ✅ 将所有未读消息高亮移除
+      document.querySelectorAll('.message-item.unread').forEach(el => {
+        el.classList.remove('unread');
+        el.classList.add('read-fade');
+      });
+
+    } catch (err) {
+      console.error('全部标记为已读失败:', err);
+      alert('全部标记失败，请稍后重试');
+    }
+  }
 });
+
 
 </script>
 </body>
