@@ -382,8 +382,13 @@ const responseWork = {
     views: work.views,
     likesCount: work.likesCount,
     isLikedByCurrentUser: isLikedByCurrentUser,
-    updatedAt: work.updatedAt,        // ✅ 新增：作品更新时间
-    createdAt: work.createdAt,        // （可选）作品创建时间
+    updatedAt: work.updatedAt,
+    createdAt: work.createdAt,
+
+    // ⭐⭐ 必须加这两行，否则前端保存后会丢失特效
+    effectsDraft: work.effectsDraft || [],
+    effectsPublished: work.effectsPublished || [],
+
     content: work.content.map(page => {
         if (page.content && typeof page.content === 'object') {
             let contentString = JSON.stringify(page.content);
@@ -401,6 +406,7 @@ const responseWork = {
         return page;
     })
 };
+
 
 
         res.json(responseWork);
