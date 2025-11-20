@@ -852,6 +852,64 @@ body.dark-mode #global-loading-bar {
   background-color: #66b0ff;
 }
 
+      /* shake */
+.effect-shake {
+  animation: effect-shake .25s infinite alternate;
+}
+@keyframes effect-shake {
+  from { transform: translateX(-1px); }
+  to { transform: translateX(2px); }
+}
+
+/* flash */
+.effect-flash {
+  animation: effect-flash 0.6s infinite;
+}
+@keyframes effect-flash {
+  0% { background-color: transparent; }
+  50% { background-color: #fff3cd; }
+  100% { background-color: transparent; }
+}
+
+/* fade in */
+.effect-fade {
+  animation: effect-fade 1.2s forwards;
+}
+@keyframes effect-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* highlight */
+.effect-highlight {
+  animation: effect-highlight 1s forwards;
+}
+@keyframes effect-highlight {
+  from { background: #fff3cd; }
+  to { background: transparent; }
+}
+
+.effect-shake {
+    display: inline-block;
+    animation: shake 0.3s infinite;
+}
+@keyframes shake {
+    0% { transform: translate(0px, 0px); }
+    25% { transform: translate(1px, -1px); }
+    50% { transform: translate(-1px, 1px); }
+    75% { transform: translate(1px, 1px); }
+    100% { transform: translate(0px, 0px); }
+}
+
+.effect-glow {
+    animation: glow 2s ease-in-out infinite;
+}
+@keyframes glow {
+    0%,100% { text-shadow: 0 0 2px rgba(255,255,255,0.5); }
+    50% { text-shadow: 0 0 10px rgba(255,255,255,1); }
+}
+
+      
     </style>
 
   <div id="global-loading-bar"></div>
@@ -1019,6 +1077,35 @@ closeCommentBtn.addEventListener('click', () => {
     commentPanel.querySelector('h4').textContent = `评论`; // <--- 恢复标题
 });
 
+// ✅ 按“全文行号” + 本页起始行号计算本页局部行号
+function applyEffectsToBlocks(rootEl, effectsPublished, pageStartIndex = 0) {
+    if (!effectsPublished || !effectsPublished.length || !rootEl) return;
+
+    const blocks = rootEl.querySelectorAll('p, h1, h2, h3, li, blockquote, pre');
+    if (!blocks.length) return;
+
+    effectsPublished.forEach(effect => {
+        if (!effect) return;
+
+        // 全局行号（保底兼容字符串）
+        let globalIdx = typeof effect.lineIndex === 'number'
+            ? effect.lineIndex
+            : parseInt(effect.lineIndex, 10);
+
+        const type = effect.effectType;
+        if (!type || isNaN(globalIdx) || globalIdx < 0) return;
+
+        // ⭐ 用本页起始行号换算成本页局部行号
+        const localIdx = globalIdx - pageStartIndex;
+        if (localIdx < 0 || localIdx >= blocks.length) return;
+
+        const target = blocks[localIdx];
+        if (target) {
+            target.classList.add(`effect-${type}`);
+        }
+    });
+}
+
         // 如果需要 token（发表评论/点赞）
         function getAuthHeader() {
             const token = localStorage.getItem('token');
@@ -1119,6 +1206,12 @@ async function loadWorkContentById(id) {
         const work = await res.json();
         activeWork = work;
 
+      // 新增：加载特效
+const effectsPublished = work.effectsPublished || [];
+activeWork.effectsPublished = effectsPublished;
+console.log("🎨 已加载特效：", effectsPublished);
+
+
         // ✅ 进度更新
         updateGlobalLoadingProgress(50, '正在加载评论...');
 
@@ -1145,29 +1238,41 @@ async function loadWorkContentById(id) {
             ? `更新时间：${new Date(work.updatedAt).toLocaleString()}`
             : `更新时间：未知`;
 
-        // -------------------------
-        // 处理每页内容
-        // -------------------------
-        let sentenceIndex = 0;
-        activePages.forEach(page => {
-            if (!page.content) page.content = { ops: [] };
-            let html = '';
+  // -------------------------
+// 处理每页内容（保留原有字体、颜色等样式）
+// -------------------------
+let sentenceIndex = 0;
+activePages.forEach(page => {
+    if (!page.content) {
+        page.content = { ops: [] };
+    }
 
-            if (typeof page.content === 'object' && page.content.ops) {
-                rendererQuill.setContents(page.content);
-                const rawHtml = rendererQuill.root.innerHTML;
-                console.log("✅ Quill 生成 HTML:", rawHtml.slice(0, 200));
+    if (typeof page.content === 'object' && page.content.ops) {
+        rendererQuill.setContents(page.content);
+        const rawHtml = rendererQuill.root.innerHTML;
 
-                const { element: tempDiv, nextIndex } = segmentContentAndAddIds(rawHtml, work._id, sentenceIndex);
-                sentenceIndex = nextIndex;
-                page.segmentedHtml = tempDiv.innerHTML;
-            } else {
-                html = page.content || '<p>（空白页面）</p>';
-                const { element: tempDiv, nextIndex } = segmentContentAndAddIds(html, work._id, sentenceIndex);
-                sentenceIndex = nextIndex;
-                page.segmentedHtml = tempDiv.innerHTML;
-            }
-        });
+        const effectRoot = document.createElement('div');
+        effectRoot.innerHTML = rawHtml;
+
+        // ⭐ 本页的“全文起始行号”
+        const pageStartIndex = sentenceIndex;
+
+        // 应用特效（用全文行号 + pageStartIndex 转成本页局部行号）
+        applyEffectsToBlocks(effectRoot, activeWork.effectsPublished || [], pageStartIndex);
+
+        const { element: tempDiv, nextIndex } = segmentContentAndAddIds(
+            effectRoot.innerHTML,
+            work._id,
+            sentenceIndex
+        );
+
+        // 可选：如果之后翻页要用，可以缓存
+        page.sentenceStartIndex = pageStartIndex;
+
+        sentenceIndex = nextIndex;
+        page.segmentedHtml = tempDiv.innerHTML;
+    }
+});
 
         renderCurrentMode();
 
@@ -1684,11 +1789,15 @@ function openCommentPanelForSentence(sentenceId, isNewCommentMode = false) {
     panel.classList.add('show');
 }
 
-// 【新增函数】：处理渲染后的内容，添加评论标识和事件 (注：请帮我看看这边是否和上面的有重复，因此需要删除)
 function processContentForSentenceIds(containerEl) {
     // 确保移除旧的高亮和标识
     document.querySelectorAll('.active-comment-target').forEach(el => el.classList.remove('active-comment-target'));
     containerEl.querySelectorAll('.comment-indicator').forEach(el => el.remove());
+
+    // ⭐ 先按句子 ID 应用特效（scroll 模式 / 翻页模式都会走到这里）
+    if (window.activeWork && Array.isArray(activeWork.effectsPublished) && activeWork.effectsPublished.length) {
+        applyEffectsToBlocks(containerEl, activeWork.effectsPublished, activeWork._id);
+    }
 
     const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
     

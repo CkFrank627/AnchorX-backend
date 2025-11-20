@@ -127,16 +127,7 @@ router.patch('/:id/cover', auth, async (req, res) => {
     }
 });
 
-// **修改：增加查询条件 isPublished: true**
-// ------------------------------------------------------------------
-router.get('/all', async (req, res) => {
-    try {
-        const works = await Work.find({ isPublished: true }).populate('author', 'username');
-        res.json(works);
-    } catch (error) {
-        res.status(500).json({ message: '获取作品失败', error: error.message });
-    }
-});
+
 // ------------------------------------------------------------------
 
 // ------------------------------------------------------------------
@@ -175,15 +166,41 @@ router.patch('/:id/publish', auth, async (req, res) => {
 });
 // ------------------------------------------------------------------
 
-// 获取所有作品的路由 (用于阅读页面)
-router.get('/all', async (req, res) => {
-    try {
-        const works = await Work.find().populate('author', 'username');
-        res.json(works);
-    } catch (error) {
-        res.status(500).json({ message: '获取作品失败', error: error.message });
-    }
+// ------------------------------------------------------------------
+// ✅ 新增：分页获取“已发布作品”（用于阅读列表）
+// GET /api/works/public?page=1&limit=5
+// ------------------------------------------------------------------
+router.get('/public', async (req, res) => {
+    try {
+        // 页码和每页数量，做一下安全处理
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
+        const skip = (page - 1) * limit;
+
+        // 只查 isPublished = true，按更新时间倒序
+        const [works, total] = await Promise.all([
+            Work.find({ isPublished: true })
+                .sort({ updatedAt: -1, _id: -1 }) // 最新在前
+                .skip(skip)
+                .limit(limit)
+                .populate('author', 'username'),
+            Work.countDocuments({ isPublished: true })
+        ]);
+
+        const hasMore = skip + works.length < total;
+
+        res.json({
+            works,
+            page,
+            limit,
+            total,
+            hasMore
+        });
+    } catch (error) {
+        res.status(500).json({ message: '获取作品失败', error: error.message });
+    }
 });
+
 
 // 获取当前登录用户的作品
 router.get('/', auth, async (req, res) => {

@@ -1,0 +1,659 @@
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // -------------------------------------------------------------------
+    // --- 配置部分 ---
+    // -------------------------------------------------------------------
+    // **注意：在真实环境中，请确保此 API_BASE_URL 是您的服务器地址**
+    const API_BASE_URL = 'https://api.anchorx.ca/api/topics'; 
+    const REPLIES_PER_PAGE = 20; 
+
+    // 获取 URL 中的主题 ID
+    const urlParams = new URLSearchParams(window.location.search);
+    const topicId = urlParams.get('id');
+
+    // 检查主题 ID
+    if (!topicId) {
+        document.getElementById('topicContent').innerHTML = '<h2>错误：缺少主题ID参数。</h2>';
+        return;
+    }
+
+    let replyCurrentPage = 1;
+    let replyTotalPages = 1;
+    let isLiked = false; 
+
+    // -------------------------------------------------------------------
+    // --- DOM & Quill 初始化 ---
+    // -------------------------------------------------------------------
+
+    // 初始化 Quill 
+    const toolbarOptions = [
+        ['bold', 'italic', 'underline', 'strike'], 
+        ['blockquote', { 'list': 'ordered' }, { 'list': 'bullet' }],
+        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+        [{ 'color': [] }, { 'background': [] }],
+        ['link', 'image', 'clean'] // 【重要】Quill 工具栏新增 'image'
+    ];
+// 初始化 Quill 
+    // ... (省略工具栏配置)
+    const replyQuill = new Quill('#replyEditor', {
+        theme: 'snow',
+        placeholder: '请在此输入您的回复...',
+        modules: {
+            toolbar: toolbarOptions,
+            // 【重要】新增图片缩放模块
+            imageResize: {
+                modules: [ 'Resize', 'DisplaySize', 'Toolbar' ]
+            },
+            // 【重要】自定义图片处理句柄
+            toolbar: {
+                container: toolbarOptions,
+                handlers: {
+                    'image': imageHandler // 绑定自定义函数
+                }
+            }
+        }
+    });
+
+    const submitReplyBtn = document.getElementById('submitReplyBtn');
+    const replyStatusMessage = document.getElementById('replyStatusMessage');
+    const likeButton = document.getElementById('likeButton'); 
+    const replyToIdInput = document.getElementById('replyToId'); // 楼中楼 ID 存储
+    const replyingToMessage = document.getElementById('replyingToMessage'); // 楼中楼提示信息
+
+
+    // 启用/禁用回复按钮 (简单的内容校验)
+    replyQuill.on('text-change', () => {
+        const text = replyQuill.getText().trim();
+        submitReplyBtn.disabled = text.length === 0 || text.length > 5000; 
+    });
+    
+    // -------------------------------------------------------------------
+    // --- 图片上传相关函数（问题 4 修正） ---
+    // -------------------------------------------------------------------
+    
+    /**
+     * 【核心上传函数】
+     * 接收文件，压缩后发送到后端 API
+     * @param {File} file - 原始图片文件
+     * @returns {Promise<string>} - 返回后端存储的图片 URL
+     */
+    async function uploadImageFile(file) {
+        // 定义压缩选项
+        const options = {
+            maxSizeMB: 0.5, // 最大文件大小，单位MB。
+            maxWidthOrHeight: 1920, // 允许的最大宽度或高度
+            useWebWorker: true // 使用 Web Worker
+        };
+
+        const token = getAuthToken();
+        if (!token) {
+             throw new Error("用户未登录");
+        }
+        
+        // 调用压缩函数 (需要引入 browser-image-compression 库)
+        const compressedFile = await imageCompression(file, options);
+        console.log('原始文件大小:', (file.size / 1024).toFixed(2), 'KB');
+        console.log('压缩后文件大小:', (compressedFile.size / 1024).toFixed(2), 'KB');
+        
+        // 使用 FormData 来包装压缩后的文件
+        const formData = new FormData();
+        // 使用原始文件名，以便后端可以获取正确的文件扩展名
+        formData.append('image', compressedFile, file.name); 
+
+        // 发送到后端上传接口
+        const res = await fetch(`${API_BASE_URL}/upload`, { // 假设您的上传接口是 /api/topics/upload
+            method: 'POST',
+            headers: {
+                // 上传 FormData 时，不需要手动设置 'Content-Type'，浏览器会自动设置
+                'Authorization': `Bearer ${token}` 
+            },
+            body: formData
+        });
+
+        if (!res.ok) {
+            const errorResult = await res.json();
+            throw new Error(errorResult.message || '图片上传失败');
+        }
+
+        const result = await res.json();
+        
+        // 【注意】这里假设后端返回的 JSON 中包含一个名为 imageUrl 的字段
+        if (!result.imageUrl) {
+            throw new Error('后端未返回图片 URL');
+        }
+        return result.imageUrl; 
+    }
+
+
+    /**
+     * 【Quill 图片工具栏处理句柄】
+     * 拦截 Quill 的图片按钮点击事件
+     */
+    function imageHandler() {
+        const input = document.createElement('input');
+        input.setAttribute('type', 'file');
+        input.setAttribute('accept', 'image/*');
+        input.click();
+
+        input.onchange = async () => {
+            if (input.files && input.files.length > 0) {
+                const file = input.files[0];
+                const range = replyQuill.getSelection(true);
+                
+                // 1. 在编辑器中插入占位文本
+                const placeholderText = " [图片上传中...] ";
+                replyQuill.insertText(range.index, placeholderText, { 'color': '#999' });
+                replyQuill.setSelection(range.index + placeholderText.length, 0, Quill.sources.SILENT);
+                replyQuill.focus();
+                
+                // 存储占位文本的起始位置和长度，以便后续删除
+                const startIndex = range.index;
+                const length = placeholderText.length;
+
+
+                try {
+                    // 2. 调用核心上传函数
+                    const imageUrl = await uploadImageFile(file);
+                    
+                    // 3. 移除占位文本，插入图片
+                    replyQuill.deleteText(startIndex, length, Quill.sources.USER);
+                    replyQuill.insertEmbed(startIndex, 'image', imageUrl, Quill.sources.USER);
+                    replyQuill.setSelection(startIndex + 1, 0, Quill.sources.SILENT);
+
+                } catch (error) {
+                    console.error('图片上传失败:', error);
+                    // 4. 上传失败，移除占位文本并显示错误信息
+                    replyQuill.deleteText(startIndex, length, Quill.sources.USER);
+                    replyStatusMessage.textContent = `图片上传失败: ${error.message || '网络错误'}`; 
+                    setTimeout(() => { replyStatusMessage.textContent = ''; }, 4000);
+                }
+            }
+        };
+    }
+
+  
+    // -------------------------------------------------------------------
+    // --- 辅助函数 ---
+    // -------------------------------------------------------------------
+    
+    function formatDate(dateString) {
+        if (!dateString) return '未知日期';
+        try {
+            return new Date(dateString).toLocaleDateString('zh-CN', { 
+                year: 'numeric', month: '2-digit', day: '2-digit', 
+                hour: '2-digit', minute: '2-digit' 
+            });
+        } catch (e) {
+            return '日期错误';
+        }
+    }
+
+    function getAuthToken() {
+        // **正确实现：**
+        const token = localStorage.getItem('token');
+        return token;
+    }
+
+    // ---------- 辅助：确保 replyLoadingMessage 存在并返回它 ----------
+    function ensureReplyLoadingMessage(message = '正在加载回复...') {
+        let loading = document.getElementById('replyLoadingMessage');
+        const list = document.getElementById('replyList');
+        if (!list) return null; 
+        if (!loading) {
+            loading = document.createElement('p');
+            loading.id = 'replyLoadingMessage';
+            loading.style.textAlign = 'center';
+            loading.style.color = '#999';
+            loading.style.padding = '20px 0';
+            list.appendChild(loading);
+        }
+        loading.textContent = message;
+        return loading;
+    }
+
+    // ---------- 辅助：简单转义（用于用户名等插入 innerHTML 的场景） ----------
+    function escapeHtml(unsafe) {
+        return String(unsafe || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+
+    // -------------------------------------------------------------------
+    // --- 渲染函数 ---
+    // -------------------------------------------------------------------
+
+    // ... renderTopicDetail (保持不变) ...
+function renderTopicDetail(topic, _isLiked) {
+
+    const titleEl = document.getElementById('topicTitle');
+    const authorEl = document.getElementById('topicAuthor');
+    const createdEl = document.getElementById('topicCreatedAt');
+    const viewsEl = document.getElementById('topicViews');
+    const repliesEl = document.getElementById('topicRepliesCount');
+    const replyCountHeaderEl = document.getElementById('replyCountHeader');
+    const sectionEl = document.getElementById('topicSection');
+    const likeCountEl = document.getElementById('likeCount');
+
+    // 💥 如果任意节点缺失，立即退出，避免 null.textContent 报错
+    if (!titleEl || !authorEl || !createdEl || !viewsEl || !repliesEl || !replyCountHeaderEl || !likeCountEl) {
+        console.warn("⚠️ renderTopicDetail：某些 DOM 元素尚未加载，跳过渲染。");
+        return;
+    }
+
+    titleEl.textContent = topic.title;
+    authorEl.textContent = `作者: ${topic.author ? escapeHtml(topic.author.username) : '匿名'}`;
+    createdEl.textContent = formatDate(topic.createdAt);
+    viewsEl.textContent = topic.viewsCount || 0;
+    repliesEl.textContent = topic.repliesCount || 0;
+    replyCountHeaderEl.textContent = topic.repliesCount || 0;
+
+    if (topic.section && topic.section.name) {
+        sectionEl.textContent = topic.section.name;
+        sectionEl.style.display = 'inline-block';
+    } else {
+        sectionEl.style.display = 'none';
+    }
+
+    likeCountEl.textContent = topic.likesCount || 0;
+    isLiked = _isLiked;
+
+    if (isLiked) {
+        likeButton.classList.add('liked');
+        likeButton.innerHTML = `🧡 <span>${likeCountEl.textContent}</span>`;
+    } else {
+        likeButton.classList.remove('liked');
+        likeButton.innerHTML = `❤️ <span>${likeCountEl.textContent}</span>`;
+    }
+}
+
+    /**
+     * 渲染回复列表 (问题 1 楼中楼实现)
+     * 【注意】：此处仅实现扁平化渲染，楼中楼的嵌套逻辑需要后端数据结构支持。
+     * * @param {Array<Object>} replies - 回复列表。
+     */
+    function renderReplies(replies) {
+        const list = document.getElementById('replyList');
+        if (!list) return;
+
+        const loadingMsg = ensureReplyLoadingMessage();
+        if (loadingMsg) loadingMsg.style.display = 'none';
+
+        list.innerHTML = '';
+        if (loadingMsg) list.appendChild(loadingMsg);
+
+        if (!replies || replies.length === 0) {
+            if (loadingMsg) {
+                loadingMsg.style.display = 'block';
+                loadingMsg.textContent = '暂无回复。';
+            } else {
+                list.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">暂无回复。</p>';
+            }
+            return;
+        }
+
+        replies.forEach((reply, index) => {
+            list.appendChild(createReplyItem(reply, index, false));
+        });
+
+        // 【问题 1 修正】绑定楼中楼回复事件
+        list.querySelectorAll('.reply-actions').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const username = e.currentTarget.dataset.username || '';
+                const replyId = e.currentTarget.dataset.replyId || '';
+                
+                // 1. 设置回复目标 ID 和用户名
+                replyToIdInput.value = replyId;
+                document.getElementById('replyToUsername').value = username;
+                replyingToMessage.textContent = ` (正在回复：${username})`;
+
+                // 2. 清空编辑器并插入 @ 提及 (保留 @ 逻辑，但现在是楼中楼的一部分)
+                replyQuill.setContents([{ insert: '\n' }]); // 清空编辑器
+                const mention = `@${username} `;
+                replyQuill.insertText(0, mention, Quill.sources.USER);
+                replyQuill.setSelection(mention.length, 0, Quill.sources.SILENT);
+                replyQuill.focus();
+
+                // 3. 滚动到编辑器位置
+                document.querySelector('.reply-editor-container').scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    }
+
+/**
+ * 🔧 将新回复 append 到 replyList 底部，而不重绘整个列表
+ * @param {Object} reply - 新增的回复对象
+ */
+function appendNewReply(reply) {
+    const list = document.getElementById('replyList');
+    if (!list) return;
+
+    // 使用 renderReplies 中的 createReplyItem 逻辑，给它提升到全局即可
+    const item = createReplyItem(reply, list.children.length, false);
+
+    list.appendChild(item);
+
+    // 自动滚动到新评论
+    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+  
+    // ... renderReplyPagination (保持不变) ...
+    function renderReplyPagination() {
+        const container = document.getElementById('replyPaginationContainer');
+        container.innerHTML = '';
+        if (replyTotalPages <= 1) return;
+
+        const prevBtn = `<button id="prevReplyBtn" class="pagination-btn" style="padding:8px; border:1px solid #ccc; margin-right: 10px;" ${replyCurrentPage === 1 ? 'disabled' : ''}>上一页</button>`;
+        const info = `<span>第 ${replyCurrentPage} / ${replyTotalPages} 页</span>`;
+        const nextBtn = `<button id="nextReplyBtn" class="pagination-btn" style="padding:8px; border:1px solid #ccc; margin-left: 10px;" ${replyCurrentPage === replyTotalPages ? 'disabled' : ''}>下一页</button>`;
+
+        container.innerHTML = prevBtn + info + nextBtn;
+        
+        // 绑定分页事件
+        document.getElementById('prevReplyBtn').addEventListener('click', () => {
+            if (replyCurrentPage > 1) {
+                fetchReplies(replyCurrentPage - 1);
+            }
+        });
+        document.getElementById('nextReplyBtn').addEventListener('click', () => {
+            if (replyCurrentPage < replyTotalPages) {
+                fetchReplies(replyCurrentPage + 1);
+            }
+        });
+    }
+
+  // 函数：创建单个回复的 DOM 结构
+function createReplyItem(reply, index, isNested = false) {
+            const authorName = reply.author ? reply.author.username : '匿名用户';
+            const initial = authorName ? escapeHtml(authorName[0]).toUpperCase() : 'U';
+            const replyId = reply._id || '';
+
+            const item = document.createElement('div');
+            item.className = isNested ? 'nested-reply-item' : 'reply-item';
+            item.dataset.replyId = replyId;
+
+            let replyIndexHtml = '';
+            if (!isNested) {
+                // 主回复才显示楼层号
+                replyIndexHtml = `<span>#${(replyCurrentPage - 1) * REPLIES_PER_PAGE + index + 1} | ${formatDate(reply.createdAt)}</span>`;
+            } else {
+                // 楼中楼只显示时间
+                replyIndexHtml = `<span>${formatDate(reply.createdAt)}</span>`;
+            }
+
+            item.innerHTML = `
+                <div class="${isNested ? 'reply-avatar' : 'reply-avatar'}" style="${isNested ? 'width: 30px; height: 30px; font-size: 0.9rem;' : ''}">${initial}</div>
+                <div class="reply-body">
+                    <div class="reply-user-meta">
+                        ${escapeHtml(authorName)} ${replyIndexHtml}
+                    </div>
+                    <div class="reply-content">${reply.content || ''}</div>
+                    <div class="reply-actions" data-reply-id="${replyId}" data-username="${escapeHtml(authorName)}">回复TA</div>
+                </div>
+            `;
+            
+            // 【楼中楼渲染逻辑】假设回复数据结构中有 nestedReplies 数组
+            if (reply.nestedReplies && reply.nestedReplies.length > 0) {
+                const nestedList = document.createElement('div');
+                nestedList.className = 'nested-reply-list';
+                reply.nestedReplies.forEach((nestedReply, nestedIndex) => {
+                    nestedList.appendChild(createReplyItem(nestedReply, nestedIndex, true)); // 递归调用，标记为嵌套
+                });
+                item.querySelector('.reply-body').appendChild(nestedList);
+            }
+
+            return item;
+        };
+
+    // -------------------------------------------------------------------
+    // --- API 交互函数 ---
+    // -------------------------------------------------------------------
+    
+    // ... submitLike (保持不变) ...
+    async function submitLike() {
+        const token = getAuthToken();
+        if (!token) {
+            alert('请先登录才能点赞！');
+            return;
+        }
+
+        likeButton.disabled = true; 
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/${topicId}/like`, {
+                method: 'POST', 
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({}) 
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                const newLikesCount = result.likesCount || 0;
+                const newIsLiked = result.isLiked; 
+
+                renderTopicDetail({
+                    ...data.topic, 
+                    likesCount: newLikesCount
+                }, newIsLiked);
+
+            } else {
+                alert(`操作失败: ${result.message || '服务器错误'}`);
+            }
+
+        } catch (error) {
+            console.error('提交点赞时发生网络错误:', error);
+            alert('提交失败: 网络连接错误。');
+        } finally {
+            likeButton.disabled = false;
+        }
+    }
+
+async function fetchTopicAndReplies() {
+    const progressContainer = document.getElementById('topic-load-progress-container');
+    const progressText = document.getElementById('topic-load-progress-text');
+    const progressBar = document.getElementById('topic-load-progress-bar');
+
+    // 启动加载条
+    progressContainer.style.display = 'block';
+    progressText.textContent = '正在请求主题数据...';
+    progressBar.style.width = '10%';
+
+    try {
+        const token = getAuthToken();
+        const topicUrl = `${API_BASE_URL}/${topicId}?page=1&limit=${REPLIES_PER_PAGE}`;
+        
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const response = await fetch(topicUrl, { headers });
+
+        if (!response.ok) throw new Error(`加载失败 (${response.status})`);
+        progressText.textContent = '正在解析数据...';
+        progressBar.style.width = '40%';
+
+        const data = await response.json();
+
+        // 渲染主题部分
+        renderTopicDetail(data.topic, !!data.isLiked);
+        progressText.textContent = '正在渲染主题内容...';
+        progressBar.style.width = '60%';
+
+        // 渲染回复部分
+        if (Array.isArray(data.replies)) {
+            renderReplies(data.replies);
+            renderReplyPagination();
+        }
+        progressText.textContent = '正在加载回复...';
+        progressBar.style.width = '80%';
+
+        // 回复页数信息
+        replyCurrentPage = data.replyPage || 1;
+        replyTotalPages = data.replyTotalPages || 1;
+
+        // 完成状态
+        progressText.textContent = '加载完成！';
+        progressBar.style.width = '100%';
+        progressBar.style.background = '#4caf50';
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            progressBar.style.background = '#0077cc';
+        }, 1000);
+
+    } catch (error) {
+        console.error('加载主题或回复失败:', error);
+        const headerEl = document.querySelector('.topic-header');
+        if (headerEl) headerEl.style.display = 'none';
+
+        const contentContainer = document.getElementById('topicContent');
+        if (contentContainer) {
+            contentContainer.innerHTML = `<p style="color:red; text-align:center;">加载失败：${escapeHtml(error.message)}</p>`;
+        }
+
+        const loadingMsg = ensureReplyLoadingMessage('主题加载失败，回复无法显示。');
+        if (loadingMsg) loadingMsg.style.display = 'block';
+
+        const pagination = document.getElementById('replyPaginationContainer');
+        if (pagination) pagination.style.display = 'none';
+
+        progressText.textContent = '加载失败';
+        progressBar.style.background = '#e53935';
+        setTimeout(() => (progressContainer.style.display = 'none'), 1200);
+    }
+}
+
+    
+    // ... fetchReplies (保持不变) ...
+    async function fetchReplies(page) {
+        const loadingMsg = ensureReplyLoadingMessage('正在加载回复...');
+        if (loadingMsg) loadingMsg.style.display = 'block';
+
+        const list = document.getElementById('replyList');
+        if (list) {
+            list.innerHTML = '';
+        }
+
+        window.scrollTo(0, 0); 
+
+        try {
+            const topicUrl = `${API_BASE_URL}/${topicId}?page=${page}&limit=${REPLIES_PER_PAGE}`;
+            const response = await fetch(topicUrl);
+            if (!response.ok) throw new Error(`加载失败，状态码: ${response.status}`);
+            const data = await response.json();
+
+            replyCurrentPage = data.replyPage || 1;
+            replyTotalPages = data.replyTotalPages || 1;
+
+            renderReplies(data.replies);
+            renderReplyPagination();
+        } catch (error) {
+            console.error('加载回复页失败:', error);
+            const loadingMsg = ensureReplyLoadingMessage('回复页加载失败。');
+            if (loadingMsg) loadingMsg.style.display = 'block';
+        }
+    }
+
+    /**
+     * 提交新回复 (问题 1 楼中楼修正)
+     */
+    async function submitReply() {
+        const contentHTML = replyQuill.root.innerHTML; 
+        const replyToId = replyToIdInput.value; // 获取回复目标的 ID
+
+        if (replyQuill.getText().trim().length === 0) {
+            replyStatusMessage.textContent = '回复内容不能为空！';
+            return;
+        }
+
+        const token = getAuthToken();
+        if (!token) {
+            replyStatusMessage.textContent = '请先登录才能回复！';
+            return;
+        }
+
+        submitReplyBtn.disabled = true;
+        replyStatusMessage.textContent = '正在提交回复...';
+        
+        try {
+            const payload = {
+                content: contentHTML,
+            };
+            
+            // 【修正点】如果有 replyToId，则将其添加到 payload 中，作为楼中楼的依据
+            if (replyToId) {
+                payload.parentId = replyToId; // 假设您的后端使用 parentId 来标识楼中楼
+            }
+
+            const response = await fetch(`${API_BASE_URL}/${topicId}/replies`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify(payload) // 包含 parentId
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                replyStatusMessage.textContent = '回复成功！正在刷新...';
+                
+                // 成功后清除楼中楼状态
+                replyToIdInput.value = '';
+                document.getElementById('replyToUsername').value = '';
+                replyingToMessage.textContent = '';
+
+                replyQuill.setContents([{ insert: '\n' }]); 
+                setTimeout(() => {
+                    replyStatusMessage.textContent = '';
+                    submitReplyBtn.disabled = false;
+                    // 重新加载主题和回复，最好是定位到新回复所在页
+                    // --- 新增逻辑：只 append 新回复，不刷新 topic 部分 ---
+if (result.reply) {
+    appendNewReply(result.reply);
+}
+
+// 更新回复数（不刷新整个 Topic）
+const repliesCountEl = document.getElementById("topicRepliesCount");
+if (repliesCountEl) repliesCountEl.textContent = Number(repliesCountEl.textContent) + 1;
+
+const replyCountHeaderEl = document.getElementById("replyCountHeader");
+if (replyCountHeaderEl) replyCountHeaderEl.textContent = Number(replyCountHeaderEl.textContent) + 1;
+
+                }, 1000);
+
+            } else {
+                replyStatusMessage.textContent = `回复失败: ${result.message || '服务器错误'}`;
+                submitReplyBtn.disabled = false;
+            }
+
+        } catch (error) {
+            console.error('提交回复时发生网络错误:', error);
+            replyStatusMessage.textContent = '提交失败: 网络连接错误。';
+            submitReplyBtn.disabled = false;
+        }
+    }
+    
+    // -------------------------------------------------------------------
+    // --- 事件绑定及初始执行 ---
+    // -------------------------------------------------------------------
+    
+    // 绑定提交回复按钮
+    submitReplyBtn.addEventListener('click', submitReply);
+    
+    // 绑定点赞按钮
+    likeButton.addEventListener('click', submitLike);
+
+    // 【移除】原图片上传按钮的占位代码，因为我们已将逻辑集成到 Quill 的 imageHandler 中
+    
+    // 初始加载数据
+    fetchTopicAndReplies();
+});
+</script>
