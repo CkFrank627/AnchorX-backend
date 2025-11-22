@@ -147,52 +147,35 @@ router.get('/:topicId', async (req, res) => {
         // 2. 增加浏览量 (不等待，异步执行)
         Topic.findByIdAndUpdate(topicId, { $inc: { viewsCount: 1 } }).exec();
 
-        // 3. 【楼中楼逻辑】计算根回复总数 (用于分页)
-        const totalRootReplies = await Reply.countDocuments({ topic: topicId, parentReply: null });
+                // 3. 计算当前主题下“所有回复总数”（不再区分根回复）
+        const totalReplies = await Reply.countDocuments({ topic: topicId });
 
-        // 4. 【楼中楼逻辑】获取当前页的根回复
-        const rootReplies = await Reply.find({ topic: topicId, parentReply: null })
-    .sort({ createdAt: 1 })
-    .skip(skip)
-    .limit(limit)
-    .populate('author', 'username lastActiveAt')
-    .lean()
-    .exec();
+        // 4. 获取当前页的“扁平回复列表”（按时间排序）
+        const replies = await Reply.find({ topic: topicId })
+            .sort({ createdAt: 1 })         // 时间升序
+            .skip(skip)
+            .limit(limit)
+            .populate('author', 'username lastActiveAt') // 带上作者和活跃时间
+            .populate({
+                path: 'parentReply',        // 让每条回复都可以拿到它“回复对象”
+                select: 'content author',
+                populate: {
+                    path: 'author',
+                    select: 'username'
+                }
+            })
+            .lean()
+            .exec();
 
-        // 5. 【楼中楼逻辑】获取所有与当前根回复相关的子回复
-        const rootReplyIds = rootReplies.map(r => r._id);
-        const nestedReplies = await Reply.find({ parentReply: { $in: rootReplyIds } })
-    .sort({ createdAt: 1 })
-    .populate('author', 'username lastActiveAt')
-    .lean()
-    .exec();
-
-
-        // 6. 【楼中楼逻辑】将子回复嵌套到对应的根回复中
-        const repliesMap = new Map();
-        rootReplies.forEach(reply => {
-            reply.nestedReplies = []; // 创建前端所需的嵌套数组
-            repliesMap.set(reply._id.toString(), reply);
-        });
-
-        nestedReplies.forEach(nested => {
-            const parentId = nested.parentReply ? nested.parentReply.toString() : null;
-            if (parentId && repliesMap.has(parentId)) {
-                // 将子回复添加到父回复的 nestedReplies 数组中
-                repliesMap.get(parentId).nestedReplies.push(nested);
-            }
-        });
-        
-        // **注意**：前端 Topic 列表的 repliesCount 仍显示的是所有评论总数，
-        // 而此处的 totalReplies 仅用于分页计算（根回复数）。
-
+        // 5. 返回给前端：topic + 扁平 replies（带 parentReply 信息）
         res.json({
             topic,
-            replies: rootReplies, // 返回包含 nestedReplies 的根回复列表
+            replies, // 现在是一个“扁平列表”，每条里有 parentReply 字段
             replyPage: page,
-            replyTotalPages: Math.ceil(totalRootReplies / limit),
-            totalReplies: totalRootReplies 
+            replyTotalPages: Math.ceil(totalReplies / limit),
+            totalReplies
         });
+
 
     } catch (error) {
         console.error('获取主题详情失败:', error);
