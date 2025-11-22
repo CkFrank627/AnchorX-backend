@@ -97,16 +97,15 @@ router.get('/', async (req, res) => {
             filter.section = section;
         }
 
-        const topics = await Topic.find(filter)
+const topics = await Topic.find(filter)
     .sort({ lastReplyAt: -1, createdAt: -1 })
     .skip(skip)
     .limit(limit)
-    // 带上作者的 lastActiveAt，方便前端展示活跃状态
-    .populate('author', 'username lastActiveAt')
-    .populate('lastRepliedBy', 'username lastActiveAt')
+    // 带上作者的 lastActiveAt + avatarUrl
+    .populate('author', 'username lastActiveAt avatarUrl')
+    .populate('lastRepliedBy', 'username lastActiveAt avatarUrl')
     .select('-content -likedBy')
     .exec();
-
 
         const totalTopics = await Topic.countDocuments(filter);
 
@@ -135,8 +134,8 @@ router.get('/:topicId', async (req, res) => {
 
     try {
         // 1. 获取主题详情
-        const topic = await Topic.findById(topicId)
-    .populate('author', 'username lastActiveAt')
+      const topic = await Topic.findById(topicId)
+    .populate('author', 'username lastActiveAt avatarUrl')
     .select('-__v')
     .exec();
 
@@ -152,20 +151,21 @@ router.get('/:topicId', async (req, res) => {
 
         // 4. 获取当前页的“扁平回复列表”（按时间排序）
         const replies = await Reply.find({ topic: topicId })
-            .sort({ createdAt: 1 })         // 时间升序
-            .skip(skip)
-            .limit(limit)
-            .populate('author', 'username lastActiveAt') // 带上作者和活跃时间
-            .populate({
-                path: 'parentReply',        // 让每条回复都可以拿到它“回复对象”
-                select: 'content author',
-                populate: {
-                    path: 'author',
-                    select: 'username'
-                }
-            })
-            .lean()
-            .exec();
+    .sort({ createdAt: 1 })
+    .skip(skip)
+    .limit(limit)
+    .populate('author', 'username lastActiveAt avatarUrl') // + avatarUrl
+    .populate({
+        path: 'parentReply',
+        select: 'content author',
+        populate: {
+            path: 'author',
+            select: 'username avatarUrl' // 让被回复的那个人也有头像
+        }
+    })
+    .lean()
+    .exec();
+
 
         // 5. 返回给前端：topic + 扁平 replies（带 parentReply 信息）
         res.json({
@@ -266,14 +266,16 @@ if (topic.author.toString() !== authorId.toString()) {
         }
 
         // 保存完再查一遍，populate 出作者和 lastActiveAt
+// 保存完再查一遍，populate 出作者、活跃时间和头像
 const populatedReply = await Reply.findById(newReply._id)
-    .populate('author', 'username lastActiveAt')
+    .populate('author', 'username lastActiveAt avatarUrl')
     .lean();
 
 res.status(201).json({
     message: '回复成功',
     reply: populatedReply
 });
+
 
     } catch (error) {
         console.error('添加回复失败:', error);
