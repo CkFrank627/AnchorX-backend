@@ -1,19 +1,16 @@
 // authMiddleware.js
 const jwt = require('jsonwebtoken');
-// ✅ 从项目根目录指向 ./models/User.js
-const User = require('./models/User');
+const User = require('./models/User');   // ✅ 根目录 → ./models/User
 
 const auth = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
-
         if (!authHeader) {
             return res.status(401).json({ message: '授权失败：没有提供令牌' });
         }
 
         const parts = authHeader.split(' ');
         const token = parts.length === 2 ? parts[1] : null;
-
         if (!token) {
             return res.status(401).json({ message: '授权失败：令牌格式不正确' });
         }
@@ -21,7 +18,7 @@ const auth = async (req, res, next) => {
         const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
         req.userData = decoded;
 
-        // ⭐ 更新 lastActiveAt
+        // ⭐ 每次通过鉴权，刷新一次 lastActiveAt
         if (decoded && decoded.userId) {
             try {
                 await User.findByIdAndUpdate(
@@ -29,8 +26,9 @@ const auth = async (req, res, next) => {
                     { lastActiveAt: new Date() },
                     { new: false, validateBeforeSave: false }
                 );
-            } catch (updateErr) {
-                console.error('更新用户 lastActiveAt 失败:', updateErr.message);
+            } catch (e) {
+                console.error('更新用户 lastActiveAt 失败:', e.message);
+                // 不要 return，失败不影响主请求
             }
         }
 

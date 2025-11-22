@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
 
   // 新增：最近活跃时间（用于前端显示在线状态）
-  lastActiveAt: { type: Date, default: Date.now }
+  lastActiveAt: { type: Date, default: null}
 });
 
 

@@ -32,10 +32,9 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ message: '用户名或密码不正确' });
         }
 
-        // 新增：登录视为一次活跃，更新 lastActiveAt
+        // ✅ 登录成功：记录本次活跃时间
         user.lastActiveAt = new Date();
         await user.save({ validateBeforeSave: false });
-        // 或者：await user.touchLastActive();
 
         // 生成 JWT
         const token = jwt.sign(
@@ -44,7 +43,7 @@ router.post('/login', async (req, res) => {
             { expiresIn: '7d' }
         );
 
-        // 顺便把用户基本信息（含 lastActiveAt）返回给前端
+        // 也可以顺便把 lastActiveAt 返回给前端用
         res.json({
             message: '登录成功',
             token,
@@ -58,6 +57,7 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ message: '登录失败', error: error.message });
     }
 });
+
 
 // 获取个人资料（受保护路由）
 router.get('/profile', auth, async (req, res) => {
