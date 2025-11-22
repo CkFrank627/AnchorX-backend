@@ -6,6 +6,11 @@ const jwt = require('jsonwebtoken');
 const auth = require('../authMiddleware');
 const bcrypt = require('bcrypt'); // 引入 bcrypt 用于新密码的哈希
 
+// ✅ 新增：头像上传相关
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
 // 注册
 router.post('/register', async (req, res) => {
     try {
@@ -102,6 +107,69 @@ router.patch('/change-password', auth, async (req, res) => {
         res.status(500).json({ message: '密码修改失败', error: error.message });
     }
 });
+
+// ================== 头像上传 ==================
+
+// 存储策略：保存到 /uploads/avatars 目录
+const avatarStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const dir = path.join(__dirname, '..', 'uploads', 'avatars');
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+        // userId-时间戳.png
+        const ext = path.extname(file.originalname) || '.png';
+        cb(null, req.userData.userId + '-' + Date.now() + ext);
+    }
+});
+
+const avatarUpload = multer({
+    storage: avatarStorage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+    fileFilter(req, file, cb) {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('只允许上传图片文件'));
+        }
+        cb(null, true);
+    }
+});
+
+// 上传 / 更改头像（受保护路由）
+// 前端使用字段名 avatar
+router.post('/avatar', auth, avatarUpload.single('avatar'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: '没有收到头像文件' });
+        }
+
+        const userId = req.userData.userId;
+
+        // 生成可以被前端访问的 URL
+        // 假设你的静态资源通过 app.use('/uploads', express.static('uploads')) 暴露
+        const relativePath = `/uploads/avatars/${req.file.filename}`;
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { avatarUrl: relativePath },
+            { new: true, select: 'username avatarUrl lastActiveAt' }
+        );
+
+        if (!user) {
+            return res.status(404).json({ message: '找不到用户' });
+        }
+
+        res.json({
+            message: '头像更新成功',
+            avatarUrl: user.avatarUrl,
+            user
+        });
+    } catch (error) {
+        console.error('头像上传失败:', error);
+        res.status(500).json({ message: '头像上传失败', error: error.message });
+    }
+});
+
 // --- 新增代码段结束 ---
 
 module.exports = router;

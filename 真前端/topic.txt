@@ -378,6 +378,27 @@
     background-color: #9ca3af;
 }
 
+      /* 顶部引用条（类似 Discord “replying to ...”） */
+.reply-parent-preview {
+    font-size: 0.8rem;
+    color: #555;
+    background-color: #f3f4f6;
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    border-left: 3px solid #d4d4d8;
+}
+
+.reply-parent-username {
+    font-weight: bold;
+    color: #4d3129;
+}
+
+.reply-parent-snippet {
+    margin-left: 4px;
+    color: #6b7280;
+}
+
       
     </style>
 </head>
@@ -802,78 +823,72 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-                const createReplyItem = (reply, index, isNested = false) => {
+        // 单条回复的渲染（不再有 isNested）
+        const createReplyItem = (reply, index) => {
             const authorName = reply.author ? reply.author.username : '匿名用户';
             const initial = authorName ? escapeHtml(authorName[0]).toUpperCase() : 'U';
             const replyId = reply._id || '';
 
             const item = document.createElement('div');
-            item.className = isNested ? 'nested-reply-item' : 'reply-item';
+            item.className = 'reply-item';
             item.dataset.replyId = replyId;
 
-            let replyIndexHtml = '';
-            if (!isNested) {
-                // 主回复才显示楼层号
-                replyIndexHtml = `<span>#${(replyCurrentPage - 1) * REPLIES_PER_PAGE + index + 1} | ${formatDate(reply.createdAt)}</span>`;
-            } else {
-                // 楼中楼只显示时间
-                replyIndexHtml = `<span>${formatDate(reply.createdAt)}</span>`;
-            }
+            // 楼层号 + 时间
+            const floorNumber = (replyCurrentPage - 1) * REPLIES_PER_PAGE + index + 1;
+            const replyIndexHtml = `<span>#${floorNumber} | ${formatDate(reply.createdAt)}</span>`;
 
-            // 新增：楼层作者的活跃状态徽章
+            // 活跃状态徽章
             let statusHtml = '';
             if (reply.author && reply.author.lastActiveAt) {
                 statusHtml = renderUserStatusBadge(reply.author.lastActiveAt);
             }
 
+            // 顶部引用条（如果有 parentReply）
+            const parentPreviewHtml = buildParentPreviewHtml(reply);
+
             item.innerHTML = `
-                <div class="${isNested ? 'reply-avatar' : 'reply-avatar'}" style="${isNested ? 'width: 30px; height: 30px; font-size: 0.9rem;' : ''}">${initial}</div>
+                <div class="reply-avatar">${initial}</div>
                 <div class="reply-body">
+                    ${parentPreviewHtml}
                     <div class="reply-user-meta">
                         ${escapeHtml(authorName)} ${statusHtml} ${replyIndexHtml}
                     </div>
                     <div class="reply-content">${reply.content || ''}</div>
-                    <div class="reply-actions" data-reply-id="${replyId}" data-username="${escapeHtml(authorName)}">回复TA</div>
+                    <div class="reply-actions"
+                         data-reply-id="${replyId}"
+                         data-username="${escapeHtml(authorName)}">
+                         回复TA
+                    </div>
                 </div>
             `;
-
-            // 【楼中楼渲染逻辑】保持不变
-            if (reply.nestedReplies && reply.nestedReplies.length > 0) {
-                const nestedList = document.createElement('div');
-                nestedList.className = 'nested-reply-list';
-                reply.nestedReplies.forEach((nestedReply, nestedIndex) => {
-                    nestedList.appendChild(createReplyItem(nestedReply, nestedIndex, true));
-                });
-                item.querySelector('.reply-body').appendChild(nestedList);
-            }
 
             return item;
         };
 
-
+        // 扁平渲染：直接按顺序 append 即可
         replies.forEach((reply, index) => {
-            list.appendChild(createReplyItem(reply, index, false));
+            list.appendChild(createReplyItem(reply, index));
         });
 
-        // 【问题 1 修正】绑定楼中楼回复事件
+        // 点击“回复TA”时，在编辑器上展示“正在回复：xxx”，并设置 parentId
         list.querySelectorAll('.reply-actions').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const username = e.currentTarget.dataset.username || '';
                 const replyId = e.currentTarget.dataset.replyId || '';
-                
-                // 1. 设置回复目标 ID 和用户名
+
+                // 1. 设置回复目标 ID 和用户名（给 submitReply 用）
                 replyToIdInput.value = replyId;
                 document.getElementById('replyToUsername').value = username;
                 replyingToMessage.textContent = ` (正在回复：${username})`;
 
-                // 2. 清空编辑器并插入 @ 提及 (保留 @ 逻辑，但现在是楼中楼的一部分)
-                replyQuill.setContents([{ insert: '\n' }]); // 清空编辑器
+                // 2. 编辑器里仍然插一段 @ 提示（可选）
+                replyQuill.setContents([{ insert: '\n' }]);
                 const mention = `@${username} `;
                 replyQuill.insertText(0, mention, Quill.sources.USER);
                 replyQuill.setSelection(mention.length, 0, Quill.sources.SILENT);
                 replyQuill.focus();
 
-                // 3. 滚动到编辑器位置
+                // 3. 滚到编辑器
                 document.querySelector('.reply-editor-container').scrollIntoView({ behavior: 'smooth' });
             });
         });
@@ -1125,6 +1140,41 @@ async function fetchTopicAndReplies() {
             submitReplyBtn.disabled = false;
         }
     }
+
+      // ---------- 从 HTML 提取纯文本，用于做引用摘要 ----------
+    function extractPlainTextFromHtml(html) {
+        if (!html) return '';
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        return (tmp.textContent || tmp.innerText || '').trim();
+    }
+
+    /**
+     * 生成“正在回复：xxx 摘要...” 这一行 HTML
+     * reply.parentReply 需要由后端 populate 出来
+     */
+    function buildParentPreviewHtml(reply) {
+        const parent = reply.parentReply;
+        if (!parent) return '';
+
+        const parentAuthorName =
+            parent.author && parent.author.username
+                ? parent.author.username
+                : '匿名用户';
+
+        const plain = extractPlainTextFromHtml(parent.content || '').replace(/\s+/g, ' ');
+        if (!plain) return '';
+
+        const snippet = plain.length > 60 ? plain.slice(0, 60) + '…' : plain;
+
+        return `
+            <div class="reply-parent-preview">
+                回复 <span class="reply-parent-username">${escapeHtml(parentAuthorName)}</span>：
+                <span class="reply-parent-snippet">${escapeHtml(snippet)}</span>
+            </div>
+        `;
+    }
+
     
     // -------------------------------------------------------------------
     // --- 事件绑定及初始执行 ---
@@ -1141,6 +1191,7 @@ async function fetchTopicAndReplies() {
     // 初始加载数据
     fetchTopicAndReplies();
 });
+
 </script>
 
 </body>

@@ -5,8 +5,11 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
 
-  // 新增：最近活跃时间（用于前端显示在线状态）
-  lastActiveAt: { type: Date, default: null}
+  // 最近活跃时间（用于前端显示在线状态）
+  lastActiveAt: { type: Date, default: null },
+
+  // ✅ 新增：头像 URL
+  avatarUrl: { type: String, default: '' }
 });
 
 
