@@ -996,10 +996,14 @@ static create(value) {
     const node = super.create(value);
     let mode = 'spoiler'; // 默认模式
 
-    // ✅ 优化: 精简判断逻辑
-    if (value && typeof value === 'object' && value.mode) {
-        mode = value.mode;
+    if (value) {
+    if (typeof value === 'object') {
+        if (value.mode) {
+            mode = value.mode;
+        }
     }
+}
+
 
     // 设置自定义属性和可能的特定 class
     node.setAttribute('data-mode', mode);
@@ -1013,17 +1017,24 @@ static create(value) {
 
         // 实例方法：更新格式属性 (在阅读端 readOnly=true, 仅供完整性保留)
         format(name, value) {
-            if (name === 'hiddenText' && value && value.mode) {
+    if (name === 'hiddenText') {
+        if (value) {
+            if (value.mode) {
                 this.domNode.setAttribute('data-mode', value.mode);
                 if (value.mode === 'secret') {
                     this.domNode.classList.add('secret-dice');
                 } else {
                     this.domNode.classList.remove('secret-dice');
                 }
-            } else {
-                super.format(name, value);
+                return; // 条件满足时就不再走 super.format 了
             }
         }
+    }
+
+    // 只要上面的条件没完全满足，就走原来的 else 分支逻辑
+    super.format(name, value);
+}
+
     }
 
     // 注册自定义 Blot
@@ -1053,7 +1064,7 @@ static create(value) {
         const API_COMMENTS = 'https://api.anchorx.ca/api/comments';
 
 
-        // 全局状态
+                // 全局状态
         let activeWork = null;      // 完整 work 对象
         let activePages = [{content: {ops: []}}]; // array of pages
         let currentMode = 'scroll';  // 'scroll' | 'page'
@@ -1062,7 +1073,13 @@ static create(value) {
         let pageQuill = null;        // 在翻页模式下动态创建的 Quill 实例
         let rendererQuill = null;    // 隐藏的 Quill 用于 Delta -> HTML 转换
 
-          let contentIndexCounter = 0; // 全局计数器，用于生成唯一ID
+        // 楼层懒加载相关
+        const FLOOR_BATCH_SIZE = 5;          // 一次渲染 5 楼
+        let renderedFloorCount = 0;          // 当前已经渲染到第几楼（数量）
+        let floorLazyScrollHandler = null;   // 楼层模式滚动监听器
+
+        let contentIndexCounter = 0; // 全局计数器，用于生成唯一ID
+
 
       // 【新增核心状态】
 let allComments = [];                 // 存储作品所有评论 (用于过滤)
@@ -1133,10 +1150,13 @@ if (typeof deltaOrHtml === 'string') {
     // 检测字符串是否是 JSON 格式的 Delta
     try {
         const maybeDelta = JSON.parse(deltaOrHtml);
-        if (maybeDelta && maybeDelta.ops) {
-            rendererQuill.setContents(maybeDelta);
-            return rendererQuill.root.innerHTML;
-        }
+        if (maybeDelta) {
+    if (maybeDelta.ops) {
+        rendererQuill.setContents(maybeDelta);
+        return rendererQuill.root.innerHTML;
+    }
+}
+
     } catch {}
     // 否则直接当 HTML 使用，不做 escape
     return deltaOrHtml;
@@ -1222,13 +1242,30 @@ console.log("🎨 已加载特效：", effectsPublished);
         updateGlobalLoadingProgress(70, '正在渲染作品内容...');
 
         // 处理 pages / content
-        if (Array.isArray(work.pages) && work.pages.length > 0) {
-            activePages = work.pages;
-        } else if (Array.isArray(work.content) && work.content.length > 0) {
-            activePages = work.content;
+        if (Array.isArray(work.pages)) {
+    if (work.pages.length > 0) {
+        activePages = work.pages;
+    } else {
+        if (Array.isArray(work.content)) {
+            if (work.content.length > 0) {
+                activePages = work.content;
+            } else {
+                activePages = [{ content: { ops: [] } }];
+            }
         } else {
             activePages = [{ content: { ops: [] } }];
         }
+    }
+} else if (Array.isArray(work.content)) {
+    if (work.content.length > 0) {
+        activePages = work.content;
+    } else {
+        activePages = [{ content: { ops: [] } }];
+    }
+} else {
+    activePages = [{ content: { ops: [] } }];
+}
+
 
         // 更新页面基本信息
         document.title = (work.title || '作品') + ' - 作品详情';
@@ -1247,7 +1284,8 @@ activePages.forEach(page => {
         page.content = { ops: [] };
     }
 
-    if (typeof page.content === 'object' && page.content.ops) {
+   if (typeof page.content === 'object') {
+    if (page.content.ops) {
         rendererQuill.setContents(page.content);
         const rawHtml = rendererQuill.root.innerHTML;
 
@@ -1272,6 +1310,8 @@ activePages.forEach(page => {
         sentenceIndex = nextIndex;
         page.segmentedHtml = tempDiv.innerHTML;
     }
+}
+
 });
 
         renderCurrentMode();
@@ -1294,22 +1334,29 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = rawHtmlContent;
   let counter = startIndex;
-  Array.from(tempDiv.children).forEach(el => {
-    if (el.nodeType === 1 && el.tagName !== 'SCRIPT' && el.textContent.trim() !== '') {
+
+  // ✅ 和 applyEffectsToBlocks 用同一套“行”的定义
+  const blocks = tempDiv.querySelectorAll('p, h1, h2, h3, li, blockquote, pre');
+
+  blocks.forEach(function (el) {
+    // 跳过纯空白
+    if (el.textContent.trim() !== '') {
       if (!el.hasAttribute('data-sentence-id')) {
-        const sentenceId = `s_${workId}_${counter++}`;
+        const sentenceId = 's_' + workId + '_' + (counter++);
         el.setAttribute('data-sentence-id', sentenceId);
       }
     }
   });
 
-  console.log("🧩 segmentContentAndAddIds 生成的 ID:", 
-      Array.from(tempDiv.querySelectorAll('[data-sentence-id]')).map(el => el.dataset.sentenceId)
+  console.log(
+    '🧩 segmentContentAndAddIds 生成的 ID:',
+    Array.from(tempDiv.querySelectorAll('[data-sentence-id]')).map(function (el) {
+      return el.dataset.sentenceId;
+    })
   );
 
   return { element: tempDiv, nextIndex: counter };
 }
-
 
 
       // 【新增函数】：获取作品所有评论，并更新全局状态
@@ -1342,76 +1389,166 @@ async function fetchAllWorkComments(workId) {
             return String(text || '').replace(/[&<>"']/g, m => map[m]);
         }
 
- // ...
-/* ---------- 渲染器：楼层（滚动）模式 ---------- */
-function renderScrollMode() {
-    // 1. 清理环境
-    destroyPageModeQuill();
-    bookContent.innerHTML = ''; // bookContent 不再是 quill 的 container
+// 渲染 [startIndex, endIndex) 这一段楼层
+function renderFloorsRange(startIndex, endIndex) {
+    if (!activePages || activePages.length === 0) return;
+    if (!bookContent) return;
 
-    // 2. 遍历并渲染所有楼层
-    activePages.forEach((page, pageIndex) => {
+    for (let pageIndex = startIndex; pageIndex < endIndex; pageIndex++) {
+        if (pageIndex >= activePages.length) {
+            break;
+        }
+
+        const page = activePages[pageIndex];
+
         const floorDiv = document.createElement('div');
         floorDiv.className = 'floor';
         floorDiv.dataset.pageIndex = String(pageIndex);
-
-        const header = document.createElement('div');
-        header.className = 'floor-header';
-        
-        // 1. 左侧：楼层信息
-        const updatedAt = page.updatedAt 
-    ? new Date(page.updatedAt).toLocaleString()
-    : (activeWork.updatedAt 
-        ? new Date(activeWork.updatedAt).toLocaleString() 
-        : '未知');
-        const leftText = document.createElement('span');
-        leftText.textContent = `第 ${pageIndex + 1} 楼 · 更新时间：${updatedAt}`;
-
-        // 2. 右侧：查看评论按钮
-        const commentBtn = document.createElement('button');
-        commentBtn.className = 'comment-view-btn';
-        // 假设 page.commentsCount 字段存在
-        const commentCount = getCommentsCountForPage(pageIndex);
-        commentBtn.textContent = `查看评论 (${commentCount})`; 
-        commentBtn.dataset.pageIndex = String(pageIndex);
-        
-        commentBtn.addEventListener('click', () => {
-            // 点击时以查看模式打开该楼层的所有评论
-            openCommentPanelForPage(pageIndex); 
-        });
-
-        header.appendChild(leftText);
-        header.appendChild(commentBtn); 
-
-        const body = document.createElement('div');
-        body.className = 'floor-body';
-        
-        // 【核心修改】：直接使用缓存的带有 ID 的 HTML
-        // ID 注入和计数器更新已经在 loadWorkContentById 中完成
-        body.innerHTML = page.segmentedHtml || ''; 
-
-        floorDiv.appendChild(header);
-        floorDiv.appendChild(body);
-        
+        floorDiv.innerHTML = `
+            <div class="floor-header">
+                <span>${pageIndex + 1} 楼</span>
+                <button class="comment-view-btn" data-page-index="${pageIndex}">
+                    查看本楼评论（${getCommentsCountForPage(pageIndex)}）
+                </button>
+            </div>
+            <div class="floor-body ql-editor">
+                ${page.segmentedHtml || ''}
+            </div>
+        `;
         bookContent.appendChild(floorDiv);
-    });
 
+        const floorBody = floorDiv.querySelector('.floor-body');
+        if (!floorBody) {
+            continue;
+        }
 
-    // 4. 渲染左侧楼层导航
-    renderSidebar(activePages.length, 'floor');
-  processContentForSentenceIds(bookContent);
+        // ❌ 把这一块删掉（不要在这里再 applyEffectsToBlocks 了）
+        /*
+        applyEffectsToBlocks(
+            floorBody,
+            activeWork ? activeWork.effectsPublished : undefined,
+            page.startIndex ? page.startIndex : 0
+        );
+        */
 
+        // 评论按钮
+        const commentBtn = floorDiv.querySelector('.comment-view-btn');
+        if (commentBtn) {
+            commentBtn.addEventListener('click', () => {
+                openCommentPanelForPage(pageIndex);
+            });
+        }
+
+        // 给新渲染的楼层绑定评论句子点击
+        processContentForSentenceIds(floorBody);
+    }
 }
+
+
+
+// 初始化 / 重新渲染楼层模式
+function renderScrollMode(initialTargetPageIndex = 0) {
+    currentMode = 'scroll';
+    bookContent.innerHTML = '';
+    renderedFloorCount = 0;
+
+    const total = activePages ? activePages.length : 0;
+    if (!total) return;
+
+    // 初次至少渲染前 5 楼，如果有目标楼层则保证目标楼层也在首批内
+    const safeTarget = Math.min(Math.max(initialTargetPageIndex, 0), total - 1);
+    const initialEnd = Math.min(
+        total,
+        Math.max(FLOOR_BATCH_SIZE, safeTarget + 1)
+    );
+
+    renderFloorsRange(0, initialEnd);
+    renderedFloorCount = initialEnd;
+
+    // 侧边栏只负责总楼层导航
+    renderSidebar(total, 'floor');
+
+    // 绑定懒加载滚动
+    setupFloorLazyLoading();
+
+    // 如果有指定目标楼层，滚动过去
+    if (safeTarget > 0) {
+        const targetFloor = document.querySelector(`.floor[data-page-index="${safeTarget}"]`);
+        if (targetFloor) {
+            targetFloor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+}
+
+// 确保某一楼已经被渲染（供导航/外部跳转使用）
+function ensureFloorRendered(targetPageIndex) {
+    const total = activePages ? activePages.length : 0;
+    if (!total) return;
+
+    if (targetPageIndex < renderedFloorCount) return;
+
+    const needEnd = Math.min(
+        total,
+        Math.max(renderedFloorCount, targetPageIndex + 1 + FLOOR_BATCH_SIZE)
+    );
+
+    if (needEnd > renderedFloorCount) {
+        renderFloorsRange(renderedFloorCount, needEnd);
+        renderedFloorCount = needEnd;
+    }
+}
+
+// 注册滚动懒加载
+function setupFloorLazyLoading() {
+    // 先解绑旧的，避免重复监听
+    if (floorLazyScrollHandler) {
+        window.removeEventListener('scroll', floorLazyScrollHandler);
+    }
+
+    floorLazyScrollHandler = () => {
+        if (currentMode !== 'scroll') return;
+
+        const scrollPos = window.scrollY + window.innerHeight;
+        const docHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
+
+        // 距离底部 300px 以内时加载下一批
+        if (scrollPos + 300 >= docHeight) {
+            const total = activePages ? activePages.length : 0;
+            if (renderedFloorCount >= total) return;
+
+            const nextEnd = Math.min(total, renderedFloorCount + FLOOR_BATCH_SIZE);
+            renderFloorsRange(renderedFloorCount, nextEnd);
+            renderedFloorCount = nextEnd;
+        }
+    };
+
+    window.addEventListener('scroll', floorLazyScrollHandler);
+}
+
 
         /* ---------- 渲染器：翻页（单页）模式 ---------- */
         function destroyPageModeQuill() {
             // 如果之前存在 pageQuill，需要删除它的容器并释放引用
             if (pageQuill) {
-                const container = pageQuill.root && pageQuill.root.parentElement;
-                try { pageQuill.disable(); } catch(e) {}
-                pageQuill = null;
-                if (container && container.parentNode) container.parentNode.removeChild(container);
-            }
+    let container = null;
+
+    if (pageQuill.root) {
+        container = pageQuill.root.parentElement;
+    }
+
+    try {
+        pageQuill.disable();
+    } catch (e) {}
+
+    pageQuill = null;
+
+    if (container) {
+        if (container.parentNode) {
+            container.parentNode.removeChild(container);
+        }
+    }
+}
+
         }
 
 function renderPageMode() {
@@ -1426,17 +1563,18 @@ function renderPageMode() {
     quillContainer.style.minHeight = '200px';
     pageDiv.appendChild(quillContainer);
 
-    // 2. 页脚（包含评论按钮）
-    const footer = document.createElement('div');
-    footer.className = 'page-footer';
-    
-    // 增加评论按钮的 HTML 结构
-    footer.innerHTML = `
-        <button id="prev-page">上一页</button>
-        <span id="page-indicator">第 ${currentPageIndex + 1} / ${activePages.length}</span>
-        <button id="next-page">下一页</button>
-         
-    `;
+   const footer = document.createElement('div');
+footer.className = 'page-footer';
+
+footer.innerHTML = `
+    <button id="prev-page">上一页</button>
+    <span id="page-indicator">第 ${currentPageIndex + 1} / ${activePages.length}</span>
+    <button id="next-page">下一页</button>
+    <button id="page-view-comment-btn" class="page-view-comment-btn">
+        查看评论 (0)
+    </button>
+`;
+
 
     pageDiv.appendChild(footer);
     bookContent.appendChild(pageDiv); // 💥 此时按钮已进入 DOM
@@ -1546,9 +1684,12 @@ if (pageCommentBtn) {
 const pageContainer = document.getElementById('page-container'); // 按钮的父容器
 if (pageContainer) {
     pageContainer.addEventListener('click', (e) => {
-        if (e.target && e.target.id === 'page-view-comment-btn') {
-            openCommentPanelForPage(currentPageIndex);
-        }
+        if (e.target) {
+    if (e.target.id === 'page-view-comment-btn') {
+        openCommentPanelForPage(currentPageIndex);
+    }
+}
+
     });
 }
 
@@ -1560,45 +1701,58 @@ if (pageContainer) {
 /* ---------- 渲染左侧导航（楼层或页码） ---------- */
 function renderSidebar(total, type) {
     // 模式切换按钮和夜间模式按钮已在 HTML 中写死
-    // 我们只在 JS 中为它们绑定事件监听器
-    // 🚨 移除了 scrollBtnGroup 和 pageBtnGroup 的获取和监听器绑定
     const navToggleBtnGroup = document.getElementById('nav-toggle-btn');
     const navToggleIcon = navToggleBtnGroup.querySelector('button');
 
-    // 更新导航按钮的图标
-    navToggleIcon.innerHTML = type === 'floor' ? '&#8635;' : '&#x2194;';
+    // 更新导航按钮的图标（楼层 <-> 页码）
+    if (type === 'floor') {
+        navToggleIcon.innerHTML = '&#8635;'; // 楼层模式图标
+    } else {
+        navToggleIcon.innerHTML = '&#x2194;'; // 翻页模式图标
+    }
 
-    // 🚨 移除了 navToggleBtnGroup 的事件监听器绑定
-    /*
-    // 原来的 scroll/page/navToggleBtnGroup.addEventListener('click', ...) 代码已移除
-    // 这些事件监听器只需要在页面加载时绑定一次
-    */
-
-    // 重新创建导航网格浮窗（这部分是正确的，需要保留）
+    // 重新创建导航网格浮窗
     const navPopup = document.getElementById('nav-grid-popup');
     navPopup.innerHTML = '';
+
     for (let i = 0; i < total; i++) {
         const cell = document.createElement('div');
         cell.className = 'nav-cell';
         cell.textContent = i + 1;
         cell.dataset.targetIndex = String(i);
-        cell.addEventListener('click', () => {
-            if (type === 'floor') {
-                const el = document.querySelector(`[data-page-index="${i}"]`);
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } else {
-                currentPageIndex = i;
-                currentMode = 'page';
-                // 这里调用 renderCurrentMode 是正确的，因为它只更新主体内容
-                renderCurrentMode(); 
-                window.scrollTo(0, 0);
-            }
+
+        // ⭐ 把点击逻辑放在真正的点击回调里，而不是 for 循环里直接执行
+        cell.addEventListener('click', function () {
             // 点击后关闭浮窗
             navPopup.classList.remove('show');
+
+            if (type === 'floor') {
+                // 楼层模式：先保证该楼已经渲染，再滚过去
+                if (typeof ensureFloorRendered === 'function') {
+                    ensureFloorRendered(i);
+                }
+
+                // 下一帧再滚动，避免刚 append 时布局没更新
+                setTimeout(function () {
+                    const selector = '.floor[data-page-index="' + i + '"]';
+                    const targetFloor = document.querySelector(selector);
+                    if (targetFloor) {
+                        targetFloor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 0);
+            } else {
+                // 翻页模式：切换 currentPageIndex 并重新渲染
+                currentPageIndex = i;
+                currentMode = 'page';
+                renderCurrentMode();
+                window.scrollTo(0, 0);
+            }
         });
+
         navPopup.appendChild(cell);
     }
 }
+
 
    // 切换夜间模式
 function toggleDarkMode() {
@@ -1795,9 +1949,14 @@ function processContentForSentenceIds(containerEl) {
     containerEl.querySelectorAll('.comment-indicator').forEach(el => el.remove());
 
     // ⭐ 先按句子 ID 应用特效（scroll 模式 / 翻页模式都会走到这里）
-    if (window.activeWork && Array.isArray(activeWork.effectsPublished) && activeWork.effectsPublished.length) {
-        applyEffectsToBlocks(containerEl, activeWork.effectsPublished, activeWork._id);
+    if (window.activeWork) {
+    if (Array.isArray(activeWork.effectsPublished)) {
+        if (activeWork.effectsPublished.length) {
+            applyEffectsToBlocks(containerEl, activeWork.effectsPublished, activeWork._id);
+        }
     }
+}
+
 
     const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
     

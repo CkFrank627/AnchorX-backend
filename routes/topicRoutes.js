@@ -98,13 +98,15 @@ router.get('/', async (req, res) => {
         }
 
         const topics = await Topic.find(filter)
-            .sort({ lastReplyAt: -1, createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .populate('author', 'username')
-            .populate('lastRepliedBy', 'username')
-            .select('-content -likedBy')
-            .exec();
+    .sort({ lastReplyAt: -1, createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    // 带上作者的 lastActiveAt，方便前端展示活跃状态
+    .populate('author', 'username lastActiveAt')
+    .populate('lastRepliedBy', 'username lastActiveAt')
+    .select('-content -likedBy')
+    .exec();
+
 
         const totalTopics = await Topic.countDocuments(filter);
 
@@ -134,9 +136,9 @@ router.get('/:topicId', async (req, res) => {
     try {
         // 1. 获取主题详情
         const topic = await Topic.findById(topicId)
-            .populate('author', 'username')
-            .select('-__v')
-            .exec();
+    .populate('author', 'username lastActiveAt')
+    .select('-__v')
+    .exec();
 
         if (!topic) {
             return res.status(404).json({ message: '找不到该主题' });
@@ -150,20 +152,21 @@ router.get('/:topicId', async (req, res) => {
 
         // 4. 【楼中楼逻辑】获取当前页的根回复
         const rootReplies = await Reply.find({ topic: topicId, parentReply: null })
-            .sort({ createdAt: 1 }) // 按时间升序排列
-            .skip(skip)
-            .limit(limit)
-            .populate('author', 'username')
-            .lean() // 使用 lean() 提高性能，方便数据操作
-            .exec();
+    .sort({ createdAt: 1 })
+    .skip(skip)
+    .limit(limit)
+    .populate('author', 'username lastActiveAt')
+    .lean()
+    .exec();
 
         // 5. 【楼中楼逻辑】获取所有与当前根回复相关的子回复
         const rootReplyIds = rootReplies.map(r => r._id);
         const nestedReplies = await Reply.find({ parentReply: { $in: rootReplyIds } })
-            .sort({ createdAt: 1 })
-            .populate('author', 'username')
-            .lean()
-            .exec();
+    .sort({ createdAt: 1 })
+    .populate('author', 'username lastActiveAt')
+    .lean()
+    .exec();
+
 
         // 6. 【楼中楼逻辑】将子回复嵌套到对应的根回复中
         const repliesMap = new Map();
@@ -279,7 +282,15 @@ if (topic.author.toString() !== authorId.toString()) {
             }
         }
 
-        res.status(201).json({ message: '回复成功', replyId: newReply._id });
+        // 保存完再查一遍，populate 出作者和 lastActiveAt
+const populatedReply = await Reply.findById(newReply._id)
+    .populate('author', 'username lastActiveAt')
+    .lean();
+
+res.status(201).json({
+    message: '回复成功',
+    reply: populatedReply
+});
 
     } catch (error) {
         console.error('添加回复失败:', error);

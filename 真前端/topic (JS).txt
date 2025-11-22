@@ -227,48 +227,43 @@ document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------------
 
     // ... renderTopicDetail (保持不变) ...
-function renderTopicDetail(topic, _isLiked) {
+    function renderTopicDetail(topic, _isLiked) {
+        document.getElementById('topicTitle').textContent = topic.title;
+        document.getElementById('topicAuthor').textContent = `作者: ${topic.author ? escapeHtml(topic.author.username) : '匿名'}`;
+        document.getElementById('topicCreatedAt').textContent = formatDate(topic.createdAt);
+        document.getElementById('topicViews').textContent = topic.viewsCount || 0;
+        document.getElementById('topicRepliesCount').textContent = topic.repliesCount || 0;
+        document.getElementById('replyCountHeader').textContent = topic.repliesCount || 0;
 
-    const titleEl = document.getElementById('topicTitle');
-    const authorEl = document.getElementById('topicAuthor');
-    const createdEl = document.getElementById('topicCreatedAt');
-    const viewsEl = document.getElementById('topicViews');
-    const repliesEl = document.getElementById('topicRepliesCount');
-    const replyCountHeaderEl = document.getElementById('replyCountHeader');
-    const sectionEl = document.getElementById('topicSection');
-    const likeCountEl = document.getElementById('likeCount');
+        const topicSectionEl = document.getElementById('topicSection');
+        if (topic.section && topic.section.name) {
+            topicSectionEl.textContent = topic.section.name;
+            topicSectionEl.style.display = 'inline-block';
+        } else {
+            topicSectionEl.style.display = 'none'; 
+        }
 
-    // 💥 如果任意节点缺失，立即退出，避免 null.textContent 报错
-    if (!titleEl || !authorEl || !createdEl || !viewsEl || !repliesEl || !replyCountHeaderEl || !likeCountEl) {
-        console.warn("⚠️ renderTopicDetail：某些 DOM 元素尚未加载，跳过渲染。");
-        return;
+        const likeCountEl = document.getElementById('likeCount');
+        likeCountEl.textContent = topic.likesCount || 0;
+        isLiked = _isLiked; 
+
+        if (isLiked) {
+            likeButton.classList.add('liked');
+            likeButton.innerHTML = `🧡 <span>${likeCountEl.textContent}</span>`;
+        } else {
+            likeButton.classList.remove('liked');
+            likeButton.innerHTML = `❤️ <span>${likeCountEl.textContent}</span>`;
+        }
+        likeButton.disabled = false; 
+
+        const contentContainer = document.getElementById('topicContent');
+        if (topic.content) {
+            contentContainer.innerHTML = topic.content;
+        } else {
+            contentContainer.innerHTML = '<p>主题内容为空。</p>';
+        }
     }
 
-    titleEl.textContent = topic.title;
-    authorEl.textContent = `作者: ${topic.author ? escapeHtml(topic.author.username) : '匿名'}`;
-    createdEl.textContent = formatDate(topic.createdAt);
-    viewsEl.textContent = topic.viewsCount || 0;
-    repliesEl.textContent = topic.repliesCount || 0;
-    replyCountHeaderEl.textContent = topic.repliesCount || 0;
-
-    if (topic.section && topic.section.name) {
-        sectionEl.textContent = topic.section.name;
-        sectionEl.style.display = 'inline-block';
-    } else {
-        sectionEl.style.display = 'none';
-    }
-
-    likeCountEl.textContent = topic.likesCount || 0;
-    isLiked = _isLiked;
-
-    if (isLiked) {
-        likeButton.classList.add('liked');
-        likeButton.innerHTML = `🧡 <span>${likeCountEl.textContent}</span>`;
-    } else {
-        likeButton.classList.remove('liked');
-        likeButton.innerHTML = `❤️ <span>${likeCountEl.textContent}</span>`;
-    }
-}
 
     /**
      * 渲染回复列表 (问题 1 楼中楼实现)
@@ -295,79 +290,8 @@ function renderTopicDetail(topic, _isLiked) {
             return;
         }
 
-        replies.forEach((reply, index) => {
-            list.appendChild(createReplyItem(reply, index, false));
-        });
-
-        // 【问题 1 修正】绑定楼中楼回复事件
-        list.querySelectorAll('.reply-actions').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const username = e.currentTarget.dataset.username || '';
-                const replyId = e.currentTarget.dataset.replyId || '';
-                
-                // 1. 设置回复目标 ID 和用户名
-                replyToIdInput.value = replyId;
-                document.getElementById('replyToUsername').value = username;
-                replyingToMessage.textContent = ` (正在回复：${username})`;
-
-                // 2. 清空编辑器并插入 @ 提及 (保留 @ 逻辑，但现在是楼中楼的一部分)
-                replyQuill.setContents([{ insert: '\n' }]); // 清空编辑器
-                const mention = `@${username} `;
-                replyQuill.insertText(0, mention, Quill.sources.USER);
-                replyQuill.setSelection(mention.length, 0, Quill.sources.SILENT);
-                replyQuill.focus();
-
-                // 3. 滚动到编辑器位置
-                document.querySelector('.reply-editor-container').scrollIntoView({ behavior: 'smooth' });
-            });
-        });
-    }
-
-/**
- * 🔧 将新回复 append 到 replyList 底部，而不重绘整个列表
- * @param {Object} reply - 新增的回复对象
- */
-function appendNewReply(reply) {
-    const list = document.getElementById('replyList');
-    if (!list) return;
-
-    // 使用 renderReplies 中的 createReplyItem 逻辑，给它提升到全局即可
-    const item = createReplyItem(reply, list.children.length, false);
-
-    list.appendChild(item);
-
-    // 自动滚动到新评论
-    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-  
-    // ... renderReplyPagination (保持不变) ...
-    function renderReplyPagination() {
-        const container = document.getElementById('replyPaginationContainer');
-        container.innerHTML = '';
-        if (replyTotalPages <= 1) return;
-
-        const prevBtn = `<button id="prevReplyBtn" class="pagination-btn" style="padding:8px; border:1px solid #ccc; margin-right: 10px;" ${replyCurrentPage === 1 ? 'disabled' : ''}>上一页</button>`;
-        const info = `<span>第 ${replyCurrentPage} / ${replyTotalPages} 页</span>`;
-        const nextBtn = `<button id="nextReplyBtn" class="pagination-btn" style="padding:8px; border:1px solid #ccc; margin-left: 10px;" ${replyCurrentPage === replyTotalPages ? 'disabled' : ''}>下一页</button>`;
-
-        container.innerHTML = prevBtn + info + nextBtn;
-        
-        // 绑定分页事件
-        document.getElementById('prevReplyBtn').addEventListener('click', () => {
-            if (replyCurrentPage > 1) {
-                fetchReplies(replyCurrentPage - 1);
-            }
-        });
-        document.getElementById('nextReplyBtn').addEventListener('click', () => {
-            if (replyCurrentPage < replyTotalPages) {
-                fetchReplies(replyCurrentPage + 1);
-            }
-        });
-    }
-
-  // 函数：创建单个回复的 DOM 结构
-function createReplyItem(reply, index, isNested = false) {
+        // 辅助函数：创建单个回复的 DOM 结构
+        const createReplyItem = (reply, index, isNested = false) => {
             const authorName = reply.author ? reply.author.username : '匿名用户';
             const initial = authorName ? escapeHtml(authorName[0]).toUpperCase() : 'U';
             const replyId = reply._id || '';
@@ -408,6 +332,59 @@ function createReplyItem(reply, index, isNested = false) {
 
             return item;
         };
+
+        replies.forEach((reply, index) => {
+            list.appendChild(createReplyItem(reply, index, false));
+        });
+
+        // 【问题 1 修正】绑定楼中楼回复事件
+        list.querySelectorAll('.reply-actions').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const username = e.currentTarget.dataset.username || '';
+                const replyId = e.currentTarget.dataset.replyId || '';
+                
+                // 1. 设置回复目标 ID 和用户名
+                replyToIdInput.value = replyId;
+                document.getElementById('replyToUsername').value = username;
+                replyingToMessage.textContent = ` (正在回复：${username})`;
+
+                // 2. 清空编辑器并插入 @ 提及 (保留 @ 逻辑，但现在是楼中楼的一部分)
+                replyQuill.setContents([{ insert: '\n' }]); // 清空编辑器
+                const mention = `@${username} `;
+                replyQuill.insertText(0, mention, Quill.sources.USER);
+                replyQuill.setSelection(mention.length, 0, Quill.sources.SILENT);
+                replyQuill.focus();
+
+                // 3. 滚动到编辑器位置
+                document.querySelector('.reply-editor-container').scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    }
+
+    // ... renderReplyPagination (保持不变) ...
+    function renderReplyPagination() {
+        const container = document.getElementById('replyPaginationContainer');
+        container.innerHTML = '';
+        if (replyTotalPages <= 1) return;
+
+        const prevBtn = `<button id="prevReplyBtn" class="pagination-btn" style="padding:8px; border:1px solid #ccc; margin-right: 10px;" ${replyCurrentPage === 1 ? 'disabled' : ''}>上一页</button>`;
+        const info = `<span>第 ${replyCurrentPage} / ${replyTotalPages} 页</span>`;
+        const nextBtn = `<button id="nextReplyBtn" class="pagination-btn" style="padding:8px; border:1px solid #ccc; margin-left: 10px;" ${replyCurrentPage === replyTotalPages ? 'disabled' : ''}>下一页</button>`;
+
+        container.innerHTML = prevBtn + info + nextBtn;
+        
+        // 绑定分页事件
+        document.getElementById('prevReplyBtn').addEventListener('click', () => {
+            if (replyCurrentPage > 1) {
+                fetchReplies(replyCurrentPage - 1);
+            }
+        });
+        document.getElementById('nextReplyBtn').addEventListener('click', () => {
+            if (replyCurrentPage < replyTotalPages) {
+                fetchReplies(replyCurrentPage + 1);
+            }
+        });
+    }
 
     // -------------------------------------------------------------------
     // --- API 交互函数 ---
@@ -475,7 +452,7 @@ async function fetchTopicAndReplies() {
 
         const response = await fetch(topicUrl, { headers });
 
-        if (!response.ok) throw new Error(`加载失败 (${response.status})`);
+        if (!response.ok) throw new Error(`您的浏览器似乎想和我们对着干！请手动刷新页面 (${response.status})`);
         progressText.textContent = '正在解析数据...';
         progressBar.style.width = '40%';
 
@@ -514,7 +491,7 @@ async function fetchTopicAndReplies() {
 
         const contentContainer = document.getElementById('topicContent');
         if (contentContainer) {
-            contentContainer.innerHTML = `<p style="color:red; text-align:center;">加载失败：${escapeHtml(error.message)}</p>`;
+            contentContainer.innerHTML = `<p style="color:red; text-align:center;">请手动刷新页面（你的浏览器比较松弛）：${escapeHtml(error.message)}</p>`;
         }
 
         const loadingMsg = ensureReplyLoadingMessage('主题加载失败，回复无法显示。');
@@ -538,6 +515,7 @@ async function fetchTopicAndReplies() {
         const list = document.getElementById('replyList');
         if (list) {
             list.innerHTML = '';
+            if (loadingMsg) list.appendChild(loadingMsg);
         }
 
         window.scrollTo(0, 0); 
@@ -615,18 +593,7 @@ async function fetchTopicAndReplies() {
                     replyStatusMessage.textContent = '';
                     submitReplyBtn.disabled = false;
                     // 重新加载主题和回复，最好是定位到新回复所在页
-                    // --- 新增逻辑：只 append 新回复，不刷新 topic 部分 ---
-if (result.reply) {
-    appendNewReply(result.reply);
-}
-
-// 更新回复数（不刷新整个 Topic）
-const repliesCountEl = document.getElementById("topicRepliesCount");
-if (repliesCountEl) repliesCountEl.textContent = Number(repliesCountEl.textContent) + 1;
-
-const replyCountHeaderEl = document.getElementById("replyCountHeader");
-if (replyCountHeaderEl) replyCountHeaderEl.textContent = Number(replyCountHeaderEl.textContent) + 1;
-
+                    fetchTopicAndReplies(); 
                 }, 1000);
 
             } else {

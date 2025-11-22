@@ -403,7 +403,7 @@
 .header-top,
 .header-bottom {
   position: relative;
-  z-index: 3000 !important;
+  z-index: 100 !important;
 }
 
 /* 消息下拉菜单浮在最上层 */

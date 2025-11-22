@@ -26,14 +26,34 @@ router.post('/login', async (req, res) => {
         if (!user) {
             return res.status(400).json({ message: '用户名或密码不正确' });
         }
+
         const isMatch = await user.comparePassword(password);
         if (!isMatch) {
             return res.status(400).json({ message: '用户名或密码不正确' });
         }
 
+        // 新增：登录视为一次活跃，更新 lastActiveAt
+        user.lastActiveAt = new Date();
+        await user.save({ validateBeforeSave: false });
+        // 或者：await user.touchLastActive();
+
         // 生成 JWT
-        const token = jwt.sign({ userId: user._id }, 'YOUR_SECRET_KEY', { expiresIn: '7d' });
-        res.json({ message: '登录成功', token });
+        const token = jwt.sign(
+            { userId: user._id },
+            'YOUR_SECRET_KEY',
+            { expiresIn: '7d' }
+        );
+
+        // 顺便把用户基本信息（含 lastActiveAt）返回给前端
+        res.json({
+            message: '登录成功',
+            token,
+            user: {
+                id: user._id,
+                username: user.username,
+                lastActiveAt: user.lastActiveAt
+            }
+        });
     } catch (error) {
         res.status(500).json({ message: '登录失败', error: error.message });
     }
