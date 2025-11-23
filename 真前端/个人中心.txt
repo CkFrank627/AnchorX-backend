@@ -7,6 +7,10 @@
     <meta charset="UTF-8">
     <title>个人中心</title>
 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.css">
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.js"></script>
+
+
     <style>
         /* 新增：共享的按钮基础样式 */
         .gallery-card button {
@@ -243,6 +247,69 @@
             0% {transform: rotate(0deg);}
             100% {transform: rotate(360deg);}
         }
+
+      /* 头像预览 */
+.avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.avatar-preview {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background-color: #ddd;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 裁剪弹窗 */
+#avatarCropModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+#avatarCropInner {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+}
+
+#avatarCropImage {
+  max-width: 100%;
+  max-height: 400px;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.avatar-crop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.avatar-crop-actions button {
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
     </style>
 </head>
 
@@ -328,7 +395,7 @@
 
   <!-- ====================== TAB 内容 ====================== -->
 
-  <!--1️⃣ 更改信息 -->
+  <!-- 1️⃣ 更改信息 -->
   <div id="tab-info" class="tab-content active">
 
     <h2>更改信息</h2>
@@ -338,6 +405,23 @@
       <input id="new-username" placeholder="请输入新用户名" />
       <button id="change-username-btn">确认修改</button>
     </div>
+
+    <div class="section-block">
+  <h3>头像</h3>
+  <div class="avatar-section">
+    <div class="avatar-preview">
+      <img id="avatarPreviewImg" src="" alt="头像预览" />
+    </div>
+    <div>
+      <input type="file" id="avatarFileInput" accept="image/*" />
+      <p style="font-size:0.85rem;color:#666;margin-top:6px;">
+        请选择一张图片，支持拖动和缩放裁剪为正方形头像。
+      </p>
+      <button id="uploadAvatarBtn">上传头像</button>
+    </div>
+  </div>
+</div>
+
 
     <div class="section-block">
       <h3>更改密码</h3>
@@ -373,8 +457,22 @@
     <p>开发中</p>
   </div>
 
+
 </main>
 
+         <!-- 头像裁剪弹窗 -->
+<div id="avatarCropModal">
+  <div id="avatarCropInner">
+    <h3 style="margin-top:0;">裁剪头像</h3>
+    <img id="avatarCropImage" src="" alt="头像裁剪" />
+    <div class="avatar-crop-actions">
+      <button id="avatarCropCancel">取消</button>
+      <button id="avatarCropConfirm">确认裁剪并保存</button>
+    </div>
+  </div>
+</div>
+
+      
 <style>
 /* 顶部横向 tab */
 .user-center-tabs {
@@ -461,6 +559,10 @@
 </style>
 
 <script>
+  const API_BASE = 'https://api.anchorx.ca';  // 统一放前面
+
+const DEFAULT_AVATAR_URL = 'https://ibb.co/r2x1hTqG';  // 你图床的默认头像（建议换成直链）
+  
 // ==================== TAB 切换 ====================
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -482,7 +584,7 @@ document.getElementById("change-username-btn").onclick = async () => {
   if (!newName) return alert("请输入新用户名！");
   if (!token) return alert("请先登录");
 
-  const res = await fetch("/api/users/profile", {
+  const res = await fetch(`${API_BASE}/api/users/profile`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -508,7 +610,7 @@ document.getElementById("change-password-btn").onclick = async () => {
   if (newPassword !== confirmPassword)
     return alert("两次密码不一致");
 
-  const res = await fetch("/api/users/change-password", {
+  const res = await fetch(`${API_BASE}/api/users/change-password`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -556,6 +658,161 @@ async function loadMessages() {
     box.appendChild(item);
   });
 }
+
+// ==================== 头像上传 / 裁剪 ====================
+let avatarCropper = null;
+const avatarPreviewImg = document.getElementById('avatarPreviewImg');
+const avatarFileInput = document.getElementById('avatarFileInput');
+const avatarCropModal = document.getElementById('avatarCropModal');
+const avatarCropImage = document.getElementById('avatarCropImage');
+const avatarCropCancel = document.getElementById('avatarCropCancel');
+const avatarCropConfirm = document.getElementById('avatarCropConfirm');
+
+function getToken() {
+  return localStorage.getItem('token');
+}
+
+(async function loadProfileForAvatar() {
+  const token = getToken();
+  if (!token) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/users/profile`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!res.ok) {
+      console.warn('加载头像失败，状态码 =', res.status);
+      avatarPreviewImg.src = DEFAULT_AVATAR_URL;
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.user && data.user.avatarUrl) {
+      let baseUrl = data.user.avatarUrl;
+
+      // ✅ 如果是 /uploads/... 这种相对路径，就自动补上 API 域名
+      if (baseUrl.startsWith('/uploads/')) {
+        baseUrl = `${API_BASE}${baseUrl}`;
+      }
+
+      const newUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+      avatarPreviewImg.src = newUrl;
+    } else {
+      avatarPreviewImg.src = DEFAULT_AVATAR_URL;
+    }
+
+  } catch (e) {
+    console.warn('加载头像失败:', e);
+    avatarPreviewImg.src = DEFAULT_AVATAR_URL;
+  }
+})();
+
+
+// 选择文件后，弹出裁剪框
+avatarFileInput.addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    avatarCropImage.src = evt.target.result;
+    avatarCropModal.style.display = 'flex';
+
+    // 销毁旧 cropper
+    if (avatarCropper) {
+      avatarCropper.destroy();
+    }
+    // 初始化 cropper（固定 1:1）
+    avatarCropper = new Cropper(avatarCropImage, {
+      aspectRatio: 1,
+      viewMode: 1,
+      dragMode: 'move',
+      autoCropArea: 1,
+    });
+  };
+  reader.readAsDataURL(file);
+});
+
+// 取消裁剪
+avatarCropCancel.addEventListener('click', () => {
+  avatarCropModal.style.display = 'none';
+  if (avatarCropper) {
+    avatarCropper.destroy();
+    avatarCropper = null;
+  }
+});
+
+// 确认裁剪并上传
+avatarCropConfirm.addEventListener('click', async () => {
+  const token = getToken();
+  if (!token) {
+    alert('请先登录');
+    return;
+  }
+  if (!avatarCropper) return;
+
+  try {
+    const canvas = avatarCropper.getCroppedCanvas({
+      width: 256,
+      height: 256,
+    });
+
+    // ✅ 先用本地裁剪结果更新预览，不用等服务器
+    avatarPreviewImg.src = canvas.toDataURL('image/png');
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const formData = new FormData();
+    formData.append('avatar', blob, 'avatar.png');
+
+    const res = await fetch(`${API_BASE}/api/users/avatar`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  },
+  body: formData
+});
+
+
+    const data = await res.json();
+if (!res.ok) {
+  alert(data.message || '头像上传失败');
+  return;
+}
+
+// ✅ 更新预览：补全域名 + 加时间戳，避免缓存
+if (data.avatarUrl) {
+  let baseUrl = data.avatarUrl;
+
+  if (baseUrl.startsWith('/uploads/')) {
+    baseUrl = `${API_BASE}${baseUrl}`;
+  }
+
+  const newUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+  avatarPreviewImg.src = newUrl;
+}
+
+alert('头像更新成功！');
+
+
+  } catch (e) {
+    console.error('上传头像出错:', e);
+    alert('头像上传失败：' + (e.message || '网络错误'));
+  } finally {
+    avatarCropModal.style.display = 'none';
+    if (avatarCropper) {
+      avatarCropper.destroy();
+      avatarCropper = null;
+    }
+  }
+});
+
+// 也可以让“上传头像”按钮触发文件选择
+document.getElementById('uploadAvatarBtn').addEventListener('click', () => {
+  avatarFileInput.click();
+});
+
+  
 </script>
 
 </body>

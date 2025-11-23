@@ -6,10 +6,19 @@ const jwt = require('jsonwebtoken');
 const auth = require('../authMiddleware');
 const bcrypt = require('bcrypt'); // 引入 bcrypt 用于新密码的哈希
 
-// ✅ 新增：头像上传相关
+// ✅ 头像上传相关
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+
+// ✅ 新增：调用 imgbb
+const fetch = require('node-fetch');        // 确保已安装 node-fetch（建议 v2）
+const { URLSearchParams } = require('url');
+
+// 从环境变量读取 imgbb API key（推荐）
+// Linux 上可以 export IMGBB_API_KEY=xxxxx
+const IMGBB_API_KEY = process.env.IMGBB_API_KEY || 040dbc9e6e680f321e09d9e05f447094;
+
 
 // 注册
 router.post('/register', async (req, res) => {
@@ -111,18 +120,9 @@ router.patch('/change-password', auth, async (req, res) => {
 // ================== 头像上传 ==================
 
 // 存储策略：保存到 /uploads/avatars 目录
-const avatarStorage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const dir = path.join(__dirname, '..', 'uploads', 'avatars');
-        fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: function (req, file, cb) {
-        // userId-时间戳.png
-        const ext = path.extname(file.originalname) || '.png';
-        cb(null, req.userData.userId + '-' + Date.now() + ext);
-    }
-});
+// ✅ 改用内存存储：文件只存在于内存 buffer，不落地到本地硬盘
+const avatarStorage = multer.memoryStorage();
+
 
 const avatarUpload = multer({
     storage: avatarStorage,
@@ -137,21 +137,51 @@ const avatarUpload = multer({
 
 // 上传 / 更改头像（受保护路由）
 // 前端使用字段名 avatar
+// 上传 / 更改头像（受保护路由）
+// 前端仍然使用字段名 avatar
 router.post('/avatar', auth, avatarUpload.single('avatar'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: '没有收到头像文件' });
         }
 
+        if (!IMGBB_API_KEY || IMGBB_API_KEY === 'YOUR_IMGBB_API_KEY') {
+            return res.status(500).json({ message: '服务器未配置 imgbb API key' });
+        }
+
         const userId = req.userData.userId;
 
-        // 生成可以被前端访问的 URL
-        // 假设你的静态资源通过 app.use('/uploads', express.static('uploads')) 暴露
-        const relativePath = `/uploads/avatars/${req.file.filename}`;
+        // 1️⃣ 把内存中的文件 buffer 转成 base64（imgbb 支持 base64 上传）
+        const imageBuffer = req.file.buffer;
+        const base64Image = imageBuffer.toString('base64');
 
+        // 2️⃣ 准备请求体，使用 x-www-form-urlencoded
+        const params = new URLSearchParams();
+        params.append('image', base64Image);
+
+        // 3️⃣ 调用 imgbb API
+        const imgbbResp = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: params
+        });
+
+        const imgbbData = await imgbbResp.json();
+
+        if (!imgbbResp.ok || !imgbbData.success) {
+            console.error('imgbb 上传失败:', imgbbData);
+            return res.status(500).json({
+                message: '上传到图床失败',
+                detail: imgbbData
+            });
+        }
+
+        // 4️⃣ 从返回中取出图片 URL（display_url / url 都可以）
+        const imageUrl = imgbbData.data.display_url || imgbbData.data.url;
+
+        // 5️⃣ 存到用户 avatarUrl 里
         const user = await User.findByIdAndUpdate(
             userId,
-            { avatarUrl: relativePath },
+            { avatarUrl: imageUrl },
             { new: true, select: 'username avatarUrl lastActiveAt' }
         );
 

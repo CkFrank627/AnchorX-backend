@@ -399,6 +399,29 @@
     color: #6b7280;
 }
 
+      .reply-avatar {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #ccc;
+    margin-right: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #fff;
+    font-size: 1.2rem;
+    overflow: hidden;           /* ✅ 新增：裁成圆形 */
+}
+
+.reply-avatar img {             /* ✅ 新增：头像图片样式 */
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
       
     </style>
 </head>
@@ -411,10 +434,12 @@
             <h1 class="topic-title" id="topicTitle"></h1>
             <div class="topic-meta">
                 <div class="topic-author-info">
-                    <a href="#" class="topic-section-tag" id="topicSection">分区</a>
-                    <span id="topicAuthor"></span>
-                    <span class="meta-info">创建于 <span id="topicCreatedAt"></span></span>
-                </div>
+    <a href="#" class="topic-section-tag" id="topicSection">分区</a>
+    <div class="reply-avatar" id="topicAuthorAvatar" style="width:32px;height:32px;"></div>
+    <span id="topicAuthor"></span>
+    <span class="meta-info">创建于 <span id="topicCreatedAt"></span></span>
+</div>
+
                 <div>
                     <span class="meta-info">👀 <span id="topicViews">0</span> 浏览</span>
                     <span class="meta-info">💬 <span id="topicRepliesCount">0</span> 回复</span>
@@ -750,17 +775,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 渲染函数 ---
     // -------------------------------------------------------------------
 
-    function renderTopicDetail(topic, _isLiked) {
-        document.getElementById('topicTitle').textContent = topic.title;
+ function renderTopicDetail(topic, _isLiked) {
+    document.getElementById('topicTitle').textContent = topic.title;
 
-        const topicAuthorEl = document.getElementById('topicAuthor');
-        if (topic.author) {
-            // 新增：根据作者的 lastActiveAt 渲染状态徽章
-            const statusHtml = renderUserStatusBadge(topic.author.lastActiveAt);
-            topicAuthorEl.innerHTML = `作者: ${escapeHtml(topic.author.username)} ${statusHtml}`;
+    const topicAuthorEl = document.getElementById('topicAuthor');
+    const topicAuthorAvatarEl = document.getElementById('topicAuthorAvatar');
+
+    if (topic.author) {
+        const statusHtml = renderUserStatusBadge(topic.author.lastActiveAt);
+        topicAuthorEl.innerHTML = `作者: ${escapeHtml(topic.author.username)} ${statusHtml}`;
+
+        if (topic.author.avatarUrl) {
+            topicAuthorAvatarEl.innerHTML =
+                `<img src="${escapeHtml(topic.author.avatarUrl)}" alt="${escapeHtml(topic.author.username)}">`;
         } else {
-            topicAuthorEl.textContent = '作者: 匿名';
+            const initial = escapeHtml(topic.author.username[0] || 'U').toUpperCase();
+            topicAuthorAvatarEl.textContent = initial;
         }
+    } else {
+        topicAuthorEl.textContent = '作者: 匿名';
+        topicAuthorAvatarEl.textContent = 'U';
+    }
 
         document.getElementById('topicCreatedAt').textContent = formatDate(topic.createdAt);
         document.getElementById('topicViews').textContent = topic.viewsCount || 0;
@@ -803,67 +838,53 @@ document.addEventListener('DOMContentLoaded', () => {
      * 【注意】：此处仅实现扁平化渲染，楼中楼的嵌套逻辑需要后端数据结构支持。
      * * @param {Array<Object>} replies - 回复列表。
      */
-    function renderReplies(replies) {
-        const list = document.getElementById('replyList');
-        if (!list) return;
+  const createReplyItem = (reply, index) => {
+    const authorName = reply.author ? reply.author.username : '匿名用户';
+    const initial = authorName ? escapeHtml(authorName[0]).toUpperCase() : 'U';
+    const avatarUrl = reply.author && reply.author.avatarUrl ? reply.author.avatarUrl : '';
+    const replyId = reply._id || '';
 
-        const loadingMsg = ensureReplyLoadingMessage();
-        if (loadingMsg) loadingMsg.style.display = 'none';
+    const item = document.createElement('div');
+    item.className = 'reply-item';
+    item.dataset.replyId = replyId;
 
-        list.innerHTML = '';
-        if (loadingMsg) list.appendChild(loadingMsg);
+    // 楼层号 + 时间（原样保留）
+    const floorNumber = (replyCurrentPage - 1) * REPLIES_PER_PAGE + index + 1;
+    const replyIndexHtml = `<span>#${floorNumber} | ${formatDate(reply.createdAt)}</span>`;
 
-        if (!replies || replies.length === 0) {
-            if (loadingMsg) {
-                loadingMsg.style.display = 'block';
-                loadingMsg.textContent = '暂无回复。';
-            } else {
-                list.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">暂无回复。</p>';
-            }
-            return;
-        }
+    // 活跃状态徽章（原样保留）
+    let statusHtml = '';
+    if (reply.author && reply.author.lastActiveAt) {
+        statusHtml = renderUserStatusBadge(reply.author.lastActiveAt);
+    }
 
-        // 单条回复的渲染（不再有 isNested）
-        const createReplyItem = (reply, index) => {
-            const authorName = reply.author ? reply.author.username : '匿名用户';
-            const initial = authorName ? escapeHtml(authorName[0]).toUpperCase() : 'U';
-            const replyId = reply._id || '';
+    // 顶部引用条
+    const parentPreviewHtml = buildParentPreviewHtml(reply);
 
-            const item = document.createElement('div');
-            item.className = 'reply-item';
-            item.dataset.replyId = replyId;
+    // ✅ 新增：有头像就用图片，没有就用首字母
+    const avatarHtml = avatarUrl
+        ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(authorName)}">`
+        : initial;
 
-            // 楼层号 + 时间
-            const floorNumber = (replyCurrentPage - 1) * REPLIES_PER_PAGE + index + 1;
-            const replyIndexHtml = `<span>#${floorNumber} | ${formatDate(reply.createdAt)}</span>`;
+    item.innerHTML = `
+        <div class="reply-avatar">${avatarHtml}</div>
+        <div class="reply-body">
+            ${parentPreviewHtml}
+            <div class="reply-user-meta">
+                ${escapeHtml(authorName)} ${statusHtml} ${replyIndexHtml}
+            </div>
+            <div class="reply-content">${reply.content || ''}</div>
+            <div class="reply-actions"
+                 data-reply-id="${replyId}"
+                 data-username="${escapeHtml(authorName)}">
+                 回复TA
+            </div>
+        </div>
+    `;
 
-            // 活跃状态徽章
-            let statusHtml = '';
-            if (reply.author && reply.author.lastActiveAt) {
-                statusHtml = renderUserStatusBadge(reply.author.lastActiveAt);
-            }
+    return item;
+};
 
-            // 顶部引用条（如果有 parentReply）
-            const parentPreviewHtml = buildParentPreviewHtml(reply);
-
-            item.innerHTML = `
-                <div class="reply-avatar">${initial}</div>
-                <div class="reply-body">
-                    ${parentPreviewHtml}
-                    <div class="reply-user-meta">
-                        ${escapeHtml(authorName)} ${statusHtml} ${replyIndexHtml}
-                    </div>
-                    <div class="reply-content">${reply.content || ''}</div>
-                    <div class="reply-actions"
-                         data-reply-id="${replyId}"
-                         data-username="${escapeHtml(authorName)}">
-                         回复TA
-                    </div>
-                </div>
-            `;
-
-            return item;
-        };
 
         // 扁平渲染：直接按顺序 append 即可
         replies.forEach((reply, index) => {
@@ -892,7 +913,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.querySelector('.reply-editor-container').scrollIntoView({ behavior: 'smooth' });
             });
         });
-    }
+    
 
     // ... renderReplyPagination (保持不变) ...
     function renderReplyPagination() {
