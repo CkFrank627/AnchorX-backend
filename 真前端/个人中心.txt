@@ -561,7 +561,8 @@
 <script>
   const API_BASE = 'https://api.anchorx.ca';  // 统一放前面
 
-const DEFAULT_AVATAR_URL = 'https://ibb.co/r2x1hTqG';  // 你图床的默认头像（建议换成直链）
+const DEFAULT_AVATAR_URL = 'https://i.ibb.co/GQWbDBGv/black-cat-icon-0.png';  // 你图床的默认头像（建议换成直链）
+  const IMGBB_API_KEY = '040dbc9e6e680f321e09d9e05f447094';
   
 // ==================== TAB 切换 ====================
 document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -689,13 +690,8 @@ function getToken() {
     const data = await res.json();
 
     if (data.user && data.user.avatarUrl) {
-      let baseUrl = data.user.avatarUrl;
-
-      // ✅ 如果是 /uploads/... 这种相对路径，就自动补上 API 域名
-      if (baseUrl.startsWith('/uploads/')) {
-        baseUrl = `${API_BASE}${baseUrl}`;
-      }
-
+      const baseUrl = data.user.avatarUrl;
+      // 加个时间戳避免缓存，imgbb 也没问题
       const newUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
       avatarPreviewImg.src = newUrl;
     } else {
@@ -707,6 +703,7 @@ function getToken() {
     avatarPreviewImg.src = DEFAULT_AVATAR_URL;
   }
 })();
+
 
 
 // 选择文件后，弹出裁剪框
@@ -743,7 +740,7 @@ avatarCropCancel.addEventListener('click', () => {
   }
 });
 
-// 确认裁剪并上传
+// 确认裁剪并上传（前端直传 imgbb，再把链接保存给后端）
 avatarCropConfirm.addEventListener('click', async () => {
   const token = getToken();
   if (!token) {
@@ -758,42 +755,62 @@ avatarCropConfirm.addEventListener('click', async () => {
       height: 256,
     });
 
-    // ✅ 先用本地裁剪结果更新预览，不用等服务器
-    avatarPreviewImg.src = canvas.toDataURL('image/png');
+    // 1️⃣ 先用本地裁剪结果更新预览，不用等任何服务器
+    const dataUrl = canvas.toDataURL('image/png'); // "data:image/png;base64,..."
+    avatarPreviewImg.src = dataUrl;
 
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    // 2️⃣ 提取 base64 数据部分
+    const base64Data = dataUrl.split(',')[1]; // 去掉前缀 "data:image/png;base64,"
+
+    // 3️⃣ 调用 imgbb API（前端直传）
+    if (!IMGBB_API_KEY || IMGBB_API_KEY === '在 imgBB 后台复制来的完整 API Key') {
+      alert('尚未配置 imgbb API key');
+      return;
+    }
+
     const formData = new FormData();
-    formData.append('avatar', blob, 'avatar.png');
+    formData.append('image', base64Data);
 
-    const res = await fetch(`${API_BASE}/api/users/avatar`, {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`
-  },
-  body: formData
-});
+    const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+      method: 'POST',
+      body: formData
+    });
 
+    const imgbbData = await imgbbRes.json();
+    if (!imgbbRes.ok || !imgbbData.success) {
+      console.error('imgbb 上传失败:', imgbbData);
+      alert('上传到图床失败，请稍后重试');
+      return;
+    }
 
-    const data = await res.json();
-if (!res.ok) {
-  alert(data.message || '头像上传失败');
-  return;
-}
+    const imageUrl = imgbbData.data.display_url || imgbbData.data.url;
+    if (!imageUrl) {
+      alert('图床未返回有效图片链接');
+      return;
+    }
 
-// ✅ 更新预览：补全域名 + 加时间戳，避免缓存
-if (data.avatarUrl) {
-  let baseUrl = data.avatarUrl;
+    // 4️⃣ 把图床链接保存到后端用户资料（只存 URL，不上传文件）
+    const saveRes = await fetch(`${API_BASE}/api/users/profile`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ avatarUrl: imageUrl })
+    });
 
-  if (baseUrl.startsWith('/uploads/')) {
-    baseUrl = `${API_BASE}${baseUrl}`;
-  }
+    const saveData = await saveRes.json();
+    if (!saveRes.ok) {
+      console.error('保存头像链接失败:', saveData);
+      alert(saveData.message || '保存头像链接失败');
+      return;
+    }
 
-  const newUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
-  avatarPreviewImg.src = newUrl;
-}
+    // 5️⃣ 再用一次图床 URL + 时间戳 刷新预览，避免缓存问题
+    const finalUrl = `${imageUrl}${imageUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    avatarPreviewImg.src = finalUrl;
 
-alert('头像更新成功！');
-
+    alert('头像更新成功！');
 
   } catch (e) {
     console.error('上传头像出错:', e);
@@ -806,6 +823,7 @@ alert('头像更新成功！');
     }
   }
 });
+
 
 // 也可以让“上传头像”按钮触发文件选择
 document.getElementById('uploadAvatarBtn').addEventListener('click', () => {

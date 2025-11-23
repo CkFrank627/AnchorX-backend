@@ -63,6 +63,45 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// 更新个人资料（用户名 / 头像等）
+router.patch('/profile', auth, async (req, res) => {
+    try {
+        const userId = req.userData.userId;
+        const { username, avatarUrl } = req.body;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: '用户不存在' });
+        }
+
+        // 可选：修改用户名
+        if (username && typeof username === 'string' && username.trim()) {
+            user.username = username.trim();
+        }
+
+        // ✅ 新增：保存头像链接（imgbb 或 /uploads/...）
+        if (avatarUrl && typeof avatarUrl === 'string') {
+            user.avatarUrl = avatarUrl;
+        }
+
+        await user.save({ validateBeforeSave: false });
+
+        res.json({
+            message: '资料更新成功',
+            user: {
+                id: user._id,
+                username: user.username,
+                avatarUrl: user.avatarUrl,
+                lastActiveAt: user.lastActiveAt
+            }
+        });
+    } catch (error) {
+        console.error('更新用户资料失败:', error);
+        res.status(500).json({ message: '更新用户资料失败', error: error.message });
+    }
+});
+
+
 
 // 获取个人资料（受保护路由）
 router.get('/profile', auth, async (req, res) => {
