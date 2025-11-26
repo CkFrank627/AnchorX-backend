@@ -1567,9 +1567,10 @@
       const removeEffectBtn = document.getElementById('effect-remove-btn');
 
       let currentWorkId = null;
-      let currentLines = [];         // 所有行文本
-      let selectedLineIndex = null;  // 当前选中行
-      let effectsDraft = [];         // [{ lineIndex, effectType }]
+      let currentLines = [];         // 所有行文本（包含空行）
+      let rawToEffectiveIndex = [];  // 原始行号 -> “阅读端句子编号”（空行为 null）
+      let selectedLineIndex = null;  // 当前选中行（按“有效句子编号”计数）
+      let effectsDraft = [];         // [{ lineIndex, effectType }]，lineIndex 存的是“有效句子编号”
       let isPreviewing = false;
 
       /* ---------- 作品相关 ---------- */
@@ -1711,23 +1712,49 @@ if (Array.isArray(work.effectsDraft)) {
 
       function renderLineList() {
         lineListEl.innerHTML = '';
-        currentLines.forEach((lineText, idx) => {
+
+        // 重新构建：原始行号 -> 有效句子编号（空行为 null）
+        rawToEffectiveIndex = [];
+        let eff = 0; // 有效句子计数（和阅读端保持一致）
+
+        currentLines.forEach((lineText, rawIdx) => {
+          const text = lineText || '';
+          const trimmed = text.trim();
+          let effectiveIdx = null;
+
+          if (trimmed !== '') {
+            // 只有真正有内容的行才参与编号
+            effectiveIdx = eff++;
+          }
+          rawToEffectiveIndex[rawIdx] = effectiveIdx;
+
           const li = document.createElement('li');
           li.className = 'effect-line-item';
-          li.dataset.index = idx;
+          li.dataset.index = rawIdx; // 原始行号（仅用于调试）
+          if (effectiveIdx !== null) {
+            li.dataset.effIndex = String(effectiveIdx); // 真正写入后端的“句子编号”
+          }
 
-          const tag = effectsDraft.find(e => e.lineIndex === idx);
+          // 只有有效句子才会去找特效标签
+          const tag = (effectiveIdx === null)
+            ? null
+            : effectsDraft.find(e => e.lineIndex === effectiveIdx);
+
+          const displayNum = (effectiveIdx === null) ? '' : (effectiveIdx + 1);
+          const displayText = (text === '')
+            ? '&nbsp;'
+            : escapeHtml(text);
 
           li.innerHTML = `
-            <div class="effect-line-num">${idx + 1}</div>
-            <div class="effect-line-text">${lineText === '' ? '&nbsp;' : escapeHtml(lineText)}</div>
+            <div class="effect-line-num">${displayNum}</div>
+            <div class="effect-line-text">${displayText}</div>
             <div class="effect-line-tags">
               ${tag ? `<span class="effect-tag">${effectTypeLabel(tag.effectType)}</span>` : ''}
             </div>
           `;
 
-          // 如果当前是选中行
-          if (idx === selectedLineIndex) {
+          // 根据“有效句子编号”来决定是否高亮
+          if (effectiveIdx !== null && effectiveIdx === selectedLineIndex) {
             li.classList.add('selected');
           }
 
@@ -1740,6 +1767,7 @@ if (Array.isArray(work.effectsDraft)) {
 
         lineListEl.scrollTop = 0;
       }
+
 
       function escapeHtml(str) {
         return str.replace(/[&<>"']/g, s => ({
@@ -1757,18 +1785,29 @@ if (Array.isArray(work.effectsDraft)) {
         }
       }
 
-      lineListEl.addEventListener('click', e => {
+            lineListEl.addEventListener('click', e => {
         const item = e.target.closest('.effect-line-item');
         if (!item) return;
-        const idx = Number(item.dataset.index);
-        selectedLineIndex = idx;
+
+        const effStr = item.dataset.effIndex;
+        // 空行（只有空格/换行）是没有 effIndex 的，不参与特效计数
+        if (!effStr && effStr !== '0') {
+          alert('这一行是空行（或只有空格），在阅读端不会算作一句，不能直接绑定特效。\n\n请点一行真正有文字的句子。');
+          return;
+        }
+
+        const effIdx = Number(effStr);
+        if (Number.isNaN(effIdx)) return;
+
+        selectedLineIndex = effIdx;
 
         // 更新选中样式
         document.querySelectorAll('.effect-line-item').forEach(li => li.classList.remove('selected'));
         item.classList.add('selected');
 
-        selectedLineLabel.textContent = '第 ' + (idx + 1) + ' 行';
+        selectedLineLabel.textContent = '第 ' + (effIdx + 1) + ' 句（按阅读端计数）';
       });
+
 
       // 设置/清除某一行特效
       function setEffectForLine(lineIndex, effectType) {
@@ -1807,19 +1846,31 @@ if (Array.isArray(work.effectsDraft)) {
 
       /* ---------- 预览特效 ---------- */
 
-      function applyPreviewClasses() {
-        document.querySelectorAll('.effect-line-text').forEach((el, idx) => {
-          el.classList.remove('effect-shake', 'effect-flash', 'effect-fade', 'effect-highlight');
-          const tag = effectsDraft.find(e => e.lineIndex === idx);
+            function applyPreviewClasses() {
+        document.querySelectorAll('.effect-line-item').forEach(li => {
+          const textEl = li.querySelector('.effect-line-text');
+          if (!textEl) return;
+
+          textEl.classList.remove('effect-shake', 'effect-flash', 'effect-fade', 'effect-highlight');
+
+          const effStr = li.dataset.effIndex;
+          if (!effStr && effStr !== '0') return; // 空行 / 无效行
+
+          const effIdx = Number(effStr);
+          if (Number.isNaN(effIdx)) return;
+
+          const tag = effectsDraft.find(e => e.lineIndex === effIdx);
           if (!tag) return;
+
           switch (tag.effectType) {
-            case 'shake': el.classList.add('effect-shake'); break;
-            case 'flash': el.classList.add('effect-flash'); break;
-            case 'fade': el.classList.add('effect-fade'); break;
-            case 'highlight': el.classList.add('effect-highlight'); break;
+            case 'shake':     textEl.classList.add('effect-shake'); break;
+            case 'flash':     textEl.classList.add('effect-flash'); break;
+            case 'fade':      textEl.classList.add('effect-fade'); break;
+            case 'highlight': textEl.classList.add('effect-highlight'); break;
           }
         });
       }
+
 
       function clearPreviewClasses() {
         document.querySelectorAll('.effect-line-text').forEach(el => {

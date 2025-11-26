@@ -573,18 +573,20 @@
   flex-direction:row;
 }
 .right-sidebar {
-  /* 保持原有样式 */ flex-shrink:0;
-  width:250px;
-  background-color:#f7f9fc;
-  border-left:1px solid #eee;
-  padding:20px;
-  transition:width 0.3s ease-in-out;
-  /* 核心修改：使用固定定位 */ position:fixed;
-  top:0;
-  right:0;
-  height:100vh;
-  overflow-y:auto;
+  flex-shrink: 0;
+  width: 250px;
+  background-color: #f7f9fc;
+  border-left: 1px solid #eee;
+  padding: 20px;
+  transition: width 0.3s ease-in-out;
+  position: sticky;
+  top: 70px; /* ✅ 向下错开，避免遮挡消息箱或页眉 */
+  right: 0;
+  height: calc(100vh - 70px); /* ✅ 同步调整高度 */
+  overflow-y: auto;
+  z-index: 50; /* ✅ 保证在编辑器上层但不盖住页眉 */
 }
+
 /* 新增角色選擇按钮样式 */ .role-select-btn {
   width:20px;
   height:20px;
@@ -641,7 +643,7 @@
   border:1px solid #ddd;
   box-shadow:0 4px 8px rgba(0,0,0,0.1);
   border-radius:8px;
-  z-index:100;
+  z-index:9000;
 }
 .page-select-dropdown ul {
   list-style:none;
@@ -1224,11 +1226,121 @@
     }
 }
 
-  #plainEditor {
-  display: none;
+  #autoSaveToggleBtn {
+    margin-left: 10px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 1px solid #0077cc;
+    transition: background-color 0.2s, color 0.2s;
 }
 
+/* 开启状态（默认） */
+.autosave-on {
+    background-color: #e6f7ff;
+    color: #0077cc;
+}
 
+/* 关闭状态 */
+.autosave-off {
+    background-color: #f8f9fa;
+    color: #555;
+    border-color: #999;
+}
+
+/* 整个图库浮窗遮罩层 */
+#galleryModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;              /* 默认隐藏，JS 用 display:flex 打开 */
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+/* 浮窗本体：加宽加高 */
+#galleryModal .gallery-modal-content {
+  width: min(1100px, 96vw);   /* 比原来宽很多 */
+  max-height: 90vh;           /* 接近全屏高度 */
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 图片列表区域可滚动 */
+#galleryImageList {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  padding-right: 4px;
+}
+
+  /* 单个图片格子 */
+.gallery-image-item {
+  position: relative;
+  background: #f8f8f8;
+  border-radius: 8px;
+  padding: 6px 6px 4px;
+  box-sizing: border-box;
+}
+
+/* 缩略图容器，保持大致比例但不裁掉头 */
+.gallery-image-item .thumb-wrapper {
+  width: 100%;
+  /* 给个大致比例，比如立绘常见 3:4，你也可以改成 2:3 等 */
+  aspect-ratio: 3 / 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* 关键：用 contain 而不是 cover，保证整张图都进来 */
+.gallery-image-item img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* 文件名 / 表情名 */
+.gallery-image-item .img-name {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  color: #555;
+  word-break: break-all;
+}
+
+/* 删除按钮保持右上角小叉 */
+.gallery-image-item .delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+}
+
+  
 </style>
   
 <body>
@@ -1290,6 +1402,16 @@
                 </div>
                 <span class="nav-text">共享素材库</span>
             </a>
+
+          <a href="https://zhidianworld.com/effect/" class="nav-link">
+    <div class="nav-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+            fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2L15 8l6 .5-4.5 4 1 6-5-3-5 3 1-6L3 8.5 9 8z" />
+        </svg>
+    </div>
+    <span class="nav-text">⭐渲染特效</span>
+</a>
 
             <a href="https://zhidianworld.com/usercenter/" class="nav-link">
                 <div class="nav-icon">
@@ -1378,7 +1500,7 @@
                     <div class="editor-title" id="editorTitle"></div>
                     <div class="page-controls">
                         <div class="page-current" id="pageCurrentDisplay">
-                            第 <span id="currentPage">1</span> 页
+                            第 <span id="currentPage">1</span> 页（展开）
                         </div>
                         <div class="page-select-dropdown hidden" id="pageDropdown">
                             <ul id="pageList">
@@ -1388,7 +1510,7 @@
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <button class="back-button" id="saveBtn">保存草稿</button>
-                
+                        <button id="autoSaveToggleBtn" class="autosave-on">自动保存：开</button>
                         <button class="back-button" id="publishBtn">发布</button>
                     </div>
                 </div>
@@ -1439,32 +1561,9 @@
             <div class="editor-main full-screen">
                 <div class="editor-container">
                     <div class="editor-main">
-  <div id="toolbar-quill">
-    <span class="ql-formats">
-      <button class="ql-bold"></button>
-      <button class="ql-italic"></button>
-      <button class="ql-underline"></button>
-      <button class="ql-strike"></button>
-    </span>
-    <span class="ql-formats">
-      <select class="ql-header">
-        <option value="1"></option>
-        <option value="2"></option>
-        <option selected></option>
-      </select>
-      <button class="ql-list" value="ordered"></button>
-      <button class="ql-list" value="bullet"></button>
-    </span>
-    <span class="ql-formats">
-      <button class="ql-image"></button>
-      <button class="ql-video"></button>
-      <button class="ql-link"></button>
-    </span>
-  </div>
-
-  <div id="editor"></div>
-</div>
-
+                        <div id="editor"></div>
+                        <textarea id="plainEditor" class="hidden"></textarea>
+                    </div>
                     <aside id="rightSidebar" class="right-sidebar">
                         <div class="tool-section">
                             <h3>工具</h3>
@@ -1610,4 +1709,6 @@
   </div>
   
   </div>
+
+  
     </body>

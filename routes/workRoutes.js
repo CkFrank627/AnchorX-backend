@@ -347,10 +347,11 @@ router.get('/:id', optionalAuth, async (req, res) => {
         const workId = req.params.id;
 
         // 使用 findByIdAndUpdate 原子性地增加浏览量，并返回更新后的文档
+        // ✅ 关键：禁止这次操作更新 updatedAt
         const work = await Work.findByIdAndUpdate(
             workId,
-            { $inc: { views: 1 } }, // 使用 $inc 操作符让 views 字段自增1
-            { new: true } // 返回更新后的文档
+            { $inc: { views: 1 } },
+            { new: true, timestamps: false }   // ← 加上这一项
         ).populate('author', 'username');
 
 if (!work) {
