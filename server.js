@@ -19,6 +19,8 @@ const commentRoutes = require('./routes/commentRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 // 新增：讨论区路由
 const topicRoutes = require('./routes/topicRoutes');
+// 新增：自定义特效路由
+const effectRoutes = require('./routes/effectRoutes');
 
 // 2. 创建 Express 应用实例
 const app = express();
@@ -110,6 +112,7 @@ app.use('/api/galleries', galleryRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/topics', topicRoutes);
+app.use('/api/effects', effectRoutes);
 
 app.get('/read/:id', async (req, res) => {
   try {
