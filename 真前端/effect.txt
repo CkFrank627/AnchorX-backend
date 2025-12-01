@@ -1226,18 +1226,238 @@
     }
 }
 
+    /* ====== 自定义特效管理页 ====== */
+    .custom-effect-layout {
+      display: flex;
+      gap: 20px;
+      margin-top: 10px;
+    }
+
+    .custom-effect-list-panel {
+      flex: 2;
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .custom-effect-editor-panel {
+      flex: 3;
+      background: #fff;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      font-size: 0.9rem;
+      color: #444;
+    }
+
+    .custom-effect-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .custom-effect-item {
+      padding: 8px 10px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background-color .15s;
+    }
+
+    .custom-effect-item:hover {
+      background: #f5f9ff;
+    }
+
+    .custom-effect-item.active {
+      background: #e6f3ff;
+    }
+
+    .custom-effect-name {
+      font-weight: bold;
+    }
+
+    .custom-effect-meta {
+      font-size: 0.8rem;
+      color: #777;
+    }
+
+    .custom-effect-empty-tip {
+      text-align: center;
+      color: #999;
+      margin-top: 20px;
+    }
+
+    .custom-effect-editor-panel label {
+      display: block;
+      margin-top: 8px;
+      margin-bottom: 4px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: #555;
+    }
+
+    .custom-effect-editor-panel input,
+    .custom-effect-editor-panel textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    .custom-effect-editor-panel textarea {
+      min-height: 220px;
+      font-family: Consolas, Menlo, Monaco, monospace;
+    }
+
+    .custom-effect-help {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      background: #f8f9fa;
+      font-size: 0.85rem;
+      color: #444;
+    }
+
+    .custom-effect-sample {
+      margin-top: 6px;
+      background: #272822;
+      color: #f8f8f2;
+      padding: 6px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      overflow: auto;
+      white-space: pre;
+    }
+
+    .custom-effect-editor-buttons {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .custom-effect-editor-buttons .danger {
+      background-color: #dc3545;
+      color: #fff;
+    }
+
+    .custom-effect-editor-buttons .danger:hover {
+      background-color: #c82333;
+    }
+
+    /* ====== 编辑器顶部自定义特效下拉 ====== */
+    .custom-effect-dropdown {
+      position: relative;
+      display: inline-block;
+      margin-left: 8px;
+    }
+
+    .custom-effect-dropdown-panel {
+      position: absolute;
+      top: 110%;
+      right: 0;
+      width: 230px;
+      max-height: 260px;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding: 8px;
+      z-index: 50;
+    }
+
+    .custom-effect-dropdown-panel.hidden {
+      display: none;
+    }
+
+    .custom-effect-dropdown-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .custom-effect-dropdown-header h4 {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    .custom-effect-dropdown-header .close-btn {
+      border: none;
+      background: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .custom-effect-dropdown-header .close-btn:hover {
+      color: #000;
+    }
+
+    .custom-effect-dropdown-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .custom-effect-dropdown-list li {
+      margin-bottom: 4px;
+    }
+
+    .custom-effect-dropdown-list button {
+      width: 100%;
+      text-align: left;
+      border: 1px solid #ddd;
+      background: #f9fafb;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      cursor: pointer;
+        color: #000 !important;
+    }
+
+    .custom-effect-dropdown-list button:hover {
+      background: #e6f7ff;
+      border-color: #0077cc;
+    }
+
+    .custom-effect-dropdown-footer {
+      margin-top: 6px;
+      text-align: right;
+    }
+
+    .custom-effect-dropdown-footer button {
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 768px) {
+      .custom-effect-layout {
+        flex-direction: column;
+      }
+      .custom-effect-list-panel,
+      .custom-effect-editor-panel {
+        max-height: none;
+      }
+    }
 
 </style>
   
 <body>
   <div class="page-container">
 
-    <!-- 左侧侧边栏：和 write 一样，只是高亮“渲染特效” -->
     <aside class="sidebar-nav" id="sidebar">
       <a href="https://zhidianworld.com/write/" class="nav-link">
         <div class="nav-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
-               fill="currentColor" viewBox="0 0 24 24">
+            fill="currentColor" viewBox="0 0 24 24">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <path d="M12 12V4h6l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2h12a2 2 0 0 0 2-2V12z" />
           </svg>
@@ -1248,7 +1468,7 @@
       <a href="https://zhidianworld.com/pictureshare/" class="nav-link">
         <div class="nav-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
-               fill="currentColor" viewBox="0 0 24 24">
+            fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15H9V9h2v8zm4 0h-2V9h2v8z" />
           </svg>
         </div>
@@ -1258,18 +1478,17 @@
       <a href="https://zhidianworld.com/usercenter/" class="nav-link">
         <div class="nav-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
-               fill="currentColor" viewBox="0 0 24 24">
+            fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
           </svg>
         </div>
         <span class="nav-text">个人中心</span>
       </a>
 
-      <!-- ⭐ 新增：渲染特效，高亮当前页 -->
       <a href="https://zhidianworld.com/effect/" class="nav-link active">
         <div class="nav-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
-               fill="currentColor" viewBox="0 0 24 24">
+            fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2L15 8l6 .5-4.5 4 1 6-5-3-5 3 1-6L3 8.5 9 8z" />
           </svg>
         </div>
@@ -1279,7 +1498,7 @@
       <a href="https://zhidianworld.com/home/" class="nav-link">
         <div class="nav-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
-               fill="currentColor" viewBox="0 0 24 24">
+            fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v-8h-2v8z" />
           </svg>
         </div>
@@ -1289,7 +1508,7 @@
       <a href="#" class="nav-link" id="logout-btn">
         <div class="nav-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
-               fill="currentColor" viewBox="0 0 24 24">
+            fill="currentColor" viewBox="0 0 24 24">
             <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zm-8 4H2v2h7v-2zM4 22h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2z" />
           </svg>
         </div>
@@ -1297,16 +1516,19 @@
       </a>
     </aside>
 
-    <!-- 右侧主内容 -->
     <main class="main-content">
 
-      <!-- 作品列表页 -->
       <section id="effect-list-page">
         <div class="content-header">
           <div class="header-left">
             <div class="header-title">
               <h2>选择作品（特效编辑）(<span id="effect-work-count">0</span>)</h2>
             </div>
+          </div>
+          <div class="header-right">
+            <button id="custom-effect-manage-btn" class="back-button">
+              管理自定义特效
+            </button>
           </div>
         </div>
 
@@ -1315,7 +1537,68 @@
         </div>
       </section>
 
-      <!-- 特效编辑器页 -->
+      <section id="custom-effect-page" class="hidden">
+        <div class="content-header">
+          <div class="header-left">
+            <button id="custom-effect-back-btn" class="back-button">返回特效列表</button>
+            <div class="header-title">
+              <h2>自定义特效列表</h2>
+            </div>
+          </div>
+          <div class="header-right">
+            <button id="custom-effect-new-btn" class="create-button">新建自定义特效</button>
+          </div>
+        </div>
+
+        <div class="custom-effect-layout">
+          <div class="custom-effect-list-panel">
+            <ul id="custom-effect-list" class="custom-effect-list"></ul>
+            <p id="custom-effect-empty-tip" class="custom-effect-empty-tip">
+              暂无自定义特效，请点击右上角“新建自定义特效”。
+            </p>
+          </div>
+
+          <div id="custom-effect-editor-panel" class="custom-effect-editor-panel hidden">
+            
+            <h3 id="custom-effect-editor-title">请选择左侧特效，或点击“新建自定义特效”</h3>
+
+            <label for="custom-effect-name-input">特效名称（显示用）：</label>
+            <input id="custom-effect-name-input" type="text" placeholder="例如：闪烁+摇晃一次">
+
+            <label for="custom-effect-key-input">特效 key（英文，用于标记）：</label>
+            <input id="custom-effect-key-input" type="text" placeholder="例如：flashShakeOnce">
+
+            <label for="custom-effect-code-input">特效代码（JS）：</label>
+            <textarea id="custom-effect-code-input"></textarea>
+
+            <div class="custom-effect-help">
+              不会写代码的可以问 AI。（示例代码见下）
+              <div class="custom-effect-sample">
+/**
+ * 约定：系统将来会把当前句子的 DOM 元素传给这个函数
+ * 你只需要实现 applyEffect(targetEl) 即可
+ */
+function applyEffect(targetEl) {
+  // 示例：给句子加上「effect-shake」类，让它晃动一下
+  targetEl.classList.add('effect-shake');
+
+  // 600ms 后移除 class，避免一直抖
+  setTimeout(() => {
+    targetEl.classList.remove('effect-shake');
+  }, 600);
+}
+              </div>
+            </div>
+
+            <div class="custom-effect-editor-buttons">
+              <button id="custom-effect-save-btn" class="create-button">保存草稿</button>
+              <button id="custom-effect-delete-btn" class="back-button danger">删除当前特效</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      
       <section id="effect-editor-page" class="hidden">
         <div class="content-header">
           <div class="header-left">
@@ -1331,7 +1614,6 @@
           </div>
         </div>
 
-        <!-- 特效工具栏 -->
         <div class="effect-toolbar">
           <div class="effect-toolbar-left">
             <span>当前选中行：</span>
@@ -1344,15 +1626,34 @@
             <button class="effect-btn" data-effect="fade">淡入</button>
             <button class="effect-btn" data-effect="highlight">高亮</button>
             <button id="effect-remove-btn" class="back-button">清除特效</button>
+
+            <div class="custom-effect-dropdown" id="custom-effect-dropdown">
+              <button id="custom-effect-toggle-btn" class="back-button">
+                展开自定义特效
+              </button>
+              <div class="custom-effect-dropdown-panel hidden" id="custom-effect-dropdown-panel">
+                <div class="custom-effect-dropdown-header">
+                  <h4>自定义特效</h4>
+                  <button class="close-btn" id="custom-effect-dropdown-close">&times;</button>
+                </div>
+                <p style="font-size:0.8rem;color:#666;margin:0 0 4px;">
+                  选择一个自定义特效，应用到当前选中句子：
+                </p>
+                <ul class="custom-effect-dropdown-list" id="custom-effect-dropdown-list"></ul>
+                <div class="custom-effect-dropdown-footer">
+                  <button id="custom-effect-open-manage-btn" class="back-button">
+                    管理自定义特效
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- 主编辑区：左边行列表，右边说明/预览 -->
         <div class="effect-editor-layout">
           <div class="effect-line-panel">
             <ul id="effect-line-list" class="effect-line-list">
-              <!-- 自动渲染每一行 -->
-            </ul>
+              </ul>
           </div>
           <div class="effect-preview-panel">
             <h3>说明 / 小提示</h3>
@@ -1530,6 +1831,7 @@
   <script>
     // 和 write 保持一致的 API 地址
     const API_BASE_URL = 'https://api.anchorx.ca/api/works';
+     const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects'; // ⭐ 新增这一行
 
     // 生成带 Authorization 的请求头
     function authHeaders(json) {
@@ -1566,12 +1868,50 @@
       const publishBtn = document.getElementById('effect-publish-btn');
       const removeEffectBtn = document.getElementById('effect-remove-btn');
 
+      // ⭐ 新增：自定义特效管理页 DOM
+      const customEffectPage = document.getElementById('custom-effect-page');
+      const customEffectManageBtn = document.getElementById('custom-effect-manage-btn');
+      const customEffectBackBtn = document.getElementById('custom-effect-back-btn');
+      const customEffectNewBtn = document.getElementById('custom-effect-new-btn');
+      const customEffectListEl = document.getElementById('custom-effect-list');
+      const customEffectEmptyTip = document.getElementById('custom-effect-empty-tip');
+      const customEffectEditorTitle = document.getElementById('custom-effect-editor-title');
+      const customEffectNameInput = document.getElementById('custom-effect-name-input');
+      const customEffectKeyInput = document.getElementById('custom-effect-key-input');
+      const customEffectCodeInput = document.getElementById('custom-effect-code-input');
+      const customEffectSaveBtn = document.getElementById('custom-effect-save-btn');
+      const customEffectEditorPanel = document.getElementById('custom-effect-editor-panel'); // ⭐ 新增
+      const customEffectDeleteBtn = document.getElementById('custom-effect-delete-btn');
+
+      // ⭐ 新增：编辑器顶部自定义特效下拉 DOM
+      const customEffectToggleBtn = document.getElementById('custom-effect-toggle-btn');
+      const customEffectDropdownPanel = document.getElementById('custom-effect-dropdown-panel');
+      const customEffectDropdownClose = document.getElementById('custom-effect-dropdown-close');
+      const customEffectDropdownList = document.getElementById('custom-effect-dropdown-list');
+      const customEffectOpenManageBtn = document.getElementById('custom-effect-open-manage-btn');
+
       let currentWorkId = null;
       let currentLines = [];         // 所有行文本（包含空行）
       let rawToEffectiveIndex = [];  // 原始行号 -> “阅读端句子编号”（空行为 null）
       let selectedLineIndex = null;  // 当前选中行（按“有效句子编号”计数）
       let effectsDraft = [];         // [{ lineIndex, effectType }]，lineIndex 存的是“有效句子编号”
       let isPreviewing = false;
+
+       // ⭐ 新增：自定义特效状态
+      let customEffects = [];
+      let currentCustomEffectId = null;
+      const DEFAULT_SAMPLE_CODE =
+`/**
+ * 约定：系统将来会把当前句子的 DOM 元素传入这个函数
+ * 你只需要实现 applyEffect(targetEl) 即可
+ */
+function applyEffect(targetEl) {
+  // 示例：给句子加上「effect-shake」类，让它晃动一下
+  targetEl.classList.add('effect-shake');
+  setTimeout(() => {
+    targetEl.classList.remove('effect-shake');
+  }, 600);
+}`;
 
       /* ---------- 作品相关 ---------- */
 
@@ -1692,6 +2032,7 @@ if (Array.isArray(work.effectsDraft)) {
         updateDebugJson();
 
         listPage.classList.add('hidden');
+        customEffectPage.classList.add('hidden');  // ⭐ 新增
         editorPage.classList.remove('hidden');
       }
 
@@ -1768,14 +2109,297 @@ if (Array.isArray(work.effectsDraft)) {
         lineListEl.scrollTop = 0;
       }
 
+            /* ---------- 自定义特效：与后端交互 ---------- */
 
+      async function fetchCustomEffects() {
+        try {
+          const res = await fetch(EFFECT_API_BASE_URL, {
+            headers: authHeaders(false),
+          });
+          if (res.status === 401) {
+            alert('请先登录后再使用自定义特效功能');
+            return [];
+          }
+          const j = await res.json().catch(() => []);
+          if (!res.ok) {
+            alert('获取自定义特效失败：' + (j.message || res.status));
+            return [];
+          }
+          customEffects = Array.isArray(j) ? j : [];
+          return customEffects;
+        } catch (e) {
+          console.error(e);
+          alert('网络错误，无法加载自定义特效');
+          return [];
+        }
+      }
+
+      function renderCustomEffectManageList() {
+        customEffectListEl.innerHTML = '';
+
+        if (!customEffects.length) {
+          customEffectEmptyTip.style.display = 'block';
+          return;
+        }
+        customEffectEmptyTip.style.display = 'none';
+
+        customEffects.forEach(effect => {
+          const li = document.createElement('li');
+          li.className = 'custom-effect-item' + (effect._id === currentCustomEffectId ? ' active' : '');
+          li.dataset.id = effect._id;
+          li.innerHTML = `
+            <span class="custom-effect-name">${escapeHtml(effect.name || '(未命名特效)')}</span>
+            <span class="custom-effect-meta">${escapeHtml(effect.key || '')}</span>
+          `;
+          customEffectListEl.appendChild(li);
+        });
+      }
+
+      function resetCustomEffectEditorToEmpty() {
+  currentCustomEffectId = null;
+  customEffectNameInput.value = '';
+  customEffectKeyInput.value = '';
+  customEffectCodeInput.value = '';
+  customEffectEditorTitle.textContent = '请选择左侧特效，或点击“新建自定义特效”';
+
+  // ⭐ 默认隐藏右侧编辑器
+  if (customEffectEditorPanel) {
+    customEffectEditorPanel.classList.add('hidden');
+  }
+}
+
+
+      async function openCustomEffectPage() {
+        listPage.classList.add('hidden');
+        editorPage.classList.add('hidden');
+        customEffectPage.classList.remove('hidden');
+
+        resetCustomEffectEditorToEmpty();
+        await fetchCustomEffects();
+        renderCustomEffectManageList();
+      }
+
+      /* ---------- 自定义特效管理页：事件绑定 ---------- */
+
+      if (customEffectManageBtn) {
+        customEffectManageBtn.addEventListener('click', () => {
+          openCustomEffectPage();
+        });
+      }
+
+      if (customEffectBackBtn) {
+        customEffectBackBtn.addEventListener('click', () => {
+          customEffectPage.classList.add('hidden');
+          editorPage.classList.add('hidden');
+          listPage.classList.remove('hidden');
+        });
+      }
+
+      if (customEffectNewBtn) {
+  customEffectNewBtn.addEventListener('click', () => {
+    currentCustomEffectId = null;
+    customEffectNameInput.value = '';
+    customEffectKeyInput.value = '';
+    customEffectCodeInput.value = DEFAULT_SAMPLE_CODE;
+    customEffectEditorTitle.textContent = '新建自定义特效';
+
+    // ⭐ 显示编辑器
+    if (customEffectEditorPanel) {
+      customEffectEditorPanel.classList.remove('hidden');
+    }
+
+    renderCustomEffectManageList();
+  });
+}
+
+
+      customEffectListEl.addEventListener('click', (e) => {
+  const item = e.target.closest('.custom-effect-item');
+  if (!item) return;
+
+  const id = item.dataset.id;
+  const effect = customEffects.find(x => x._id === id);
+  if (!effect) return;
+
+  currentCustomEffectId = id;
+  customEffectNameInput.value = effect.name || '';
+  customEffectKeyInput.value = effect.key || '';
+  customEffectCodeInput.value = effect.code || '';
+  customEffectEditorTitle.textContent = '正在编辑：' + (effect.name || '(未命名特效)');
+
+  // ⭐ 显示编辑器
+  if (customEffectEditorPanel) {
+    customEffectEditorPanel.classList.remove('hidden');
+  }
+
+  renderCustomEffectManageList();
+});
+
+
+      if (customEffectSaveBtn) {
+        customEffectSaveBtn.addEventListener('click', async () => {
+          const name = customEffectNameInput.value.trim();
+          const key = customEffectKeyInput.value.trim();
+          const code = customEffectCodeInput.value;
+
+          if (!name || !key || !code.trim()) {
+            alert('名称、key 和代码都不能为空');
+            return;
+          }
+
+          const payload = { name, key, code };
+
+          try {
+            let res;
+            if (currentCustomEffectId) {
+              res = await fetch(`${EFFECT_API_BASE_URL}/${currentCustomEffectId}`, {
+                method: 'PATCH',
+                headers: authHeaders(true),
+                body: JSON.stringify(payload),
+              });
+            } else {
+              res = await fetch(EFFECT_API_BASE_URL, {
+                method: 'POST',
+                headers: authHeaders(true),
+                body: JSON.stringify(payload),
+              });
+            }
+
+            const j = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              alert('保存自定义特效失败：' + (j.message || res.status));
+              return;
+            }
+
+            alert('自定义特效已保存！');
+
+            // 更新当前 id（新建时返回的 _id）
+            if (j && j._id) {
+              currentCustomEffectId = j._id;
+            }
+
+            await fetchCustomEffects();
+            renderCustomEffectManageList();
+          } catch (err) {
+            console.error(err);
+            alert('保存失败，请检查网络');
+          }
+        });
+      }
+
+      if (customEffectDeleteBtn) {
+        customEffectDeleteBtn.addEventListener('click', async () => {
+          if (!currentCustomEffectId) {
+            alert('请先在左侧选择一个要删除的自定义特效');
+            return;
+          }
+          if (!confirm('确定删除当前自定义特效？该操作不可恢复。')) return;
+
+          try {
+            const res = await fetch(`${EFFECT_API_BASE_URL}/${currentCustomEffectId}`, {
+              method: 'DELETE',
+              headers: authHeaders(false),
+            });
+            const j = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              alert('删除失败：' + (j.message || res.status));
+              return;
+            }
+
+            alert('自定义特效已删除');
+            resetCustomEffectEditorToEmpty();
+            await fetchCustomEffects();
+            renderCustomEffectManageList();
+          } catch (err) {
+            console.error(err);
+            alert('删除失败，请检查网络');
+          }
+        });
+      }
+
+      /* ---------- 编辑器顶部：展开自定义特效下拉 ---------- */
+
+      function renderCustomEffectDropdownList() {
+        customEffectDropdownList.innerHTML = '';
+
+        if (!customEffects.length) {
+          const li = document.createElement('li');
+          li.innerHTML = '<span style="font-size:0.8rem;color:#999;">暂无自定义特效，请点击下方“管理自定义特效”新建。</span>';
+          customEffectDropdownList.appendChild(li);
+          return;
+        }
+
+        customEffects.forEach(effect => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <button type="button" data-effect-key="${effect.key}">
+              ${escapeHtml(effect.name || '(未命名特效)')} (${escapeHtml(effect.key)})
+            </button>
+          `;
+          customEffectDropdownList.appendChild(li);
+        });
+      }
+
+      if (customEffectToggleBtn) {
+        customEffectToggleBtn.addEventListener('click', async () => {
+          const isHidden = customEffectDropdownPanel.classList.contains('hidden');
+          if (isHidden) {
+            await fetchCustomEffects();
+            renderCustomEffectDropdownList();
+            customEffectDropdownPanel.classList.remove('hidden');
+          } else {
+            customEffectDropdownPanel.classList.add('hidden');
+          }
+        });
+      }
+
+      if (customEffectDropdownClose) {
+        customEffectDropdownClose.addEventListener('click', () => {
+          customEffectDropdownPanel.classList.add('hidden');
+        });
+      }
+
+      customEffectDropdownList.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-effect-key]');
+        if (!btn) return;
+
+        if (selectedLineIndex == null) {
+          alert('请先点击左侧某一行，再应用自定义特效');
+          return;
+        }
+
+        const key = btn.dataset.effectKey;
+        if (!key) return;
+
+        // ⭐ 约定：自定义特效在 effectsDraft 中的标记方式
+        const effectType = 'custom:' + key;
+
+        setEffectForLine(selectedLineIndex, effectType);
+      });
+
+      if (customEffectOpenManageBtn) {
+        customEffectOpenManageBtn.addEventListener('click', () => {
+          customEffectDropdownPanel.classList.add('hidden');
+          openCustomEffectPage();
+        });
+      }
+
+      
       function escapeHtml(str) {
         return str.replace(/[&<>"']/g, s => ({
           '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
         }[s]));
       }
 
-      function effectTypeLabel(type) {
+            function effectTypeLabel(type) {
+        if (!type) return '';
+
+        // ⭐ 新增：custom:xxx 类型的显示
+        if (typeof type === 'string' && type.startsWith('custom:')) {
+          const key = type.slice('custom:'.length) || '';
+          return '自定义：' + key;
+        }
+
         switch (type) {
           case 'shake': return '震动';
           case 'flash': return '闪烁';
@@ -1784,6 +2408,7 @@ if (Array.isArray(work.effectsDraft)) {
           default: return type;
         }
       }
+
 
             lineListEl.addEventListener('click', e => {
         const item = e.target.closest('.effect-line-item');

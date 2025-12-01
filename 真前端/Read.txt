@@ -853,13 +853,7 @@ body.dark-mode #global-loading-bar {
 }
 
       /* shake */
-.effect-shake {
-  animation: effect-shake .25s infinite alternate;
-}
-@keyframes effect-shake {
-  from { transform: translateX(-1px); }
-  to { transform: translateX(2px); }
-}
+
 
 /* flash */
 .effect-flash {
@@ -889,18 +883,19 @@ body.dark-mode #global-loading-bar {
   to { background: transparent; }
 }
 
+/* shake：只给内部 span 用 */
 .effect-shake {
     display: inline-block;
-    animation: shake 0.3s infinite;
-}
-@keyframes shake {
-    0% { transform: translate(0px, 0px); }
-    25% { transform: translate(1px, -1px); }
-    50% { transform: translate(-1px, 1px); }
-    75% { transform: translate(1px, 1px); }
-    100% { transform: translate(0px, 0px); }
+    animation: shake 0.25s infinite;
 }
 
+@keyframes shake {
+    0%   { transform: translateX(0); }
+    25%  { transform: translateX(1px); }
+    50%  { transform: translateX(-1px); }
+    75%  { transform: translateX(1px); }
+    100% { transform: translateX(0); }
+}
 .effect-glow {
     animation: glow 2s ease-in-out infinite;
 }
@@ -1039,6 +1034,95 @@ static create(value) {
 
     // 注册自定义 Blot
     Quill.register(HiddenTextBlot);
+
+      // ================= 自定义特效（阅读端）全局配置 =================
+const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects';
+
+let customEffectFnMap = {};
+let customEffectsLoaded = false;
+
+// 用于“滚动到视口一定比例才触发”的观察器
+let effectObserver = null;
+
+// 初始化 IntersectionObserver（阈值设为 1/3 可视高度）
+function initEffectObserver() {
+    if (!('IntersectionObserver' in window)) {
+        console.warn('当前浏览器不支持 IntersectionObserver，自定义特效将直接播放');
+        return;
+    }
+    if (effectObserver) return;
+
+    effectObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            const cb = entry.target.__effectTrigger;
+            if (!cb) return;
+
+            const ratio = entry.intersectionRatio || 0;
+            // 至少有 1/3 在屏幕内时触发
+            if (ratio >= 0.33) {
+                try {
+                    cb(entry.target);
+                } catch (err) {
+                    console.error('执行特效时出错:', err);
+                }
+                effectObserver.unobserve(entry.target);
+                delete entry.target.__effectTrigger;
+            }
+        });
+    }, {
+        root: null,
+        threshold: [0, 0.33, 0.66, 1]
+    });
+}
+
+// 把某个元素注册进“滚动触发一次”的队列
+function registerEffectTrigger(targetEl, cb) {
+    if (!targetEl || typeof cb !== 'function') return;
+
+    // 不支持 IO 的老浏览器：直接执行，不做懒加载
+    if (!('IntersectionObserver' in window)) {
+        cb(targetEl);
+        return;
+    }
+
+    initEffectObserver();
+    targetEl.__effectTrigger = cb;
+    effectObserver.observe(targetEl);
+}
+
+// 只在第一次需要时，从后端加载自定义特效列表
+async function ensureCustomEffectsLoaded() {
+    if (customEffectsLoaded) return;
+
+    try {
+        const res = await fetch(`${EFFECT_API_BASE_URL}`);
+        if (!res.ok) throw new Error('请求失败');
+
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.data || []);
+
+        customEffectFnMap = {};
+        list.forEach(item => {
+            if (!item || !item.key || !item.code) return;
+            try {
+                // 约定：代码中定义 function applyEffect(targetEl) { ... }
+                customEffectFnMap[item.key] = new Function('targetEl', `
+                    "use strict";
+                    ${item.code}
+                    if (typeof applyEffect === 'function') {
+                        return applyEffect(targetEl);
+                    }
+                `);
+            } catch (err) {
+                console.error('编译自定义特效失败：', item.key, err);
+            }
+        });
+
+        customEffectsLoaded = true;
+    } catch (err) {
+        console.error('加载自定义特效失败:', err);
+    }
+}
       
     document.addEventListener('DOMContentLoaded', () => {
         // DOM 元素
@@ -1095,33 +1179,95 @@ closeCommentBtn.addEventListener('click', () => {
 });
 
 // ✅ 按“全文行号” + 本页起始行号计算本页局部行号
-function applyEffectsToBlocks(rootEl, effectsPublished, pageStartIndex = 0) {
-    if (!effectsPublished || !effectsPublished.length || !rootEl) return;
+// ========== 应用特效（内置 + 自定义 + 只在进入视口时触发一次） ==========
+function applyEffectsToBlocks(root, effectTags, workId) {
+    if (!root || !Array.isArray(effectTags) || effectTags.length === 0) return;
 
-    const blocks = rootEl.querySelectorAll('p, h1, h2, h3, li, blockquote, pre');
+    // 所有被标记了句子 id 的块（editor/翻页/楼层模式都应该已经加上 data-sentence-id）
+    const blocks = root.querySelectorAll('[data-sentence-id]');
     if (!blocks.length) return;
 
-    effectsPublished.forEach(effect => {
-        if (!effect) return;
+    effectTags.forEach(tag => {
+        if (!tag) return;
 
-        // 全局行号（保底兼容字符串）
-        let globalIdx = typeof effect.lineIndex === 'number'
-            ? effect.lineIndex
-            : parseInt(effect.lineIndex, 10);
+        const lineIndex = typeof tag.lineIndex === 'number'
+            ? tag.lineIndex
+            : parseInt(tag.lineIndex, 10);
+        if (Number.isNaN(lineIndex)) return;
 
-        const type = effect.effectType;
-        if (!type || isNaN(globalIdx) || globalIdx < 0) return;
+        const targetEl = root.querySelector(`[data-sentence-id="${lineIndex}"]`);
+        if (!targetEl) return;
 
-        // ⭐ 用本页起始行号换算成本页局部行号
-        const localIdx = globalIdx - pageStartIndex;
-        if (localIdx < 0 || localIdx >= blocks.length) return;
+        const effectType = tag.effectType || '';
 
-        const target = blocks[localIdx];
-        if (target) {
-            target.classList.add(`effect-${type}`);
+        // ------------ A. 自定义特效：effectType 形如 "custom:flashShakeOnce" ------------
+        if (effectType.startsWith('custom:')) {
+            const key = effectType.slice('custom:'.length);
+            const fn = customEffectFnMap[key];
+
+            if (!fn) {
+                console.warn('找不到自定义特效：', key);
+                return;
+            }
+
+            // 滚动到视口 1/3 后才执行用户代码
+            registerEffectTrigger(targetEl, (el) => {
+                try {
+                    fn(el);
+                } catch (err) {
+                    console.error('执行自定义特效失败：', key, err);
+                }
+            });
+            return;
+        }
+
+        // ------------ B. 内置特效：同样改成“进入视口再触发” ------------
+        switch (effectType) {
+            case 'shake': {
+                // 为了不提前抖动，这里等进入视口后再把文字包进 span.effect-shake
+                registerEffectTrigger(targetEl, (el) => {
+                    const span = document.createElement('span');
+                    span.classList.add('effect-shake');
+                    // 把原来的子节点全部移进去
+                    while (el.firstChild) {
+                        span.appendChild(el.firstChild);
+                    }
+                    el.appendChild(span);
+                });
+                break;
+            }
+            case 'flash':
+                registerEffectTrigger(targetEl, (el) => {
+                    el.classList.add('effect-flash');
+                    // 可选：一定时间之后移除 class，避免长时间闪
+                    setTimeout(() => {
+                        el.classList.remove('effect-flash');
+                    }, 1200);
+                });
+                break;
+            case 'fade':
+                registerEffectTrigger(targetEl, (el) => {
+                    el.classList.add('effect-fade');
+                });
+                break;
+            case 'highlight':
+                registerEffectTrigger(targetEl, (el) => {
+                    el.classList.add('effect-highlight');
+                });
+                break;
+            case 'glow':
+                registerEffectTrigger(targetEl, (el) => {
+                    el.classList.add('effect-glow');
+                });
+                break;
+            default:
+                // 未知 effectType，忽略
+                break;
         }
     });
 }
+
+
 
         // 如果需要 token（发表评论/点赞）
         function getAuthHeader() {
@@ -1228,6 +1374,10 @@ async function loadWorkContentById(id) {
 
       // 新增：加载特效
 const effectsPublished = work.effectsPublished || [];
+
+            // 读取自定义特效代码，只会真正加载一次
+await ensureCustomEffectsLoaded();
+      
 activeWork.effectsPublished = effectsPublished;
 console.log("🎨 已加载特效：", effectsPublished);
 
