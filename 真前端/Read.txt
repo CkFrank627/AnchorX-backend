@@ -1036,7 +1036,7 @@ static create(value) {
     Quill.register(HiddenTextBlot);
 
       // ================= 自定义特效（阅读端）全局配置 =================
-const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects';
+const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects/public';
 
 let customEffectFnMap = {};
 let customEffectsLoaded = false;

@@ -4,11 +4,12 @@ const router = express.Router();
 const auth = require('../authMiddleware');
 const Effect = require('../models/Effect');
 
-// ⭐ 新增：公开获取自定义特效列表（供阅读端使用，无需登录）
+// ⭐ 公开获取自定义特效列表（供阅读端使用，无需登录）
+// 注意：一定要写在 router.get('/:id', ...) 之前
 router.get('/public', async (req, res) => {
   try {
     // 只返回必要字段，避免把所有内部字段都暴露出去
-    const list = await CustomEffect.find({}, 'name key code').lean();
+    const list = await Effect.find({}, 'name key code').lean();
     res.json(list);
   } catch (err) {
     console.error('读取公开自定义特效失败:', err);
