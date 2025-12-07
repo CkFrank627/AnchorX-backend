@@ -343,96 +343,80 @@ router.delete('/:id', auth, async (req, res) => {
 
 // 修改：获取单个作品的路由（用于阅读页面），并增加浏览量
 router.get('/:id', optionalAuth, async (req, res) => {
+    const handlerStart = Date.now();          // 整个接口开始时间
+    console.log(`📥 [WORK GET] start, id = ${req.params.id}`);
+
     try {
         const workId = req.params.id;
 
-        // 使用 findByIdAndUpdate 原子性地增加浏览量，并返回更新后的文档
-        // ✅ 关键：禁止这次操作更新 updatedAt
+        // ---------- 1）计时：数据库查询 ----------
+        const dbStart = Date.now();
         const work = await Work.findByIdAndUpdate(
             workId,
             { $inc: { views: 1 } },
-            { new: true, timestamps: false }   // ← 加上这一项
+            { new: true, timestamps: false }
         ).populate('author', 'username');
+        const dbEnd = Date.now();
 
-if (!work) {
+        if (!work) {
+            console.log(`❗ [WORK GET] not found, DB time = ${dbEnd - dbStart} ms`);
             return res.status(404).json({ message: '作品不存在' });
         }
-        
-        // -------------------------------------------------------------
-        // 【新增代码：替换图片链接协议】
-        // -------------------------------------------------------------
-        if (work.content && Array.isArray(work.content)) {
-             // 假设 content 是一个页面数组，每个页面有 content 字段
-             work.content.forEach(page => {
-                 if (page.content && typeof page.content === 'object') {
-                     // Quill Delta 内容可能包含图片 URL。
-                     // 简单地在整个 JSON 字符串中替换可能会破坏 Delta 结构，
-                     // 但我们假设图片 URL是以字符串形式存储在 Delta 对象的某个 insert 属性中。
-                     // 最安全的做法是在返回前，将其内容对象转换为 JSON 字符串再替换，然后作为字符串返回给前端。
-                     // 
-                     // *注意：如果 content 是一个包含 Quill Delta 对象的数组，
-                     // 那么内容中的图片 URL通常出现在 op.insert.image 字段中，
-                     // 但由于 Delta 结构复杂，我们先做最简单和最广泛的字符串替换。
-                     
-                     // 将 Delta 对象转换为字符串进行替换
-                     let contentString = JSON.stringify(page.content);
-                     contentString = contentString.replace(
-                         /http:\/\/api\.anchorx\.ca\/uploads/g,
-                         'https://api.anchorx.ca/uploads'
-                     );
-                     
-                     // 替换完成后，需要将字符串再解析回对象，
-                     // 但为了避免破坏 Mongoose 文档，通常是创建一个副本或直接在返回时处理。
-                     // 为了简单和安全，我们只在返回时处理。
-                     
-                     // 暂时跳过对 work.content 的原地修改，我们在最终返回对象中处理。
-                 }
-             });
-        }
-        
-        // 检查当前用户是否已点赞
+
+        // ---------- 2）计时：内容处理（字符串替换 + toObject） ----------
+        const processStart = Date.now();
+
         const isLikedByCurrentUser = req.userId ? work.likedBy.includes(req.userId) : false;
-        
-const responseWork = {
-    _id: work._id,
-    title: work.title,
-    author: work.author,
-    views: work.views,
-    likesCount: work.likesCount,
-    isLikedByCurrentUser: isLikedByCurrentUser,
-    updatedAt: work.updatedAt,
-    createdAt: work.createdAt,
 
-    // ⭐⭐ 必须加这两行，否则前端保存后会丢失特效
-    effectsDraft: work.effectsDraft || [],
-    effectsPublished: work.effectsPublished || [],
-
-    content: work.content.map(page => {
-        if (page.content && typeof page.content === 'object') {
-            let contentString = JSON.stringify(page.content);
-            contentString = contentString.replace(
-                /http:\/\/api\.anchorx\.ca\/uploads/g,
-                'https://api.anchorx.ca/uploads'
-            );
-            try {
-                return { ...page.toObject(), content: JSON.parse(contentString) };
-            } catch (e) {
-                console.error("Content replacement error:", e);
+        const responseWork = {
+            _id: work._id,
+            title: work.title,
+            author: work.author,
+            views: work.views,
+            likesCount: work.likesCount,
+            isLikedByCurrentUser: isLikedByCurrentUser,
+            updatedAt: work.updatedAt,
+            createdAt: work.createdAt,
+            effectsDraft: work.effectsDraft || [],
+            effectsPublished: work.effectsPublished || [],
+            content: work.content.map(page => {
+                if (page.content && typeof page.content === 'object') {
+                    let contentString = JSON.stringify(page.content);
+                    contentString = contentString.replace(
+                        /http:\/\/api\.anchorx\.ca\/uploads/g,
+                        'https://api.anchorx.ca/uploads'
+                    );
+                    try {
+                        return { ...page.toObject(), content: JSON.parse(contentString) };
+                    } catch (e) {
+                        console.error("Content replacement error:", e);
+                        return page;
+                    }
+                }
                 return page;
-            }
-        }
-        return page;
-    })
-};
+            })
+        };
 
+        const processEnd = Date.now();
 
+        // ---------- 3）整条链路耗时 ----------
+        const handlerEnd = Date.now();
+        console.log(
+          `✅ [WORK GET] id=${workId}
+             DB time       : ${dbEnd - dbStart} ms
+             Process time  : ${processEnd - processStart} ms
+             Handler total : ${handlerEnd - handlerStart} ms`
+        );
 
         res.json(responseWork);
     } catch (error) {
+        const handlerEnd = Date.now();
         console.error('获取作品失败:', error);
+        console.log(`❌ [WORK GET] error, total = ${handlerEnd - handlerStart} ms`);
         res.status(500).json({ message: '获取作品失败', error: error.message });
     }
 });
+
 
 // **新增：作品点赞/取消点赞的路由**
 router.post('/:id/like', auth, async (req, res) => {

@@ -75,6 +75,27 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// ================== 全局请求计时中间件 ==================
+app.use((req, res, next) => {
+  const start = Date.now();
+
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(
+      `⏱ [${req.method}] ${req.originalUrl} -> ${res.statusCode} | ${duration} ms`
+    );
+  });
+
+  next();
+});
+// ====================================================
+
+// 纯网络测试接口：不查数据库，只看网络 + 基础开销
+app.get('/api/ping', (req, res) => {
+  res.json({ ok: true, time: Date.now() });
+});
+
+
 // 映射静态资源
 app.use('/vendor_assets', express.static(path.join(__dirname, 'public', 'vendor_assets')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));

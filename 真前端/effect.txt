@@ -2134,6 +2134,55 @@ if (Array.isArray(work.effectsDraft)) {
         }
       }
 
+            async function fetchCustomEffects() {
+        try {
+          const res = await fetch(EFFECT_API_BASE_URL, {
+            headers: authHeaders(false),
+          });
+          if (res.status === 401) {
+            alert('请先登录后再使用自定义特效功能');
+            return [];
+          }
+          const j = await res.json().catch(() => []);
+          if (!res.ok) {
+            alert('获取自定义特效失败：' + (j.message || res.status));
+            return [];
+          }
+          customEffects = Array.isArray(j) ? j : [];
+          return customEffects;
+        } catch (e) {
+          console.error(e);
+          alert('网络错误，无法加载自定义特效');
+          return [];
+        }
+      }
+
+      function renderCustomEffectManageList() {
+        // ... 你的原代码 ...
+      }
+
+      // ⭐ 新增：根据 key 在当前 customEffects 里找到代码并执行 applyEffect
+      function runCustomEffectOnElement(effectKey, targetEl) {
+        if (!effectKey || !targetEl) return;
+        const effect = customEffects.find(e => e.key === effectKey);
+        if (!effect || !effect.code) return;
+
+        try {
+          const wrapped = new Function(
+            'targetEl',
+            effect.code + `
+              if (typeof applyEffect === 'function') {
+                applyEffect(targetEl);
+              }
+            `
+          );
+          wrapped(targetEl);
+        } catch (err) {
+          console.error('自定义特效执行失败:', err);
+        }
+      }
+
+
       function renderCustomEffectManageList() {
         customEffectListEl.innerHTML = '';
 
@@ -2476,6 +2525,7 @@ if (Array.isArray(work.effectsDraft)) {
           const textEl = li.querySelector('.effect-line-text');
           if (!textEl) return;
 
+          // 先清理内置特效用到的 class
           textEl.classList.remove('effect-shake', 'effect-flash', 'effect-fade', 'effect-highlight');
 
           const effStr = li.dataset.effIndex;
@@ -2487,7 +2537,20 @@ if (Array.isArray(work.effectsDraft)) {
           const tag = effectsDraft.find(e => e.lineIndex === effIdx);
           if (!tag) return;
 
-          switch (tag.effectType) {
+          const type = tag.effectType;
+
+          // ⭐ 新增：自定义特效预览（effectType 形如 custom:damie）
+          if (typeof type === 'string' && type.startsWith('custom:')) {
+            const key = type.slice('custom:'.length);
+            if (key) {
+              runCustomEffectOnElement(key, textEl);
+            }
+            // 自定义特效不再往下走 switch
+            return;
+          }
+
+          // 原来的内置特效逻辑
+          switch (type) {
             case 'shake':     textEl.classList.add('effect-shake'); break;
             case 'flash':     textEl.classList.add('effect-flash'); break;
             case 'fade':      textEl.classList.add('effect-fade'); break;
@@ -2503,9 +2566,11 @@ if (Array.isArray(work.effectsDraft)) {
         });
       }
 
-      previewBtn.addEventListener('click', () => {
+        previewBtn.addEventListener('click', async () => {
         isPreviewing = !isPreviewing;
         if (isPreviewing) {
+          // ⭐ 进入预览时，确保拿到最新的自定义特效列表
+          await fetchCustomEffects();
           applyPreviewClasses();
           previewBtn.textContent = '关闭预览';
         } else {
@@ -2513,6 +2578,7 @@ if (Array.isArray(work.effectsDraft)) {
           previewBtn.textContent = '预览特效';
         }
       });
+
 
       /* ---------- 保存草稿 / 发布特效 ---------- */
       function updateDebugJson() {

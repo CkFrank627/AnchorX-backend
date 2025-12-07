@@ -63,6 +63,128 @@ static create(value) {
 
     // 注册自定义 Blot
     Quill.register(HiddenTextBlot);
+
+      // ================= 自定义特效（阅读端）全局配置 =================
+const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects/public';
+
+let customEffectFnMap = {};
+let customEffectsLoaded = false;
+
+      const EFFECT_DEBUG = true;           // ⭐ 打开调试日志
+const EFFECT_USE_OBSERVER = false;   // ⭐ 暂时关掉 IntersectionObserver，先确认特效本身能跑
+
+
+// 用于“滚动到视口一定比例才触发”的观察器
+let effectObserver = null;
+
+// 初始化 IntersectionObserver（阈值设为 1/3 可视高度）
+function initEffectObserver() {
+    if (!('IntersectionObserver' in window)) {
+        console.warn('当前浏览器不支持 IntersectionObserver，自定义特效将直接播放');
+        return;
+    }
+    if (effectObserver) return;
+
+    effectObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            const cb = entry.target.__effectTrigger;
+            if (!cb) return;
+
+            const ratio = entry.intersectionRatio || 0;
+            // 至少有 1/3 在屏幕内时触发
+            if (ratio >= 0.33) {
+                try {
+                    cb(entry.target);
+                } catch (err) {
+                    console.error('执行特效时出错:', err);
+                }
+                effectObserver.unobserve(entry.target);
+                delete entry.target.__effectTrigger;
+            }
+        });
+    }, {
+        root: null,
+        threshold: [0, 0.33, 0.66, 1]
+    });
+}
+
+// 把某个元素注册进“滚动触发一次”的队列
+// 把某个元素注册进“滚动触发一次”的队列（调试版）
+function registerEffectTrigger(targetEl, cb) {
+    if (!targetEl || typeof cb !== 'function') return;
+
+    const sid = targetEl.getAttribute('data-sentence-id') || '(no-id)';
+
+    if (EFFECT_DEBUG) {
+        console.log(
+            '🧪 [registerEffectTrigger] 目标句子 =',
+            sid,
+            '，当前在 DOM 中 =',
+            document.body.contains(targetEl),
+            '，使用 Observer =',
+            EFFECT_USE_OBSERVER && ('IntersectionObserver' in window)
+        );
+    }
+
+    // 调试阶段：如果关闭懒加载，或者浏览器不支持 IO，就直接执行一次特效
+    if (!EFFECT_USE_OBSERVER || !('IntersectionObserver' in window)) {
+        try {
+            cb(targetEl);
+        } catch (err) {
+            console.error('❌ [registerEffectTrigger] 直接执行特效出错:', sid, err);
+        }
+        return;
+    }
+
+    initEffectObserver();
+    if (!effectObserver) {
+        // 理论上不会走到这里，但为了健壮性再兜一下
+        try {
+            cb(targetEl);
+        } catch (err) {
+            console.error('❌ [registerEffectTrigger] effectObserver 不存在，fallback 执行特效失败:', sid, err);
+        }
+        return;
+    }
+
+    targetEl.__effectTrigger = cb;
+    effectObserver.observe(targetEl);
+}
+
+
+// 只在第一次需要时，从后端加载自定义特效列表
+async function ensureCustomEffectsLoaded() {
+    if (customEffectsLoaded) return;
+
+    try {
+        const res = await fetch(`${EFFECT_API_BASE_URL}`);
+        if (!res.ok) throw new Error('请求失败');
+
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.data || []);
+
+        customEffectFnMap = {};
+        list.forEach(item => {
+            if (!item || !item.key || !item.code) return;
+            try {
+                // 约定：代码中定义 function applyEffect(targetEl) { ... }
+                customEffectFnMap[item.key] = new Function('targetEl', `
+                    "use strict";
+                    ${item.code}
+                    if (typeof applyEffect === 'function') {
+                        return applyEffect(targetEl);
+                    }
+                `);
+            } catch (err) {
+                console.error('编译自定义特效失败：', item.key, err);
+            }
+        });
+
+        customEffectsLoaded = true;
+    } catch (err) {
+        console.error('加载自定义特效失败:', err);
+    }
+}
       
     document.addEventListener('DOMContentLoaded', () => {
         // DOM 元素
@@ -118,34 +240,136 @@ closeCommentBtn.addEventListener('click', () => {
     commentPanel.querySelector('h4').textContent = `评论`; // <--- 恢复标题
 });
 
-// ✅ 按“全文行号” + 本页起始行号计算本页局部行号
-function applyEffectsToBlocks(rootEl, effectsPublished, pageStartIndex = 0) {
-    if (!effectsPublished || !effectsPublished.length || !rootEl) return;
+// 只在“阅读端真正显示出来的 DOM 容器”上应用特效
+// ========== 应用特效（内置 + 自定义）【调试版】 ==========
+// ========== 按 data-sentence-id + workId 应用特效（带调试日志） ==========
+function applyEffectsToBlocks(rootEl, effectsPublished, workId) {
+    // 基础防御
+    if (!rootEl) {
+        console.warn('⚠ [effects] applyEffectsToBlocks: rootEl 为空，直接返回');
+        return;
+    }
+    if (!Array.isArray(effectsPublished) || !effectsPublished.length) {
+        console.log('ℹ [effects] 当前作品没有任何特效，跳过');
+        return;
+    }
+    if (!workId) {
+        console.warn('⚠ [effects] 缺少 workId，无法构造句子 ID');
+        return;
+    }
 
-    const blocks = rootEl.querySelectorAll('p, h1, h2, h3, li, blockquote, pre');
-    if (!blocks.length) return;
+    // 找出当前 container 里所有带 data-sentence-id 的句子
+    const sentenceEls = rootEl.querySelectorAll('[data-sentence-id]');
+    if (!sentenceEls.length) {
+        console.log('ℹ [effects] root 内没有任何 data-sentence-id 节点，暂不应用特效');
+        return;
+    }
+
+    console.log('🧪 [effects] applyEffectsToBlocks 被调用：', {
+        workId,
+        effectCount: effectsPublished.length,
+        sentenceCount: sentenceEls.length,
+        sampleIds: Array.from(sentenceEls)
+            .slice(0, 10)
+            .map(el => el.getAttribute('data-sentence-id'))
+    });
+
+    // 避免重复包裹 / 重复添加 class
+    const appliedSet = new Set();
 
     effectsPublished.forEach(effect => {
         if (!effect) return;
 
-        // 全局行号（保底兼容字符串）
-        let globalIdx = typeof effect.lineIndex === 'number'
-            ? effect.lineIndex
-            : parseInt(effect.lineIndex, 10);
-
+        const rawIndex = effect.lineIndex;
         const type = effect.effectType;
-        if (!type || isNaN(globalIdx) || globalIdx < 0) return;
 
-        // ⭐ 用本页起始行号换算成本页局部行号
-        const localIdx = globalIdx - pageStartIndex;
-        if (localIdx < 0 || localIdx >= blocks.length) return;
+        // 行号容错处理
+        let lineIndex = typeof rawIndex === 'number'
+            ? rawIndex
+            : parseInt(rawIndex, 10);
 
-        const target = blocks[localIdx];
-        if (target) {
-            target.classList.add(`effect-${type}`);
+        if (Number.isNaN(lineIndex) || lineIndex < 0) {
+            console.warn('⚠ [effects] 非法 lineIndex：', rawIndex, effect);
+            return;
         }
+        if (!type) return;
+
+        // 统一和 segmentContentAndAddIds 生成规则：
+        // data-sentence-id="s_<workId>_<行号>"
+        const sentenceId = `s_${workId}_${lineIndex}`;
+        const selector = `[data-sentence-id="${sentenceId}"]`;
+        const target = rootEl.querySelector(selector);
+
+        console.log('🎯 [effects] 处理特效:', {
+            lineIndex,
+            sentenceId,
+            type,
+            found: !!target
+        });
+
+        if (!target) return;
+
+        // 防止对同一句多次重复应用
+        const key = sentenceId + '::' + type;
+        if (appliedSet.has(key)) return;
+        appliedSet.add(key);
+
+        // 调试可视化：画一个淡淡的轮廓，方便你肉眼看到“哪一行被匹配到了”
+        target.style.outline = '1px dashed rgba(255,0,0,0.25)';
+
+        // --- 实际特效处理 ---
+        // 自定义特效：effectType 形如 "custom:xxx"
+        if (typeof type === 'string' && type.startsWith('custom:')) {
+            const customKey = type.slice('custom:'.length) || '';
+
+            // 暂时先简单处理：打上一个 class，方便你用 CSS / 手动排查
+            target.classList.add('effect-custom-placeholder');
+
+            console.log('🧪 [effects] 命中自定义特效占位:', {
+                customKey,
+                sentenceId
+            });
+
+            // ⬇⬇⬇ 将来你可以在这里接入 customEffectFnMap[customKey](target) 之类的逻辑
+            return;
+        }
+
+        // 内置 shake：包一层 span，让整句抖动
+        if (type === 'shake') {
+            if (!target.querySelector('.effect-shake')) {
+                const span = document.createElement('span');
+                span.className = 'effect-shake';
+                while (target.firstChild) {
+                    span.appendChild(target.firstChild);
+                }
+                target.appendChild(span);
+            }
+            return;
+        }
+
+        // 其它内置特效：直接加 class
+        if (type === 'flash') {
+            target.classList.add('effect-flash');
+            return;
+        }
+        if (type === 'fade') {
+            target.classList.add('effect-fade');
+            return;
+        }
+        if (type === 'highlight') {
+            target.classList.add('effect-highlight');
+            return;
+        }
+        if (type === 'glow') {
+            target.classList.add('effect-glow');
+            return;
+        }
+
+        // 未识别的类型，仅做 log
+        console.log('ℹ [effects] 未识别的 effectType：', type, '，已跳过');
     });
 }
+
 
         // 如果需要 token（发表评论/点赞）
         function getAuthHeader() {
@@ -252,6 +476,10 @@ async function loadWorkContentById(id) {
 
       // 新增：加载特效
 const effectsPublished = work.effectsPublished || [];
+
+            // 读取自定义特效代码，只会真正加载一次
+await ensureCustomEffectsLoaded();
+      
 activeWork.effectsPublished = effectsPublished;
 console.log("🎨 已加载特效：", effectsPublished);
 
@@ -319,9 +547,6 @@ activePages.forEach(page => {
         // ⭐ 本页的“全文起始行号”
         const pageStartIndex = sentenceIndex;
 
-        // 应用特效（用全文行号 + pageStartIndex 转成本页局部行号）
-        applyEffectsToBlocks(effectRoot, activeWork.effectsPublished || [], pageStartIndex);
-
         const { element: tempDiv, nextIndex } = segmentContentAndAddIds(
             effectRoot.innerHTML,
             work._id,
@@ -358,27 +583,33 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = rawHtmlContent;
   let counter = startIndex;
-  Array.from(tempDiv.children).forEach(el => {
-    if (el.nodeType === 1) {
-  if (el.tagName !== 'SCRIPT') {
+
+  // ✅ 和 applyEffectsToBlocks 用同一套“行”的定义
+  const blocks = tempDiv.querySelectorAll('p, h1, h2, h3, li, blockquote, pre');
+
+  blocks.forEach(function (el) {
+    // 跳过纯空白
     if (el.textContent.trim() !== '') {
       if (!el.hasAttribute('data-sentence-id')) {
-        const sentenceId = `s_${workId}_${counter++}`;
+        const sentenceId = 's_' + workId + '_' + (counter++);
         el.setAttribute('data-sentence-id', sentenceId);
       }
     }
-  }
-}
-
   });
 
-  console.log("🧩 segmentContentAndAddIds 生成的 ID:", 
-      Array.from(tempDiv.querySelectorAll('[data-sentence-id]')).map(el => el.dataset.sentenceId)
+  if (window.READER_DEBUG_VERBOSE) {
+  console.log(
+    '🧩 segmentContentAndAddIds 生成的 ID（前 30 条示例）:',
+    Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
+      .slice(0, 30)
+      .map(function (el) {
+        return el.dataset.sentenceId;
+      })
   );
+}
 
   return { element: tempDiv, nextIndex: counter };
 }
-
 
 
       // 【新增函数】：获取作品所有评论，并更新全局状态
@@ -411,59 +642,62 @@ async function fetchAllWorkComments(workId) {
             return String(text || '').replace(/[&<>"']/g, m => map[m]);
         }
 
- // ...
 // 渲染 [startIndex, endIndex) 这一段楼层
 function renderFloorsRange(startIndex, endIndex) {
-    if (!activePages || !activePages.length) return;
+    if (!activePages || activePages.length === 0) return;
+    if (!bookContent) return;
 
     for (let pageIndex = startIndex; pageIndex < endIndex; pageIndex++) {
-    if (pageIndex >= activePages.length) {
-        break;
+        if (pageIndex >= activePages.length) {
+            break;
+        }
+
+        const page = activePages[pageIndex];
+
+        const floorDiv = document.createElement('div');
+        floorDiv.className = 'floor';
+        floorDiv.dataset.pageIndex = String(pageIndex);
+        floorDiv.innerHTML = `
+            <div class="floor-header">
+                <span>${pageIndex + 1} 楼</span>
+                <button class="comment-view-btn" data-page-index="${pageIndex}">
+                    查看本楼评论（${getCommentsCountForPage(pageIndex)}）
+                </button>
+            </div>
+            <div class="floor-body ql-editor">
+                ${page.segmentedHtml || ''}
+            </div>
+        `;
+        bookContent.appendChild(floorDiv);
+
+        const floorBody = floorDiv.querySelector('.floor-body');
+        if (!floorBody) {
+            continue;
+        }
+
+        // ❌ 把这一块删掉（不要在这里再 applyEffectsToBlocks 了）
+        /*
+        applyEffectsToBlocks(
+            floorBody,
+            activeWork ? activeWork.effectsPublished : undefined,
+            page.startIndex ? page.startIndex : 0
+        );
+        */
+
+        // 评论按钮
+        const commentBtn = floorDiv.querySelector('.comment-view-btn');
+        if (commentBtn) {
+            commentBtn.addEventListener('click', () => {
+                openCommentPanelForPage(pageIndex);
+            });
+        }
+
+        // 给新渲染的楼层绑定评论句子点击
+        processContentForSentenceIds(floorBody);
     }
-
-    const page = activePages[pageIndex];
-
-    const floorDiv = document.createElement('div');
-    floorDiv.className = 'floor';
-    floorDiv.dataset.pageIndex = String(pageIndex);
-    floorDiv.innerHTML = `
-        <div class="floor-header">
-            <span>${pageIndex + 1} 楼</span>
-            <button class="comment-view-btn" data-page-index="${pageIndex}">
-                查看本楼评论（${getCommentsCountForPage(pageIndex)}）
-            </button>
-        </div>
-        <div class="floor-body ql-editor">
-            ${page.segmentedHtml || ''}
-        </div>
-    `;
-    bookContent.appendChild(floorDiv);
-
-    const floorBody = floorDiv.querySelector('.floor-body');
-    if (!floorBody) {
-        continue;
-    }
-
-    // 应用特效（用本页起始行号换算）
-    applyEffectsToBlocks(
-        floorBody,
-        activeWork?.effectsPublished,
-        page.startIndex || 0
-    );
-
-    // 评论按钮
-    const commentBtn = floorDiv.querySelector('.comment-view-btn');
-    if (commentBtn) {
-        commentBtn.addEventListener('click', () => {
-            openCommentPanelForPage(pageIndex);
-        });
-    }
-
-    // 给新渲染的楼层绑定评论句子点击
-    processContentForSentenceIds(floorBody);
 }
 
-}
+
 
 // 初始化 / 重新渲染楼层模式
 function renderScrollMode(initialTargetPageIndex = 0) {
@@ -582,17 +816,18 @@ function renderPageMode() {
     quillContainer.style.minHeight = '200px';
     pageDiv.appendChild(quillContainer);
 
-    // 2. 页脚（包含评论按钮）
-    const footer = document.createElement('div');
-    footer.className = 'page-footer';
-    
-    // 增加评论按钮的 HTML 结构
-    footer.innerHTML = `
-        <button id="prev-page">上一页</button>
-        <span id="page-indicator">第 ${currentPageIndex + 1} / ${activePages.length}</span>
-        <button id="next-page">下一页</button>
-         
-    `;
+   const footer = document.createElement('div');
+footer.className = 'page-footer';
+
+footer.innerHTML = `
+    <button id="prev-page">上一页</button>
+    <span id="page-indicator">第 ${currentPageIndex + 1} / ${activePages.length}</span>
+    <button id="next-page">下一页</button>
+    <button id="page-view-comment-btn" class="page-view-comment-btn">
+        查看评论 (0)
+    </button>
+`;
+
 
     pageDiv.appendChild(footer);
     bookContent.appendChild(pageDiv); // 💥 此时按钮已进入 DOM
@@ -719,53 +954,57 @@ if (pageContainer) {
 /* ---------- 渲染左侧导航（楼层或页码） ---------- */
 function renderSidebar(total, type) {
     // 模式切换按钮和夜间模式按钮已在 HTML 中写死
-    // 我们只在 JS 中为它们绑定事件监听器
-    // 🚨 移除了 scrollBtnGroup 和 pageBtnGroup 的获取和监听器绑定
     const navToggleBtnGroup = document.getElementById('nav-toggle-btn');
     const navToggleIcon = navToggleBtnGroup.querySelector('button');
 
-    // 更新导航按钮的图标
-    navToggleIcon.innerHTML = type === 'floor' ? '&#8635;' : '&#x2194;';
+    // 更新导航按钮的图标（楼层 <-> 页码）
+    if (type === 'floor') {
+        navToggleIcon.innerHTML = '&#8635;'; // 楼层模式图标
+    } else {
+        navToggleIcon.innerHTML = '&#x2194;'; // 翻页模式图标
+    }
 
-    // 🚨 移除了 navToggleBtnGroup 的事件监听器绑定
-    /*
-    // 原来的 scroll/page/navToggleBtnGroup.addEventListener('click', ...) 代码已移除
-    // 这些事件监听器只需要在页面加载时绑定一次
-    */
-
-    // 重新创建导航网格浮窗（这部分是正确的，需要保留）
+    // 重新创建导航网格浮窗
     const navPopup = document.getElementById('nav-grid-popup');
     navPopup.innerHTML = '';
+
     for (let i = 0; i < total; i++) {
         const cell = document.createElement('div');
         cell.className = 'nav-cell';
         cell.textContent = i + 1;
         cell.dataset.targetIndex = String(i);
-        if (type === 'floor') {
-        // 楼层模式：先保证该楼已经渲染，再滚过去
-        if (typeof ensureFloorRendered === 'function') {
-            ensureFloorRendered(i);
-        }
 
-        // 刚刚 append 完可能还在回流，下一帧再滚动更稳
-        setTimeout(() => {
-            const targetFloor = document.querySelector(`.floor[data-page-index="${i}"]`);
-            if (targetFloor) {
-                targetFloor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }, 0);
-    } else {
-                currentPageIndex = i;
-                currentMode = 'page';
-                // 这里调用 renderCurrentMode 是正确的，因为它只更新主体内容
-                renderCurrentMode(); 
-                window.scrollTo(0, 0);
-            }
+        // ⭐ 把点击逻辑放在真正的点击回调里，而不是 for 循环里直接执行
+        cell.addEventListener('click', function () {
             // 点击后关闭浮窗
             navPopup.classList.remove('show');
-        };
+
+            if (type === 'floor') {
+                // 楼层模式：先保证该楼已经渲染，再滚过去
+                if (typeof ensureFloorRendered === 'function') {
+                    ensureFloorRendered(i);
+                }
+
+                // 下一帧再滚动，避免刚 append 时布局没更新
+                setTimeout(function () {
+                    const selector = '.floor[data-page-index="' + i + '"]';
+                    const targetFloor = document.querySelector(selector);
+                    if (targetFloor) {
+                        targetFloor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 0);
+            } else {
+                // 翻页模式：切换 currentPageIndex 并重新渲染
+                currentPageIndex = i;
+                currentMode = 'page';
+                renderCurrentMode();
+                window.scrollTo(0, 0);
+            }
+        });
+
         navPopup.appendChild(cell);
     }
+}
 
 
    // 切换夜间模式
@@ -958,19 +1197,16 @@ function openCommentPanelForSentence(sentenceId, isNewCommentMode = false) {
 }
 
 function processContentForSentenceIds(containerEl) {
-    // 确保移除旧的高亮和标识
+   // 确保移除旧的高亮和标识
     document.querySelectorAll('.active-comment-target').forEach(el => el.classList.remove('active-comment-target'));
     containerEl.querySelectorAll('.comment-indicator').forEach(el => el.remove());
 
     // ⭐ 先按句子 ID 应用特效（scroll 模式 / 翻页模式都会走到这里）
-    if (window.activeWork) {
-    if (Array.isArray(activeWork.effectsPublished)) {
-        if (activeWork.effectsPublished.length) {
-            applyEffectsToBlocks(containerEl, activeWork.effectsPublished, activeWork._id);
-        }
+    if (activeWork && Array.isArray(activeWork.effectsPublished) && activeWork.effectsPublished.length) {
+        // 如果有些作品是用 workId 而不是 _id，也可以更稳一点：
+        const workIdForEffect = activeWork._id || activeWork.workId;
+        applyEffectsToBlocks(containerEl, activeWork.effectsPublished, workIdForEffect);
     }
-}
-
 
     const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
     
@@ -1173,11 +1409,17 @@ function getCommentsCountForPage(pageIndex) {
   const pageObj = activePages[pageIndex];
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = pageObj.segmentedHtml || '';
-  const pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]')).map(el => el.getAttribute('data-sentence-id'));
+  const pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
+    .map(el => el.getAttribute('data-sentence-id'));
   const commentsForPage = allComments.filter(c => pageSentenceIds.includes(c.sentenceId));
   
-  console.log(`🧩 Page ${pageIndex + 1} 的句子IDs:`, pageSentenceIds);
-  console.log(`🧩 Page ${pageIndex + 1} 匹配的评论数:`, commentsForPage.length);
+  if (window.READER_DEBUG_VERBOSE) {
+    console.log(
+      `🧩 Page ${pageIndex + 1} 的句子IDs（前 20 条示例）:`,
+      pageSentenceIds.slice(0, 20)
+    );
+    console.log(`🧩 Page ${pageIndex + 1} 匹配的评论数:`, commentsForPage.length);
+  }
   
   return commentsForPage.length;
 }

@@ -1041,54 +1041,206 @@ const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects/public';
 let customEffectFnMap = {};
 let customEffectsLoaded = false;
 
+      const EFFECT_DEBUG = true;           // ⭐ 打开调试日志
+const EFFECT_USE_OBSERVER = true;    // ⭐ 开启 IntersectionObserver 滚动触发模式
+
+
 // 用于“滚动到视口一定比例才触发”的观察器
 let effectObserver = null;
 
-// 初始化 IntersectionObserver（阈值设为 1/3 可视高度）
+// 初始化 IntersectionObserver（在句子到达视口上方 1/5 附近触发）
+// ---------------------------------------------------------------------
+// 重写 initEffectObserver —— 触发条件改成“句子到达屏幕下方 1/5”
+// ---------------------------------------------------------------------
+
+
+// 初始化 IntersectionObserver（在句子到达视口上方 1/5 附近触发）
+// ---------------------------------------------------------------------
+// 重写 initEffectObserver —— 触发条件改成“句子到达屏幕下方 1/5”
+// ---------------------------------------------------------------------
 function initEffectObserver() {
     if (!('IntersectionObserver' in window)) {
-        console.warn('当前浏览器不支持 IntersectionObserver，自定义特效将直接播放');
-        return;
+        if (EFFECT_DEBUG) {
+            console.log('⚠️ [effects] 当前环境不支持 IntersectionObserver，改用滚动监听方案');
+        }
+        return null;
     }
-    if (effectObserver) return;
 
-    effectObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            const cb = entry.target.__effectTrigger;
+    // 计算视口高度，用来确定“下方 1/5”这条带状区域
+    var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    // 下方 1/5 的上边界，例如 0.8 * height
+    var lowerBandTop = viewportHeight * 0.8;
+    // 下方 1/5 的下边界就是视口底部
+    var lowerBandBottom = viewportHeight;
+
+    if (EFFECT_DEBUG) {
+        console.log(
+            '🔧 [effects] IntersectionObserver 初始化完成：\n',
+            '   viewportHeight =', viewportHeight,
+            '   lowerBandTop =', lowerBandTop,
+            '   lowerBandBottom =', lowerBandBottom
+        );
+    }
+
+    // 构造一组 threshold，让元素在视口内部移动时也能多次触发回调
+    var thresholds = [];
+    var t = 0.0;
+    while (t <= 1.0) {
+        thresholds.push(t);
+        t = t + 0.1;     // 每 0.1 一个点，你也可以改成 0.05 更细
+    }
+
+    effectObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            var target = entry.target;
+            var cb = target.__effectTrigger;
             if (!cb) return;
 
-            const ratio = entry.intersectionRatio || 0;
-            // 至少有 1/3 在屏幕内时触发
-            if (ratio >= 0.33) {
-                try {
-                    cb(entry.target);
-                } catch (err) {
-                    console.error('执行特效时出错:', err);
+            var rect = target.getBoundingClientRect();
+            var shouldTrigger = false;
+
+            // 用元素中心点判断
+            var centerY = rect.top + rect.height / 2;
+            if (centerY >= lowerBandTop) {
+                if (centerY <= lowerBandBottom) {
+                    shouldTrigger = true;
                 }
-                effectObserver.unobserve(entry.target);
-                delete entry.target.__effectTrigger;
             }
+
+            if (!shouldTrigger) {
+                return;
+            }
+
+            if (EFFECT_DEBUG) {
+                console.log(
+                    '🚀 [IO] 触发特效：',
+                    target.getAttribute('data-sentence-id'),
+                    ' rect.top =', rect.top.toFixed(1),
+                    ' rect.bottom =', rect.bottom.toFixed(1),
+                    ' centerY =', centerY.toFixed(1),
+                    ' lowerBandTop =', lowerBandTop.toFixed(1),
+                    ' lowerBandBottom =', lowerBandBottom.toFixed(1),
+                    ' ratio =', entry.intersectionRatio.toFixed(2)
+                );
+            }
+
+            try {
+                cb(target);
+            } catch (err) {
+                console.error('执行特效时出错:', err);
+            }
+
+            // 只触发一次就取消监听
+            effectObserver.unobserve(target);
+            delete target.__effectTrigger;
         });
     }, {
         root: null,
-        threshold: [0, 0.33, 0.66, 1]
+        threshold: thresholds
     });
+
+
+    return effectObserver;
 }
 
+
+
 // 把某个元素注册进“滚动触发一次”的队列
+// 把某个元素注册进“滚动触发一次”的队列（调试版）
 function registerEffectTrigger(targetEl, cb) {
     if (!targetEl || typeof cb !== 'function') return;
 
-    // 不支持 IO 的老浏览器：直接执行，不做懒加载
-    if (!('IntersectionObserver' in window)) {
-        cb(targetEl);
+    const sid = targetEl.getAttribute('data-sentence-id') || '(no-id)';
+
+    if (EFFECT_DEBUG) {
+    var useObserver = false;
+
+    // 先判断是否启用 Observer
+    if (EFFECT_USE_OBSERVER) {
+        // 再判断浏览器是否支持 IntersectionObserver
+        if ('IntersectionObserver' in window) {
+            useObserver = true;
+        }
+    }
+
+    console.log(
+        '🧪 [registerEffectTrigger] 目标句子 =',
+        sid,
+        '，当前在 DOM 中 =',
+        document.body.contains(targetEl),
+        '，使用 Observer =',
+        useObserver
+    );
+}
+
+
+    // 调试阶段：如果关闭懒加载，或者浏览器不支持 IO，就直接执行一次特效
+    if (!EFFECT_USE_OBSERVER || !('IntersectionObserver' in window)) {
+        try {
+            cb(targetEl);
+        } catch (err) {
+            console.error('❌ [registerEffectTrigger] 直接执行特效出错:', sid, err);
+        }
         return;
     }
 
-    initEffectObserver();
+            initEffectObserver();
+    if (!effectObserver) {
+        try {
+            cb(targetEl);
+        } catch (err) {
+            console.error('❌ [registerEffectTrigger] effectObserver 不存在，fallback 执行特效失败:', sid, err);
+        }
+        return;
+    }
+
+    // ⭐ 新增：顶部补触发逻辑（无 && 版本）
+    (function () {
+        var rect = targetEl.getBoundingClientRect();
+        var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        var lowerBandTop = viewportHeight * 0.8;   // 保持 0.8 不变
+        var lowerBandBottom = viewportHeight;
+
+        // 计算是否在视口内（不使用 &&）
+        var inViewport = false;
+        if (rect.bottom > 0) {
+            if (rect.top < viewportHeight) {
+                inViewport = true;
+            }
+        }
+
+        var centerY = rect.top + rect.height / 2;
+
+        // 如果当前已经在视口里，但中心点在下方 1/5 以上，直接播一次特效（不使用 &&）
+        if (inViewport) {
+            if (centerY < lowerBandTop) {
+                if (EFFECT_DEBUG) {
+                    console.log(
+                        '⚡ [registerEffectTrigger] 顶部补触发：',
+                        sid,
+                        ' rect.top =', rect.top.toFixed(1),
+                        ' rect.bottom =', rect.bottom.toFixed(1),
+                        ' centerY =', centerY.toFixed(1),
+                        ' lowerBandTop =', lowerBandTop.toFixed(1),
+                        ' lowerBandBottom =', lowerBandBottom.toFixed(1)
+                    );
+                }
+                try {
+                    cb(targetEl);
+                } catch (err) {
+                    console.error('❌ [registerEffectTrigger] 顶部补触发失败:', sid, err);
+                }
+                // 不再交给 Observer
+                return;
+            }
+        }
+    })();
+
+    // 正常情况：交给 IntersectionObserver，等它滚到屏幕下方 1/5 再触发
     targetEl.__effectTrigger = cb;
     effectObserver.observe(targetEl);
 }
+
 
 // 只在第一次需要时，从后端加载自定义特效列表
 async function ensureCustomEffectsLoaded() {
@@ -1178,95 +1330,154 @@ closeCommentBtn.addEventListener('click', () => {
     commentPanel.querySelector('h4').textContent = `评论`; // <--- 恢复标题
 });
 
-// ✅ 按“全文行号” + 本页起始行号计算本页局部行号
-// ========== 应用特效（内置 + 自定义 + 只在进入视口时触发一次） ==========
-function applyEffectsToBlocks(root, effectTags, workId) {
-    if (!root || !Array.isArray(effectTags) || effectTags.length === 0) return;
+// 只在“阅读端真正显示出来的 DOM 容器”上应用特效
+// ========== 应用特效（内置 + 自定义）【调试版】 ==========
+// ========== 按 data-sentence-id + workId 应用特效（带调试日志） ==========
+function applyEffectsToBlocks(rootEl, effectsPublished, workId) {
+    // 基础防御
+    if (!rootEl) {
+        console.warn('⚠ [effects] applyEffectsToBlocks: rootEl 为空，直接返回');
+        return;
+    }
+    if (!Array.isArray(effectsPublished) || !effectsPublished.length) {
+        console.log('ℹ [effects] 当前作品没有任何特效，跳过');
+        return;
+    }
+    if (!workId) {
+        console.warn('⚠ [effects] 缺少 workId，无法构造句子 ID');
+        return;
+    }
 
-    // 所有被标记了句子 id 的块（editor/翻页/楼层模式都应该已经加上 data-sentence-id）
-    const blocks = root.querySelectorAll('[data-sentence-id]');
-    if (!blocks.length) return;
+    // 找出当前 container 里所有带 data-sentence-id 的句子
+    const sentenceEls = rootEl.querySelectorAll('[data-sentence-id]');
+    if (!sentenceEls.length) {
+        console.log('ℹ [effects] root 内没有任何 data-sentence-id 节点，暂不应用特效');
+        return;
+    }
 
-    effectTags.forEach(tag => {
-        if (!tag) return;
+    console.log('🧪 [effects] applyEffectsToBlocks 被调用：', {
+        workId,
+        effectCount: effectsPublished.length,
+        sentenceCount: sentenceEls.length,
+        sampleIds: Array.from(sentenceEls)
+            .slice(0, 10)
+            .map(el => el.getAttribute('data-sentence-id'))
+    });
 
-        const lineIndex = typeof tag.lineIndex === 'number'
-            ? tag.lineIndex
-            : parseInt(tag.lineIndex, 10);
-        if (Number.isNaN(lineIndex)) return;
+    // 避免重复包裹 / 重复添加 class
+    const appliedSet = new Set();
 
-        const targetEl = root.querySelector(`[data-sentence-id="${lineIndex}"]`);
-        if (!targetEl) return;
+    effectsPublished.forEach(effect => {
+        if (!effect) return;
 
-        const effectType = tag.effectType || '';
+        const rawIndex = effect.lineIndex;
+        const type = effect.effectType;
 
-        // ------------ A. 自定义特效：effectType 形如 "custom:flashShakeOnce" ------------
-        if (effectType.startsWith('custom:')) {
-            const key = effectType.slice('custom:'.length);
-            const fn = customEffectFnMap[key];
+        // 行号容错处理
+        let lineIndex = typeof rawIndex === 'number'
+            ? rawIndex
+            : parseInt(rawIndex, 10);
 
-            if (!fn) {
-                console.warn('找不到自定义特效：', key);
-                return;
-            }
+        if (Number.isNaN(lineIndex) || lineIndex < 0) {
+            console.warn('⚠ [effects] 非法 lineIndex：', rawIndex, effect);
+            return;
+        }
+        if (!type) return;
 
-            // 滚动到视口 1/3 后才执行用户代码
-            registerEffectTrigger(targetEl, (el) => {
-                try {
-                    fn(el);
-                } catch (err) {
-                    console.error('执行自定义特效失败：', key, err);
+        // 统一和 segmentContentAndAddIds 生成规则：
+        // data-sentence-id="s_<workId>_<行号>"
+        const sentenceId = `s_${workId}_${lineIndex}`;
+        const selector = `[data-sentence-id="${sentenceId}"]`;
+        const target = rootEl.querySelector(selector);
+
+        console.log('🎯 [effects] 处理特效:', {
+            lineIndex,
+            sentenceId,
+            type,
+            found: !!target
+        });
+
+        if (!target) return;
+
+        // 防止对同一句多次重复应用
+        const key = sentenceId + '::' + type;
+        if (appliedSet.has(key)) return;
+        appliedSet.add(key);
+
+        // 调试可视化：画一个淡淡的轮廓，方便你肉眼看到“哪一行被匹配到了”
+        target.style.outline = '1px dashed rgba(255,0,0,0.25)';
+
+        // --- 实际特效处理 ---
+        // 自定义特效：effectType 形如 "custom:xxx"
+        // 自定义特效：effectType 形如 "custom:xxx"
+if (typeof type === 'string' && type.startsWith('custom:')) {
+    const customKey = type.slice('custom:'.length) || '';
+
+    // 调试用：先加一个占位 class，方便肉眼确认命中
+    target.classList.add('effect-custom-placeholder');
+
+    console.log('🧪 [effects] 命中自定义特效占位:', {
+        customKey,
+        sentenceId
+    });
+
+    // ⭐ 关键：从映射里取出对应的执行函数
+    const runner = customEffectFnMap && customEffectFnMap[customKey];
+
+    if (!runner) {
+        console.warn('⚠ [effects] 未找到自定义特效函数:', customKey);
+        return;
+    }
+
+    // 用统一的触发器包装一下，便于以后切回 IntersectionObserver 懒加载
+    registerEffectTrigger(target, (el) => {
+        try {
+            // 这里真正执行你写在后端的代码：
+            // new Function('targetEl', `"use strict"; ${item.code} ...`)(el)
+            runner(el);
+        } catch (err) {
+            console.error('❌ [effects] 自定义特效执行失败:', customKey, err);
+        }
+    });
+
+    return;
+}
+
+        // 内置 shake：包一层 span，让整句抖动
+        if (type === 'shake') {
+            if (!target.querySelector('.effect-shake')) {
+                const span = document.createElement('span');
+                span.className = 'effect-shake';
+                while (target.firstChild) {
+                    span.appendChild(target.firstChild);
                 }
-            });
+                target.appendChild(span);
+            }
             return;
         }
 
-        // ------------ B. 内置特效：同样改成“进入视口再触发” ------------
-        switch (effectType) {
-            case 'shake': {
-                // 为了不提前抖动，这里等进入视口后再把文字包进 span.effect-shake
-                registerEffectTrigger(targetEl, (el) => {
-                    const span = document.createElement('span');
-                    span.classList.add('effect-shake');
-                    // 把原来的子节点全部移进去
-                    while (el.firstChild) {
-                        span.appendChild(el.firstChild);
-                    }
-                    el.appendChild(span);
-                });
-                break;
-            }
-            case 'flash':
-                registerEffectTrigger(targetEl, (el) => {
-                    el.classList.add('effect-flash');
-                    // 可选：一定时间之后移除 class，避免长时间闪
-                    setTimeout(() => {
-                        el.classList.remove('effect-flash');
-                    }, 1200);
-                });
-                break;
-            case 'fade':
-                registerEffectTrigger(targetEl, (el) => {
-                    el.classList.add('effect-fade');
-                });
-                break;
-            case 'highlight':
-                registerEffectTrigger(targetEl, (el) => {
-                    el.classList.add('effect-highlight');
-                });
-                break;
-            case 'glow':
-                registerEffectTrigger(targetEl, (el) => {
-                    el.classList.add('effect-glow');
-                });
-                break;
-            default:
-                // 未知 effectType，忽略
-                break;
+        // 其它内置特效：直接加 class
+        if (type === 'flash') {
+            target.classList.add('effect-flash');
+            return;
         }
+        if (type === 'fade') {
+            target.classList.add('effect-fade');
+            return;
+        }
+        if (type === 'highlight') {
+            target.classList.add('effect-highlight');
+            return;
+        }
+        if (type === 'glow') {
+            target.classList.add('effect-glow');
+            return;
+        }
+
+        // 未识别的类型，仅做 log
+        console.log('ℹ [effects] 未识别的 effectType：', type, '，已跳过');
     });
 }
-
 
 
         // 如果需要 token（发表评论/点赞）
@@ -1445,9 +1656,6 @@ activePages.forEach(page => {
         // ⭐ 本页的“全文起始行号”
         const pageStartIndex = sentenceIndex;
 
-        // 应用特效（用全文行号 + pageStartIndex 转成本页局部行号）
-        applyEffectsToBlocks(effectRoot, activeWork.effectsPublished || [], pageStartIndex);
-
         const { element: tempDiv, nextIndex } = segmentContentAndAddIds(
             effectRoot.innerHTML,
             work._id,
@@ -1498,12 +1706,16 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
     }
   });
 
+  if (window.READER_DEBUG_VERBOSE) {
   console.log(
-    '🧩 segmentContentAndAddIds 生成的 ID:',
-    Array.from(tempDiv.querySelectorAll('[data-sentence-id]')).map(function (el) {
-      return el.dataset.sentenceId;
-    })
+    '🧩 segmentContentAndAddIds 生成的 ID（前 30 条示例）:',
+    Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
+      .slice(0, 30)
+      .map(function (el) {
+        return el.dataset.sentenceId;
+      })
   );
+}
 
   return { element: tempDiv, nextIndex: counter };
 }
@@ -2094,19 +2306,16 @@ function openCommentPanelForSentence(sentenceId, isNewCommentMode = false) {
 }
 
 function processContentForSentenceIds(containerEl) {
-    // 确保移除旧的高亮和标识
+   // 确保移除旧的高亮和标识
     document.querySelectorAll('.active-comment-target').forEach(el => el.classList.remove('active-comment-target'));
     containerEl.querySelectorAll('.comment-indicator').forEach(el => el.remove());
 
     // ⭐ 先按句子 ID 应用特效（scroll 模式 / 翻页模式都会走到这里）
-    if (window.activeWork) {
-    if (Array.isArray(activeWork.effectsPublished)) {
-        if (activeWork.effectsPublished.length) {
-            applyEffectsToBlocks(containerEl, activeWork.effectsPublished, activeWork._id);
-        }
+    if (activeWork && Array.isArray(activeWork.effectsPublished) && activeWork.effectsPublished.length) {
+        // 如果有些作品是用 workId 而不是 _id，也可以更稳一点：
+        const workIdForEffect = activeWork._id || activeWork.workId;
+        applyEffectsToBlocks(containerEl, activeWork.effectsPublished, workIdForEffect);
     }
-}
-
 
     const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
     
@@ -2309,11 +2518,17 @@ function getCommentsCountForPage(pageIndex) {
   const pageObj = activePages[pageIndex];
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = pageObj.segmentedHtml || '';
-  const pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]')).map(el => el.getAttribute('data-sentence-id'));
+  const pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
+    .map(el => el.getAttribute('data-sentence-id'));
   const commentsForPage = allComments.filter(c => pageSentenceIds.includes(c.sentenceId));
   
-  console.log(`🧩 Page ${pageIndex + 1} 的句子IDs:`, pageSentenceIds);
-  console.log(`🧩 Page ${pageIndex + 1} 匹配的评论数:`, commentsForPage.length);
+  if (window.READER_DEBUG_VERBOSE) {
+    console.log(
+      `🧩 Page ${pageIndex + 1} 的句子IDs（前 20 条示例）:`,
+      pageSentenceIds.slice(0, 20)
+    );
+    console.log(`🧩 Page ${pageIndex + 1} 匹配的评论数:`, commentsForPage.length);
+  }
   
   return commentsForPage.length;
 }

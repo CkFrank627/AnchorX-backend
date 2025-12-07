@@ -573,18 +573,20 @@
   flex-direction:row;
 }
 .right-sidebar {
-  /* 保持原有样式 */ flex-shrink:0;
-  width:250px;
-  background-color:#f7f9fc;
-  border-left:1px solid #eee;
-  padding:20px;
-  transition:width 0.3s ease-in-out;
-  /* 核心修改：使用固定定位 */ position:fixed;
-  top:0;
-  right:0;
-  height:100vh;
-  overflow-y:auto;
+  flex-shrink: 0;
+  width: 250px;
+  background-color: #f7f9fc;
+  border-left: 1px solid #eee;
+  padding: 20px;
+  transition: width 0.3s ease-in-out;
+  position: sticky;
+  top: 70px; /* ✅ 向下错开，避免遮挡消息箱或页眉 */
+  right: 0;
+  height: calc(100vh - 70px); /* ✅ 同步调整高度 */
+  overflow-y: auto;
+  z-index: 50; /* ✅ 保证在编辑器上层但不盖住页眉 */
 }
+
 /* 新增角色選擇按钮样式 */ .role-select-btn {
   width:20px;
   height:20px;
@@ -641,7 +643,7 @@
   border:1px solid #ddd;
   box-shadow:0 4px 8px rgba(0,0,0,0.1);
   border-radius:8px;
-  z-index:100;
+  z-index:9000;
 }
 .page-select-dropdown ul {
   list-style:none;
@@ -1224,7 +1226,121 @@
     }
 }
 
+  #autoSaveToggleBtn {
+    margin-left: 10px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 1px solid #0077cc;
+    transition: background-color 0.2s, color 0.2s;
+}
 
+/* 开启状态（默认） */
+.autosave-on {
+    background-color: #e6f7ff;
+    color: #0077cc;
+}
+
+/* 关闭状态 */
+.autosave-off {
+    background-color: #f8f9fa;
+    color: #555;
+    border-color: #999;
+}
+
+/* 整个图库浮窗遮罩层 */
+#galleryModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;              /* 默认隐藏，JS 用 display:flex 打开 */
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+/* 浮窗本体：加宽加高 */
+#galleryModal .gallery-modal-content {
+  width: min(1100px, 96vw);   /* 比原来宽很多 */
+  max-height: 90vh;           /* 接近全屏高度 */
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 图片列表区域可滚动 */
+#galleryImageList {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  padding-right: 4px;
+}
+
+  /* 单个图片格子 */
+.gallery-image-item {
+  position: relative;
+  background: #f8f8f8;
+  border-radius: 8px;
+  padding: 6px 6px 4px;
+  box-sizing: border-box;
+}
+
+/* 缩略图容器，保持大致比例但不裁掉头 */
+.gallery-image-item .thumb-wrapper {
+  width: 100%;
+  /* 给个大致比例，比如立绘常见 3:4，你也可以改成 2:3 等 */
+  aspect-ratio: 3 / 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* 关键：用 contain 而不是 cover，保证整张图都进来 */
+.gallery-image-item img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* 文件名 / 表情名 */
+.gallery-image-item .img-name {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  color: #555;
+  word-break: break-all;
+}
+
+/* 删除按钮保持右上角小叉 */
+.gallery-image-item .delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+}
+
+  
 </style>
   
 <body>
@@ -1286,6 +1402,16 @@
                 </div>
                 <span class="nav-text">共享素材库</span>
             </a>
+
+          <a href="https://zhidianworld.com/effect/" class="nav-link">
+    <div class="nav-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+            fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2L15 8l6 .5-4.5 4 1 6-5-3-5 3 1-6L3 8.5 9 8z" />
+        </svg>
+    </div>
+    <span class="nav-text">⭐渲染特效</span>
+</a>
 
             <a href="https://zhidianworld.com/usercenter/" class="nav-link">
                 <div class="nav-icon">
@@ -1374,7 +1500,7 @@
                     <div class="editor-title" id="editorTitle"></div>
                     <div class="page-controls">
                         <div class="page-current" id="pageCurrentDisplay">
-                            第 <span id="currentPage">1</span> 页
+                            第 <span id="currentPage">1</span> 页（展开）
                         </div>
                         <div class="page-select-dropdown hidden" id="pageDropdown">
                             <ul id="pageList">
@@ -1383,10 +1509,15 @@
                             <button class="delete-page-btn" id="deletePageBtn">刪除页面</button> </div>
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <button class="back-button" id="saveBtn">保存草稿</button>
-                
-                        <button class="back-button" id="publishBtn">发布</button>
-                    </div>
+    <!-- 新增：本地备份按钮 -->
+    <button class="back-button" id="localSaveBtn">保存到本地</button>
+
+    <!-- 原有按钮保持不变 -->
+    <button class="back-button" id="saveBtn">保存草稿</button>
+    <button id="autoSaveToggleBtn" class="autosave-on">自动保存：开</button>
+    <button class="back-button" id="publishBtn">发布</button>
+</div>
+
                 </div>
 
                 <div id="toolbar-quill" class="ql-toolbar ql-snow">
@@ -1648,6 +1779,7 @@ let isSaving = false; // 防止多重保存请求
 
         // 编辑器相关
         const saveBtn = document.getElementById('saveBtn');
+      const localSaveBtn = document.getElementById('localSaveBtn'); // ✅ 新增：本地保存按钮
         const publishBtn = document.getElementById('publishBtn');
         const quillEditor = document.getElementById('editor');
         const plainEditor = document.getElementById('plainEditor');
@@ -1705,6 +1837,43 @@ const hiddenTextBtn = document.getElementById('hiddenTextBtn');
       const toggleBtn2 = document.getElementById('toggleSidebarBtn');
 const sidebar2 = document.getElementById('floatingSidebar');
 const closeBtn2 = document.getElementById('closeSidebarBtn');
+
+          // --- 📱 手机端同步右侧工具栏内容 ---
+const desktopSidebar = document.getElementById('rightSidebar');
+
+// 初次加载时将电脑端工具栏的内容复制到浮窗中
+if (!desktopSidebar) return;
+if (!sidebar2) return;
+
+const clonedContent = desktopSidebar.innerHTML;
+sidebar2.insertAdjacentHTML('beforeend', clonedContent);
+
+
+// 切换浮窗的显示状态
+toggleBtn2.addEventListener('click', (e) => {
+  e.stopPropagation();
+  sidebar2.classList.toggle('open');
+});
+
+closeBtn2.addEventListener('click', () => {
+  sidebar2.classList.remove('open');
+});
+
+// 点击浮窗外区域关闭（仅手机端）
+document.addEventListener('click', (e) => {
+  if (window.innerWidth <= 768) {
+    const clickedInsideSidebar = sidebar2.contains(e.target);
+    const clickedToggleButton = toggleBtn2.contains(e.target);
+
+    if (!clickedInsideSidebar) {
+      if (!clickedToggleButton) {
+        sidebar2.classList.remove('open');
+      }
+    }
+  }
+});
+
+
 
 toggleBtn2.addEventListener('click', () => {
   sidebar2.classList.toggle('open');
@@ -2473,9 +2642,87 @@ async function saveWork(isAuto = false) {
     }
     return success;
 }
+
+/* ---------- 新增：导出所有楼层到本地 JSON ---------- */
+async function downloadLocalBackup() {
+    if (!currentWorkId) {
+        alert('请先保存或创建作品，再导出到本地。');
+        return;
+    }
+
+    // 1️⃣ 先把当前页的内容写回 pages（和 performSave 里的逻辑保持一致）
+    if (isQuillActive) {
+        pages[currentPageIndex].content = quill.getContents();
+    } else {
+        const lines = plainEditor.value.split('\n');
+        const ops = lines.map(line => ({ insert: line + '\n' }));
+        pages[currentPageIndex].content = { ops };
+    }
+
+    // 2️⃣ 从后端再拿一次作品，主要是拿特效字段（effectsDraft / effectsPublished）
+    let effectsDraft = [];
+    let effectsPublished = [];
+    try {
+        const work = await fetchWorkById(currentWorkId);
+        if (work) {
+            if (Array.isArray(work.effectsDraft)) {
+                effectsDraft = work.effectsDraft;
+            }
+            if (Array.isArray(work.effectsPublished)) {
+                effectsPublished = work.effectsPublished;
+            }
+        }
+    } catch (err) {
+        console.error('获取作品特效失败（导出时忽略）：', err);
+        // 即使失败也继续导出页面内容
+    }
+
+    // 3️⃣ 组装备份数据
+    const backupData = {
+        meta: {
+            workId: currentWorkId,
+            title: editorTitle.textContent.replace('正在编辑：', ''),
+            exportedAt: new Date().toISOString(),
+            source: 'AnchorX-write-local-backup-v1'
+        },
+        // 所有楼层内容：这里是 Quill 的 Delta，保留了颜色、加粗、标题等样式
+        pages: pages,
+        // 角色信息
+        roles: roles,
+        // 特效信息：以“代码格式”（JSON）保留下来
+        effectsDraft: effectsDraft,
+        effectsPublished: effectsPublished
+    };
+
+    // 4️⃣ 转成 JSON 文件并触发浏览器下载
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const rawTitle = backupData.meta.title || '未命名作品';
+    const safeTitle = rawTitle.replace(/[\\/:*?"<>|]/g, '_');
+    a.href = url;
+    a.download = `${safeTitle}_本地备份_${new Date().toISOString().slice(0,10)}.json`;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // 可选：记一条历史记录
+    addHistoryRecord('导出本地备份');
+}
+
         saveBtn.addEventListener('click', saveWork);
 
-
+// ✅ 新增：给“保存到本地”按钮绑定点击事件
+if (localSaveBtn) {
+    localSaveBtn.addEventListener('click', () => {
+        console.log('▶ 点击了【保存到本地】按钮');
+        downloadLocalBackup();
+    });
+}
 
         // 转义 HTML（防止注入）
         function escapeHtml(text) {
@@ -2984,19 +3231,40 @@ if (insertThemeTriggerBtn) {
         roleDropdownHeader.classList.toggle('open');
     });
 
-  // 渲染图库图片列表的函数
-    function renderGalleryImages() {
-        // 清空现有图片，保留上传按钮
-        galleryImageList.querySelectorAll('.gallery-image-item').forEach(item => item.remove());
-        
-        galleryImages.forEach(imageUrl => {
-            const imgItem = document.createElement('div');
-            imgItem.className = 'gallery-image-item';
-            imgItem.innerHTML = `<img src="${imageUrl}" alt="角色图片">
-                                 <span class="delete-btn">x</span>`;
-            galleryImageList.prepend(imgItem);
-        });
+  // 从 URL 中简单提取一个“文件名”当作预览名称
+function getImageNameFromUrl(url) {
+    try {
+        const withoutQuery = url.split('?')[0];
+        const parts = withoutQuery.split('/');
+        return parts[parts.length - 1] || '未命名';
+    } catch (e) {
+        return '未命名';
     }
+}
+
+// 替换原来的 renderGalleryImages
+function renderGalleryImages() {
+    // 清空现有图片，保留上传按钮
+    galleryImageList.querySelectorAll('.gallery-image-item').forEach(item => item.remove());
+    
+    galleryImages.forEach((imageUrl, idx) => {
+        const imgItem = document.createElement('div');
+        imgItem.className = 'gallery-image-item';
+
+        const displayName = getImageNameFromUrl(imageUrl) || `图片 ${idx + 1}`;
+
+        imgItem.innerHTML = `
+            <div class="thumb-wrapper">
+                <img src="${imageUrl}" alt="${escapeHtml(displayName)}">
+            </div>
+            <div class="img-name">${escapeHtml(displayName)}</div>
+            <span class="delete-btn">×</span>
+        `;
+
+        galleryImageList.prepend(imgItem);
+    });
+}
+
 
     // 图片上传事件监听
 // 图片上传事件监听 (新版本，已加入压缩)
@@ -3199,6 +3467,37 @@ async function uploadFileToImgBB(file) {
         }
     });
 
+      // 自动保存开关按钮
+const autoSaveToggleBtn = document.getElementById('autoSaveToggleBtn');
+
+// 默认开启（你的 autoSaveEnabled = true）
+autoSaveToggleBtn.textContent = "自动保存：开";
+autoSaveToggleBtn.classList.add("autosave-on");
+
+// 点击切换
+autoSaveToggleBtn.addEventListener('click', () => {
+    autoSaveEnabled = !autoSaveEnabled;
+
+    if (autoSaveEnabled) {
+        autoSaveToggleBtn.textContent = "自动保存：开";
+        autoSaveToggleBtn.classList.remove("autosave-off");
+        autoSaveToggleBtn.classList.add("autosave-on");
+
+        startAutoSave(); // 重新启动自动保存
+        console.log("自动保存已开启");
+    } else {
+        autoSaveToggleBtn.textContent = "自动保存：关";
+        autoSaveToggleBtn.classList.remove("autosave-on");
+        autoSaveToggleBtn.classList.add("autosave-off");
+
+        // 停止自动保存 interval
+        if (autoSaveTimer) clearInterval(autoSaveTimer);
+
+        console.log("自动保存已关闭");
+    }
+});
+
+
     /* ---------- 其它 UI 事件 ---------- */
     // 退出
     const logoutBtn = document.getElementById('logout-btn');
@@ -3251,6 +3550,8 @@ async function uploadFileToImgBB(file) {
             }
         }
     });
+
+ 
 
 }); // end DOMContentLoaded
 </script>
