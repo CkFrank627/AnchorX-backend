@@ -270,43 +270,99 @@ router.put('/:id', auth, async (req, res) => {
 
 // **新增：支持页面(pages)删除/更新的 PATCH 路由**
 // 前端使用 PATCH /api/works/:id 发送 { pages: newPages }
+// **新增：支持页面(pages)删除/更新 + 特效/背景配置的 PATCH 路由**
+// 前端使用 PATCH /api/works/:id
+//  - 更新页：{ pages: newPages, title? }
+//  - 更新特效：{ effectsDraft, effectsPublished? }
+//  - 更新背景：{ backgroundDraft, backgroundPublished? }
 router.patch('/:id', auth, async (req, res) => {
     try {
-        // ⭐ 如果 effectsDraft / effectsPublished 以字符串形式传入，则解析为 JSON
-if (typeof req.body.effectsDraft === 'string') {
-    req.body.effectsDraft = JSON.parse(req.body.effectsDraft);
-}
-if (typeof req.body.effectsPublished === 'string') {
-    req.body.effectsPublished = JSON.parse(req.body.effectsPublished);
-}
+        // ⭐ 一些字段可能被前端当成字符串传上来，这里统一尝试解析 JSON
+        const jsonKeys = [
+            'effectsDraft',
+            'effectsPublished',
+            'backgroundDraft',
+            'backgroundPublished',
+        ];
+
+        jsonKeys.forEach((key) => {
+            if (typeof req.body[key] === 'string') {
+                try {
+                    req.body[key] = JSON.parse(req.body[key]);
+                } catch (e) {
+                    console.warn(`PATCH /:id 解析 ${key} JSON 失败:`, e.message);
+                    // 解析失败就保持原样，不中断请求
+                }
+            }
+        });
 
         const { id } = req.params;
-        // 从请求体中解构出前端可能发送的字段
-        const { pages, title, ...otherFields } = req.body; 
 
+        // 从请求体中解构出前端可能发送的字段
+        const {
+            pages,
+            title,
+            backgroundDraft,
+            backgroundPublished,
+            ...otherFields
+        } = req.body;
+
+        // otherFields 里会包含：effectsDraft / effectsPublished 等
         const updateFields = { ...otherFields };
 
-        // 核心逻辑：如果请求体中包含 pages 字段，则更新数据库中的 content 字段和字数
+        // ========= 1）如果有 pages，则更新 content + 字数 =========
         if (pages !== undefined) {
             if (!Array.isArray(pages)) {
-                return res.status(400).json({ message: 'pages 格式不正确，需要是一个页面数组' });
+                return res
+                    .status(400)
+                    .json({ message: 'pages 格式不正确，需要是一个页面数组' });
             }
-            // 将前端的 pages 映射到数据库模型中的 content 字段
-            updateFields.content = pages.map(p => ({
-    ...p,
-    updatedAt: new Date()
-}));
-updateFields.wordCount = calculateWordCount(pages);
-updateFields.updatedAt = new Date(); // 记录作品更新时间
 
+            updateFields.content = pages.map((p) => ({
+                ...p,
+                updatedAt: new Date(),
+            }));
+            updateFields.wordCount = calculateWordCount(pages);
+            updateFields.updatedAt = new Date(); // 记录作品更新时间
         }
-        
-        // 允许同时更新 title 等其他字段
+
+        // ========= 2）允许同时更新 title =========
         if (title !== undefined) {
             updateFields.title = title;
         }
 
-        // 如果没有任何需要更新的字段
+        // ========= 3）背景配置：草稿 & 已发布 =========
+        // backgroundDraft/backgroundPublished 的结构：
+        // { images: [], bindings: [], transitions: [] }
+        if (backgroundDraft && typeof backgroundDraft === 'object') {
+            updateFields.backgroundDraft = {
+                images: Array.isArray(backgroundDraft.images)
+                    ? backgroundDraft.images
+                    : [],
+                bindings: Array.isArray(backgroundDraft.bindings)
+                    ? backgroundDraft.bindings
+                    : [],
+                transitions: Array.isArray(backgroundDraft.transitions)
+                    ? backgroundDraft.transitions
+                    : [],
+            };
+        }
+
+        if (backgroundPublished && typeof backgroundPublished === 'object') {
+            updateFields.backgroundPublished = {
+                images: Array.isArray(backgroundPublished.images)
+                    ? backgroundPublished.images
+                    : [],
+                bindings: Array.isArray(backgroundPublished.bindings)
+                    ? backgroundPublished.bindings
+                    : [],
+                transitions: Array.isArray(backgroundPublished.transitions)
+                    ? backgroundPublished.transitions
+                    : [],
+            };
+        }
+
+        // ========= 4）如果没有任何需要更新的字段 =========
         if (Object.keys(updateFields).length === 0) {
             return res.status(200).json({ message: '没有需要更新的字段' });
         }
@@ -318,15 +374,20 @@ updateFields.updatedAt = new Date(); // 记录作品更新时间
         );
 
         if (!updatedWork) {
-            return res.status(404).json({ message: '作品不存在或无权修改' });
+            return res
+                .status(404)
+                .json({ message: '作品不存在或无权修改' });
         }
 
         res.json(updatedWork);
     } catch (error) {
         console.error('PATCH /:id 更新作品失败:', error);
-        res.status(500).json({ message: '更新作品失败', error: error.message });
+        res
+            .status(500)
+            .json({ message: '更新作品失败', error: error.message });
     }
 });
+
 
 // 删除作品
 router.delete('/:id', auth, async (req, res) => {
@@ -377,8 +438,24 @@ router.get('/:id', optionalAuth, async (req, res) => {
             isLikedByCurrentUser: isLikedByCurrentUser,
             updatedAt: work.updatedAt,
             createdAt: work.createdAt,
+
+            // 文字特效
             effectsDraft: work.effectsDraft || [],
             effectsPublished: work.effectsPublished || [],
+
+            // ⭐ 新增：背景配置（草稿 + 已发布）
+            backgroundDraft: work.backgroundDraft || {
+                images: [],
+                bindings: [],
+                transitions: [],
+            },
+            backgroundPublished: work.backgroundPublished || {
+                images: [],
+                bindings: [],
+                transitions: [],
+            },
+
+            // 作品内容
             content: work.content.map(page => {
                 if (page.content && typeof page.content === 'object') {
                     let contentString = JSON.stringify(page.content);

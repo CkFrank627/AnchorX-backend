@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>创作页面</title>
+    <title>渲染特效</title>
     <link href="https://api.anchorx.ca/vendor_assets/quill.snow.css" rel="stylesheet">
   
 <style> /* 隐藏类 */ .hidden {
@@ -1572,20 +1572,130 @@
             <textarea id="custom-effect-code-input"></textarea>
 
             <div class="custom-effect-help">
-              不会写代码的可以问 AI。（示例代码见下）
+              不会写的代码可以问 AI。（请务必把以下代码复制给AI，让它照着这个格式做出代码）
               <div class="custom-effect-sample">
 /**
- * 约定：系统将来会把当前句子的 DOM 元素传给这个函数
- * 你只需要实现 applyEffect(targetEl) 即可
+ * 「加载」自定义特效示例
+ * 系统会把当前句子的 DOM 元素传进来，只需实现 applyEffect(targetEl)
  */
 function applyEffect(targetEl) {
-  // 示例：给句子加上「effect-shake」类，让它晃动一下
-  targetEl.classList.add('effect-shake');
+  if (!targetEl) return;
 
-  // 600ms 后移除 class，避免一直抖
-  setTimeout(() => {
-    targetEl.classList.remove('effect-shake');
-  }, 600);
+  // 防止同一句话被多次应用这个特效
+  if (targetEl.dataset.customLoadingApplied === '1') {
+    return;
+  }
+  targetEl.dataset.customLoadingApplied = '1';
+
+  // 记录原始内容
+  const originalHtml = targetEl.innerHTML;
+
+  // 外层容器：包住“加载 UI + 原文本”
+  const wrapper = document.createElement('span');
+  wrapper.style.display = 'inline-block';
+  wrapper.style.position = 'relative';
+  wrapper.style.verticalAlign = 'baseline';
+
+  // ================== 顶部：进度条 + 百分比 ==================
+  const loadingBox = document.createElement('div');
+  loadingBox.style.display = 'flex';
+  loadingBox.style.flexDirection = 'column';
+  loadingBox.style.alignItems = 'center';
+  loadingBox.style.justifyContent = 'center';
+  loadingBox.style.fontSize = '0.85em';
+
+  // 进度条外框
+  const barOuter = document.createElement('div');
+  barOuter.style.position = 'relative';
+  barOuter.style.width = '140px';
+  barOuter.style.height = '8px';
+  barOuter.style.borderRadius = '999px';
+  barOuter.style.overflow = 'hidden';
+  barOuter.style.border = '1px solid rgba(255, 255, 255, 0.7)';
+  barOuter.style.background = 'rgba(255,255,255,0.08)';
+  barOuter.style.boxSizing = 'border-box';
+
+  // 进度条内部条
+  const barInner = document.createElement('div');
+  barInner.style.width = '0%';
+  barInner.style.height = '100%';
+  barInner.style.borderRadius = '999px';
+  barInner.style.background = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+  barInner.style.transition = 'width 0.08s linear';
+
+  barOuter.appendChild(barInner);
+
+  // 百分比文字
+  const percentText = document.createElement('div');
+  percentText.style.marginTop = '4px';
+  percentText.style.textAlign = 'center';
+  percentText.style.opacity = '0.9';
+  percentText.style.userSelect = 'none';
+  percentText.textContent = '加载中… 0%';
+
+  loadingBox.appendChild(barOuter);
+  loadingBox.appendChild(percentText);
+
+  // ================== 底部：原文本（先隐藏，后面淡入） ==================
+  const originalSpan = document.createElement('span');
+  originalSpan.innerHTML = originalHtml; // 保留原有标签/样式
+  originalSpan.style.display = 'inline-block';
+  originalSpan.style.marginTop = '6px';
+  originalSpan.style.opacity = '0';
+  originalSpan.style.transition = 'opacity 0.6s ease';
+
+  // ================== 拼装结构 ==================
+  targetEl.innerHTML = '';
+  wrapper.appendChild(loadingBox);
+  wrapper.appendChild(originalSpan);
+  targetEl.appendChild(wrapper);
+
+  // ================== 进度逻辑 ==================
+  let progress = 0;
+  const totalDuration = 2000; // 总加载时长（毫秒）
+  const step = 40;            // 定时器间隔（毫秒）
+  const inc = (100 * step) / totalDuration;
+
+  const timer = setInterval(() => {
+    progress += inc;
+    if (progress >= 100) {
+      progress = 100;
+    }
+
+    const showPercent = Math.round(progress);
+    barInner.style.width = showPercent + '%';
+    percentText.textContent = '加载中… ' + showPercent + '%';
+
+    if (progress >= 100) {
+      clearInterval(timer);
+
+      // 进度到 100%：改成“加载成功”
+      percentText.textContent = '加载成功';
+
+      // 稍作停顿，然后：上面的加载 UI 淡出，下面的原文本淡入
+      setTimeout(() => {
+        loadingBox.style.transition = 'opacity 0.6s ease';
+        loadingBox.style.opacity = '0';
+        originalSpan.style.opacity = '1';
+
+        // 动画结束后可以选择把 loadingBox 从 DOM 中移除
+        const cleanup = () => {
+          loadingBox.removeEventListener('transitionend', cleanup);
+          if (loadingBox.parentNode) {
+            loadingBox.parentNode.removeChild(loadingBox);
+          }
+        };
+        loadingBox.addEventListener('transitionend', cleanup);
+
+        // 兜底：防止某些浏览器不触发 transitionend
+        setTimeout(() => {
+          if (loadingBox.parentNode) {
+            loadingBox.parentNode.removeChild(loadingBox);
+          }
+        }, 900);
+      }, 400); // “加载成功” 停留 0.4s 再开始淡出
+    }
+  }, step);
 }
               </div>
             </div>
@@ -2585,31 +2695,52 @@ if (Array.isArray(work.effectsDraft)) {
         debugJsonEl.textContent = JSON.stringify(effectsDraft, null, 2);
       }
 
-      async function saveEffectsDraft(isPublish) {
-        if (!currentWorkId) {
-          alert('未选择作品');
-          return;
-        }
-        const fieldName = isPublish ? 'effectsPublished' : 'effectsDraft';
-        try {
-          const res = await fetch(API_BASE_URL + '/' + currentWorkId, {
-            method: 'PATCH',
-            headers: authHeaders(true),
-            body: JSON.stringify({ [fieldName]: effectsDraft })
-          });
-          const j = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            alert((isPublish ? '发布' : '保存草稿') + '失败：' + (j.message || res.status));
-            return;
-          }
-          alert(isPublish ? '特效已发布！（但是大概率阅读端还是显现不出来的，正在努力修bug中）' : '草稿已保存！');
-// 🔥 自动刷新数据，回填 UI
-enterEffectEditor(currentWorkId);
-        } catch (e) {
-          console.error(e);
-          alert((isPublish ? '发布' : '保存') + '失败，请检查网络');
-        }
+      // ⭐ 修改后：发布时同时更新 effectsDraft 和 effectsPublished
+async function saveEffectsDraft(isPublish) {
+  if (!currentWorkId) {
+    alert('未选择作品');
+    return;
+  }
+
+  // ⬇️ 这里改成根据 isPublish 构造不同的 payload
+  const payload = isPublish
+    ? {
+        // 发布时：既更新已发布配置，也同步一份到草稿
+        effectsDraft: effectsDraft,
+        effectsPublished: effectsDraft,
       }
+    : {
+        // 只保存草稿时：只动草稿字段
+        effectsDraft: effectsDraft,
+      };
+
+  try {
+    const res = await fetch(API_BASE_URL + '/' + currentWorkId, {
+      method: 'PATCH',
+      headers: authHeaders(true),
+      body: JSON.stringify(payload),
+    });
+
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert((isPublish ? '发布' : '保存草稿') + '失败：' + (j.message || res.status));
+      return;
+    }
+
+    alert(
+      isPublish
+        ? '特效已发布，并已同步保存为草稿！'
+        : '草稿已保存！'
+    );
+
+    // 🔥 自动刷新数据，回填 UI
+    enterEffectEditor(currentWorkId);
+  } catch (e) {
+    console.error(e);
+    alert((isPublish ? '发布' : '保存') + '失败，请检查网络');
+  }
+}
+
 
       saveDraftBtn.addEventListener('click', () => saveEffectsDraft(false));
       publishBtn.addEventListener('click', () => {

@@ -1339,6 +1339,63 @@
   text-align: center;
   cursor: pointer;
 }
+/* 左上角“展开”按钮 */
+.gallery-image-item .expand-btn {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+  z-index: 2;
+}
+/* 大图预览遮罩层 */
+.gallery-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 11000; /* 比图库弹窗略高 */
+}
+
+.gallery-preview-overlay.open {
+  display: flex;
+}
+
+.gallery-preview-content {
+  max-width: 90vw;
+  max-height: 90vh;
+  position: relative;
+}
+
+.gallery-preview-content img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+
+.gallery-preview-close {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 28px;
+}
 
   
 </style>
@@ -1635,20 +1692,28 @@
         </div>
 
         <div id="galleryModal" class="modal">
-            <div class="modal-content">
-                <h3>编辑图库</h3>
-                <div class="gallery-image-list" id="galleryImageList">
-                    <label for="imageUploadInput" class="add-image-btn">
-                        <span>+</span>
-                        <input type="file" id="imageUploadInput" accept="image/*" multiple style="display:none;">
-                    </label>
-                </div>
-                <div class="modal-buttons">
-                    <button class="cancel" id="cancelGalleryBtn">取消</button>
-                    <button class="confirm" id="confirmGalleryBtn">确认</button>
-                </div>
-            </div>
+    <div class="modal-content gallery-modal-content">
+        <h3>编辑图库</h3>
+        <div class="gallery-image-list" id="galleryImageList">
+            <label for="imageUploadInput" class="add-image-btn">
+                <span>+</span>
+                <input type="file" id="imageUploadInput" accept="image/*" multiple style="display:none;">
+            </label>
         </div>
+        <div class="modal-buttons">
+            <button class="cancel" id="cancelGalleryBtn">取消</button>
+            <button class="confirm" id="confirmGalleryBtn">确认</button>
+        </div>
+    </div>
+</div>
+
+      <!-- 新增：图库大图预览浮层 -->
+<div id="galleryPreviewOverlay" class="gallery-preview-overlay">
+  <div class="gallery-preview-content">
+    <button id="galleryPreviewClose" class="gallery-preview-close">×</button>
+    <img id="galleryPreviewImage" src="" alt="预览图片">
+  </div>
+</div>
 
         <div id="hiddenTextModal" class="modal hidden">
             <div class="modal-content hidden-text-modal-content">
@@ -1825,6 +1890,10 @@ let isSaving = false; // 防止多重保存请求
         const imageUploadInput = document.getElementById('imageUploadInput');
         const cancelGalleryBtn = document.getElementById('cancelGalleryBtn');
         const confirmGalleryBtn = document.getElementById('confirmGalleryBtn');
+      const galleryPreviewOverlay = document.getElementById('galleryPreviewOverlay');
+const galleryPreviewImage = document.getElementById('galleryPreviewImage');
+const galleryPreviewClose = document.getElementById('galleryPreviewClose');
+
 
   // ... 在其他变量定义之后
 
@@ -2730,6 +2799,31 @@ if (localSaveBtn) {
             return String(text).replace(/[&<>"']/g, function (m) { return map[m]; });
         }
 
+          // 显示图库大图预览
+    function showGalleryPreview(src, altText) {
+        if (!galleryPreviewOverlay || !galleryPreviewImage) return;
+        galleryPreviewImage.src = src;
+        galleryPreviewImage.alt = altText || '';
+        galleryPreviewOverlay.classList.add('open');
+    }
+
+    function hideGalleryPreview() {
+        if (!galleryPreviewOverlay) return;
+        galleryPreviewOverlay.classList.remove('open');
+    }
+
+    if (galleryPreviewClose && galleryPreviewOverlay) {
+        galleryPreviewClose.addEventListener('click', hideGalleryPreview);
+
+        // 点击遮罩空白区域也关闭
+        galleryPreviewOverlay.addEventListener('click', (e) => {
+            if (e.target === galleryPreviewOverlay) {
+                hideGalleryPreview();
+            }
+        });
+    }
+
+
 /* ---------- 发布（手动保存 + 禁用按钮）---------- */
 publishBtn.addEventListener('click', async () => {
     if (!currentWorkId) {
@@ -3253,11 +3347,12 @@ function renderGalleryImages() {
 
         const displayName = getImageNameFromUrl(imageUrl) || `图片 ${idx + 1}`;
 
-        imgItem.innerHTML = `
+                imgItem.innerHTML = `
             <div class="thumb-wrapper">
                 <img src="${imageUrl}" alt="${escapeHtml(displayName)}">
             </div>
             <div class="img-name">${escapeHtml(displayName)}</div>
+            <span class="expand-btn" title="放大预览">⤢</span>
             <span class="delete-btn">×</span>
         `;
 
@@ -3360,40 +3455,41 @@ async function uploadFileToImgBB(file) {
   }
 }
 
-// 图片删除与选择插入事件监听
-    galleryImageList.addEventListener('click', (e) => {
-        const target = e.target;
+// 图片删除 / 展开预览 / 选择插入 事件监听
+galleryImageList.addEventListener('click', (e) => {
+    const target = e.target;
 
-        // --- 逻辑 1：点击删除按钮 ---
-        if (target.classList.contains('delete-btn')) {
-            const item = target.closest('.gallery-image-item');
-            const imageUrl = item.querySelector('img').src;
-            // 从数组中删除对应的图片
-            galleryImages = galleryImages.filter(img => img !== imageUrl);
-            renderGalleryImages();
-        } 
-        // --- 逻辑 2：新增功能 - 点击图片本身 ---
-        else if (target.tagName === 'IMG') {
-            // 确保编辑器处于聚焦状态，并获取当前光标的位置
-            // getSelection(true) 会自动聚焦编辑器
-            const range = quill.getSelection(true);
-            if (range) {
-                // 在光标位置插入图片，target.src 就是被点击图片的 URL
-                quill.insertEmbed(range.index, 'image', target.src);
-                
-                // 插入图片后，将光标移动到图片之后，方便继续写作
-                quill.setSelection(range.index + 1);
+    // --- 逻辑 0：点击“展开”按钮 → 只预览，不插入编辑器 ---
+    if (target.classList.contains('expand-btn')) {
+        const item = target.closest('.gallery-image-item');
+        const imgEl = item && item.querySelector('img');
+        if (imgEl) {
+            showGalleryPreview(imgEl.src, imgEl.alt || '');
+        }
+        return; // 阻止后面继续执行
+    }
 
-                // 插入成功后，关闭图库弹窗，提升用户体验
-                galleryModal.style.display = 'none';
-                    // 新增：关闭弹窗时移除类，重新显示工具栏
-        document.body.classList.remove('modal-active');
-            } else {
-                // 如果因为某些原因无法获取光标位置，可以给个提示
-                alert('请先将光标定位到编辑器中需要插入图片的位置。');
-            }
-        }
-    });
+    // --- 逻辑 1：点击删除按钮 ---
+    if (target.classList.contains('delete-btn')) {
+        const item = target.closest('.gallery-image-item');
+        const imageUrl = item.querySelector('img').src;
+        galleryImages = galleryImages.filter(img => img !== imageUrl);
+        renderGalleryImages();
+    } 
+    // --- 逻辑 2：点击图片本身 → 插入到编辑器 ---
+    else if (target.tagName === 'IMG') {
+        const range = quill.getSelection(true);
+        if (range) {
+            quill.insertEmbed(range.index, 'image', target.src);
+            quill.setSelection(range.index + 1);
+            galleryModal.style.display = 'none';
+            document.body.classList.remove('modal-active');
+        } else {
+            alert('请先将光标定位到编辑器中需要插入图片的位置。');
+        }
+    }
+});
+
 
     // 取消按钮
     cancelGalleryBtn.addEventListener('click', () => {

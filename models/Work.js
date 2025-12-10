@@ -19,6 +19,54 @@ const pageSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now } // ✅ 新增
 });
 
+// 背景图片信息（仅用于特效配置，不是图库 Model）
+const bgImageSchema = new mongoose.Schema(
+  {
+    imageId: { type: String, required: true },   // 前端自己生成的 id，例如 'local-1'
+    name:    { type: String, required: true },   // 背景名称（你在「本地上传」时填的）
+    url:     { type: String, required: true },   // 图片 URL（可以是你的 /uploads/... 或 imgbb 链接）
+  },
+  { _id: false }
+);
+
+const bgBindingSchema = new mongoose.Schema(
+  {
+    imageId:   { type: String, required: true },
+    imageName: { type: String, required: true }, // 为了前端渲染方便，冗余一份名字
+    startLine: { type: Number, required: true }, // 起始句（按阅读端有效句子编号）
+    endLine:   { type: Number, required: true }, // 结束句
+  },
+  { _id: false }
+);
+
+const bgTransitionSchema = new mongoose.Schema(
+  {
+    fromLine:  { type: Number, required: true }, // 前一段背景的结束句
+    toLine:    { type: Number, required: true }, // 下一段背景的起始句
+    effectType:{ type: String, required: true }, // 'crossfade' | 'matrix' | 'ink' ...
+  },
+  { _id: false }
+);
+
+const bgConfigSchema = new mongoose.Schema(
+  {
+    images: {
+      type: [bgImageSchema],
+      default: [],
+    },
+    bindings: {
+      type: [bgBindingSchema],
+      default: [],
+    },
+    transitions: {
+      type: [bgTransitionSchema],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
+
 const workSchema = new mongoose.Schema({
     title: { type: String, required: true },
     content: {
@@ -64,9 +112,30 @@ effectsPublished: [
         effectType: { type: String, required: true }
     }
 ],
-    // ----------------------
+
+// ⭐ 新增：背景配置（草稿）
+backgroundDraft: {
+    type: bgConfigSchema,
+    default: () => ({
+        images: [],
+        bindings: [],
+        transitions: [],
+    }),
+},
+
+// ⭐ 新增：背景配置（已发布）
+backgroundPublished: {
+    type: bgConfigSchema,
+    default: () => ({
+        images: [],
+        bindings: [],
+        transitions: [],
+    }),
+},
+// ----------------------
 }, {
     timestamps: true
 });
+
 
 module.exports = mongoose.model('Work', workSchema);

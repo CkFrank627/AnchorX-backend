@@ -690,13 +690,19 @@ function getToken() {
     const data = await res.json();
 
     if (data.user && data.user.avatarUrl) {
-      const baseUrl = data.user.avatarUrl;
-      // 加个时间戳避免缓存，imgbb 也没问题
-      const newUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
-      avatarPreviewImg.src = newUrl;
-    } else {
-      avatarPreviewImg.src = DEFAULT_AVATAR_URL;
-    }
+  let baseUrl = data.user.avatarUrl;
+
+  // ✅ 兼容旧数据：avatarUrl 是 "/uploads/..." 时，拼到 API 域名上
+  if (baseUrl.startsWith('/uploads/')) {
+    baseUrl = `${API_BASE}${baseUrl}`;         // => https://api.anchorx.ca/uploads/avatars/xxx.png
+  }
+
+  const newUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+  avatarPreviewImg.src = newUrl;
+} else {
+  avatarPreviewImg.src = DEFAULT_AVATAR_URL;
+}
+
 
   } catch (e) {
     console.warn('加载头像失败:', e);
