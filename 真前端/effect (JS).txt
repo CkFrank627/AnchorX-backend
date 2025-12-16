@@ -1,0 +1,1443 @@
+  </style>
+
+  <!-- ⭐ JS：作品列表 + 特效编辑逻辑 -->
+  <script>
+    // 和 write 保持一致的 API 地址
+    const API_BASE_URL = 'https://api.anchorx.ca/api/works';
+     const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects'; // ⭐ 新增这一行
+      const IMGBB_API_KEY = '040dbc9e6e680f321e09d9e05f447094';
+    const WORK_UPLOAD_URL = 'https://api.anchorx.ca/api/works/upload';
+
+    // 生成带 Authorization 的请求头
+    function authHeaders(json) {
+      const h = { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') };
+      if (json) h['Content-Type'] = 'application/json';
+      return h;
+    }
+
+    // Delta -> 纯文本（用于自动按行拆）
+    function deltaToPlainText(delta) {
+      if (!delta || typeof delta !== 'object' || !Array.isArray(delta.ops)) return '';
+      let text = '';
+      delta.ops.forEach(op => {
+        if (typeof op.insert === 'string') text += op.insert;
+      });
+      return text;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const listPage = document.getElementById('effect-list-page');
+      const editorPage = document.getElementById('effect-editor-page');
+      const workListEl = document.getElementById('effect-work-list');
+      const workCountEl = document.getElementById('effect-work-count');
+
+      const backBtn = document.getElementById('effect-back-btn');
+      const editorTitleEl = document.getElementById('effect-editor-title');
+
+      const lineListEl = document.getElementById('effect-line-list');
+      const selectedLineLabel = document.getElementById('effect-selected-line-label');
+      const debugJsonEl = document.getElementById('effect-debug-json');
+
+      const previewBtn = document.getElementById('effect-preview-btn');
+      const saveDraftBtn = document.getElementById('effect-save-draft-btn');
+      const publishBtn = document.getElementById('effect-publish-btn');
+      const removeEffectBtn = document.getElementById('effect-remove-btn');
+
+      // ====== 模式 / 背景图库相关 ======
+let currentEffectMode = 'text'; // 'text' | 'background'
+
+const effectToolbarTipPrefix = document.getElementById('effect-toolbar-tip-prefix');
+const effectInsertLabel      = document.getElementById('effect-insert-label');
+const textEffectGroup        = document.getElementById('text-effect-toolbar-group');
+const bgEffectGroup          = document.getElementById('bg-effect-toolbar-group');
+const bgPanel                = document.getElementById('bg-panel');
+
+const bgUploadLocalBtn   = document.getElementById('bg-upload-local-btn');
+const bgUploadInput      = document.getElementById('bg-upload-input');
+const bgAddFromSharedBtn = document.getElementById('bg-add-from-shared-btn');
+const bgRemoveImageBtn   = document.getElementById('bg-remove-image-btn');
+const bgImageListEl      = document.getElementById('bg-image-list');
+
+// 背景相关数据结构
+let bgImages = [];      // [{ id, name, url }]
+let bgBindings = [];    // [{ imageId, imageName, startLine, endLine }]
+let bgTransitions = []; // [{ fromLine, toLine, effectType }]
+
+let bgSelectionPhase = 'idle'; // 'idle' | 'chooseStart' | 'chooseEnd' | 'chooseTransitionEnd'
+let currentBgImageId   = null;
+let currentBgImageName = '';
+let bgTempStartLine    = null;
+let currentTransitionEffectType = null;
+let bgImageAutoId = 1;
+
+      // ⭐ 新增：自定义特效管理页 DOM
+      const customEffectPage = document.getElementById('custom-effect-page');
+      const customEffectManageBtn = document.getElementById('custom-effect-manage-btn');
+      const customEffectBackBtn = document.getElementById('custom-effect-back-btn');
+      const customEffectNewBtn = document.getElementById('custom-effect-new-btn');
+      const customEffectListEl = document.getElementById('custom-effect-list');
+      const customEffectEmptyTip = document.getElementById('custom-effect-empty-tip');
+      const customEffectEditorTitle = document.getElementById('custom-effect-editor-title');
+      const customEffectNameInput = document.getElementById('custom-effect-name-input');
+      const customEffectKeyInput = document.getElementById('custom-effect-key-input');
+      const customEffectCodeInput = document.getElementById('custom-effect-code-input');
+      const customEffectSaveBtn = document.getElementById('custom-effect-save-btn');
+      const customEffectEditorPanel = document.getElementById('custom-effect-editor-panel'); // ⭐ 新增
+      const customEffectDeleteBtn = document.getElementById('custom-effect-delete-btn');
+
+      // ⭐ 新增：编辑器顶部自定义特效下拉 DOM
+      const customEffectToggleBtn = document.getElementById('custom-effect-toggle-btn');
+      const customEffectDropdownPanel = document.getElementById('custom-effect-dropdown-panel');
+      const customEffectDropdownClose = document.getElementById('custom-effect-dropdown-close');
+      const customEffectDropdownList = document.getElementById('custom-effect-dropdown-list');
+      const customEffectOpenManageBtn = document.getElementById('custom-effect-open-manage-btn');
+
+      let currentWorkId = null;
+      let currentLines = [];         // 所有行文本（包含空行）
+      let rawToEffectiveIndex = [];  // 原始行号 -> “阅读端句子编号”（空行为 null）
+      let selectedLineIndex = null;  // 当前选中行（按“有效句子编号”计数）
+      let effectsDraft = [];         // [{ lineIndex, effectType }]，lineIndex 存的是“有效句子编号”
+      let isPreviewing = false;
+
+
+       // ⭐ 新增：自定义特效状态
+      let customEffects = [];
+      let currentCustomEffectId = null;
+      const DEFAULT_SAMPLE_CODE =
+`/**
+ * 约定：系统将来会把当前句子的 DOM 元素传入这个函数
+ * 你只需要实现 applyEffect(targetEl) 即可
+ */
+function applyEffect(targetEl) {
+  // 示例：给句子加上「effect-shake」类，让它晃动一下
+  targetEl.classList.add('effect-shake');
+  setTimeout(() => {
+    targetEl.classList.remove('effect-shake');
+  }, 600);
+}`;
+
+      /* ---------- 作品相关 ---------- */
+
+      async function fetchMyWorks() {
+        try {
+          const res = await fetch(API_BASE_URL, { headers: authHeaders(false) });
+          if (res.status === 401) {
+            alert('登录已失效，请重新登录');
+            window.location.href = 'https://zhidianworld.com/login/';
+            return [];
+          }
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            alert('获取作品失败：' + (j.message || res.status));
+            return [];
+          }
+          return await res.json();
+        } catch (e) {
+          console.error(e);
+          alert('网络错误，无法加载作品');
+          return [];
+        }
+      }
+
+      async function loadWorkList() {
+  workListEl.innerHTML = '<p style="text-align:center;color:#999;margin-top:50px;">正在加载作品...</p>';
+  const works = await fetchMyWorks();
+  if (!works || works.length === 0) {
+    workListEl.innerHTML = '<p style="text-align:center;color:#999;margin-top:50px;">暂无作品。</p>';
+    workCountEl.textContent = '0';
+    return;
+  }
+
+  workListEl.innerHTML = '';
+  works.forEach(w => {
+    const div = document.createElement('div');
+    div.className = 'work-item-wrapper';
+    div.dataset.id = w._id;
+    div.innerHTML = `
+      <div class="work-item">
+        <div class="work-info">
+          <div class="work-date">${new Date(w.updatedAt).toLocaleString()}</div>
+          <div class="work-details">
+            <span class="work-title">${w.title}</span>
+          </div>
+        </div>
+
+        <div class="work-actions">
+          <button class="create-button" data-action="edit-text-effects">
+            编辑文字特效
+          </button>
+          <button class="create-button work-bg-button" data-action="edit-bg-effects">
+            编辑背景特效
+          </button>
+        </div>
+      </div>
+    `;
+    workListEl.appendChild(div);
+  });
+  workCountEl.textContent = String(works.length);
+}
+
+
+      workListEl.addEventListener('click', async e => {
+  const textBtn = e.target.closest('[data-action="edit-text-effects"]');
+  const bgBtn   = e.target.closest('[data-action="edit-bg-effects"]');
+  const btn = textBtn || bgBtn;
+  if (!btn) return;
+
+  const wrapper = btn.closest('.work-item-wrapper');
+  if (!wrapper) return;
+  const id = wrapper.dataset.id;
+
+  const mode = bgBtn ? 'background' : 'text';
+  await enterEffectEditor(id, mode);
+});
+
+      /* ---------- 进入特效编辑器 ---------- */
+
+      async function fetchWorkById(id) {
+        try {
+          const res = await fetch(API_BASE_URL + '/' + id, { headers: authHeaders(false) });
+          if (!res.ok) {
+            throw new Error('加载失败');
+          }
+          return await res.json();
+        } catch (e) {
+          console.error(e);
+          alert('加载作品失败');
+          return null;
+        }
+      }
+
+      async function enterEffectEditor(workId, mode = 'text') {
+        const work = await fetchWorkById(workId);
+        if (!work) return;
+
+        currentWorkId = workId;
+        setEditorMode(mode);
+        editorTitleEl.textContent = work.title || '';
+        // 读取已有草稿/已发布特效（如果你在后端加了字段）
+        // 优先加载 effectsDraft；若草稿为空则加载已发布
+// ⭐ 正确逻辑：只要 effectsDraft 字段存在，就使用它（即使为空数组也是有效草稿）
+//    只有字段不存在（undefined）时，才 fallback 使用 effectsPublished
+if (Array.isArray(work.effectsDraft)) {
+    effectsDraft = work.effectsDraft.map(e => ({
+        lineIndex: e.lineIndex,
+        effectType: e.effectType
+    }));
+} else if (Array.isArray(work.effectsPublished)) {
+    effectsDraft = work.effectsPublished.map(e => ({
+        lineIndex: e.lineIndex,
+        effectType: e.effectType
+    }));
+} else {
+    effectsDraft = [];
+}
+
+// ===== 背景配置：优先用 backgroundDraft，若未定义再 fallback 到 backgroundPublished =====
+// ===== 背景配置：优先用 backgroundDraft，若未定义再 fallback 到 backgroundPublished =====
+function pickBackgroundConfig(work) {
+  if (work.backgroundDraft && typeof work.backgroundDraft === 'object') {
+    return work.backgroundDraft;
+  }
+  if (work.backgroundPublished && typeof work.backgroundPublished === 'object') {
+    return work.backgroundPublished;
+  }
+  return { images: [], bindings: [], transitions: [] };
+}
+
+const bgCfg = pickBackgroundConfig(work);
+
+// ---------- 把接口里的 backgroundXXX 映射成前端内部使用的结构 ----------
+// 内部约定：
+//   bgImages:     [{ id, name, url }]
+//   bgBindings:   [{ imageId, imageName, startLine, endLine }]
+//   bgTransitions:[{ fromLine, toLine, effectType }]
+
+// 1）图片列表
+if (Array.isArray(bgCfg.images) && bgCfg.images.length > 0) {
+  bgImages = bgCfg.images.map(function (img, idx) {
+    // 兼容老数据：可能只有 name+url，或者只有 imageId
+    var id = img.id || img.imageId;
+    if (!id) {
+      // 老数据完全没有 id，就按顺序补一个
+      id = 'bg-' + String(idx + 1);
+    }
+    return {
+      id: id,
+      // 顺手把 imageId 也带一份，方便调试
+      imageId: id,
+      name: img.name || img.imageName || '',
+      url: img.url || ''
+    };
+  });
+
+  // 根据已有 id 计算下一个自增值：bgImageAutoId
+  var maxNum = 0;
+  bgImages.forEach(function (img) {
+    var m = String(img.id).match(/^bg-(\d+)$/);
+    if (m) {
+      var n = parseInt(m[1], 10);
+      if (n > maxNum) maxNum = n;
+    }
+  });
+  bgImageAutoId = maxNum + 1;
+
+  // 默认选中第一张，方便后面绑定
+  currentBgImageId = bgImages[0] ? bgImages[0].id : null;
+} else {
+  bgImages = [];
+  bgImageAutoId = 1;
+  currentBgImageId = null;
+}
+
+// 2）绑定区间
+bgBindings = Array.isArray(bgCfg.bindings)
+  ? bgCfg.bindings.map(function (b) {
+      return {
+        imageId: b.imageId,
+        imageName: b.imageName || '',
+        startLine: Number(b.startLine),
+        endLine: Number(b.endLine),
+      };
+    })
+  : [];
+
+// 3）转场特效
+bgTransitions = Array.isArray(bgCfg.transitions)
+  ? bgCfg.transitions.map(function (t) {
+      return {
+        fromLine: Number(t.fromLine),
+        toLine: Number(t.toLine),
+        effectType: t.effectType || 'crossfade',
+      };
+    })
+  : [];
+
+// 4）把数据回填到右侧背景面板
+renderBgImageList();
+renderBgBindingList();
+renderBgTransitionList();
+
+
+        // 合并所有页面文本
+        const pages = Array.isArray(work.content) ? work.content : [];
+        let fullText = '';
+        pages.forEach((p, idx) => {
+          const t = deltaToPlainText(p.content || {});
+          if (idx > 0) fullText += '\n';       // 页面之间也换一行
+          fullText += t;
+        });
+
+        currentLines = fullText.split(/\r?\n/);
+
+        renderLineList();
+        updateDebugJson();
+
+        listPage.classList.add('hidden');
+        customEffectPage.classList.add('hidden');  // ⭐ 新增
+        editorPage.classList.remove('hidden');
+      }
+
+      backBtn.addEventListener('click', () => {
+        editorPage.classList.add('hidden');
+        listPage.classList.remove('hidden');
+        currentWorkId = null;
+        currentLines = [];
+        effectsDraft = [];
+        selectedLineIndex = null;
+        isPreviewing = false;
+        lineListEl.innerHTML = '';
+        selectedLineLabel.textContent = '无';
+        previewBtn.textContent = '预览特效';
+      });
+
+      /* ---------- 行列表 / 选中行 / 设置特效 ---------- */
+
+      function bgEffectLabel(type) {
+  switch (type) {
+    case 'crossfade': return '交叉淡入淡出';
+    case 'matrix':    return '矩阵';
+    case 'ink':       return '墨染';
+    default:          return type || '背景变化';
+  }
+}
+
+function renderLineList() {
+  lineListEl.innerHTML = '';
+
+  if (!currentLines || currentLines.length === 0) {
+    lineListEl.innerHTML = '<li>暂无内容，请先在创作端写作。</li>';
+    return;
+  }
+
+  rawToEffectiveIndex = [];
+  let effIndexCounter = 0;
+
+  currentLines.forEach((line, rawIdx) => {
+    const trimmed = line.replace(/\r?\n$/, '');
+    let effIndex = null;
+    if (trimmed.trim()) {
+      effIndex = effIndexCounter++;
+    }
+    rawToEffectiveIndex[rawIdx] = effIndex;
+
+    const li = document.createElement('li');
+    li.className = 'effect-line-item';
+    li.dataset.index = String(rawIdx);
+    if (effIndex != null) li.dataset.effIndex = String(effIndex);
+
+    const displayNum  = effIndex != null ? (effIndex + 1) : '-';
+    const displayText = trimmed ? trimmed : '（空行）';
+
+    const tags = [];
+
+    // 文字特效 tag
+    if (effIndex != null) {
+      const tag = effectsDraft.find(e => e.lineIndex === effIndex);
+      if (tag) {
+        tags.push(`<span class="effect-tag">${escapeHtml(effectTypeLabel(tag.effectType))}</span>`);
+      }
+
+      // 背景起始 / 结束 tag
+      const bindingsForLine = bgBindings.filter(
+        b => b.startLine === effIndex || b.endLine === effIndex
+      );
+      bindingsForLine.forEach(b => {
+        const isStart = b.startLine === effIndex;
+        const label = (isStart ? '起始' : '结束') + `：【${escapeHtml(b.imageName)}】`;
+        tags.push(
+          `<span class="bg-tag ${isStart ? 'bg-tag-start' : 'bg-tag-end'}">${label}</span>`
+        );
+      });
+    }
+
+    const tagsHtml = tags.join(' ');
+
+    li.innerHTML = `
+      <span class="effect-line-num">${displayNum}</span>
+      <span class="effect-line-text">${escapeHtml(displayText)}</span>
+      <span class="effect-line-tags">${tagsHtml}</span>
+    `;
+    lineListEl.appendChild(li);
+
+    // 在这一行后面插入背景转场行（fromLine = 当前句）
+    if (effIndex != null) {
+      const transitions = bgTransitions.filter(t => t.fromLine === effIndex);
+      transitions.forEach(t => {
+        const trLi = document.createElement('li');
+        trLi.className = 'bg-transition-item';
+        trLi.dataset.from = String(t.fromLine);
+        trLi.dataset.to   = String(t.toLine);
+        trLi.textContent  = `【${bgEffectLabel(t.effectType)}】`;
+        lineListEl.appendChild(trLi);
+      });
+    }
+  });
+
+  // 文字模式下，重新高亮当前行
+  if (currentEffectMode === 'text' && selectedLineIndex != null) {
+    document.querySelectorAll('.effect-line-item').forEach(li => {
+      li.classList.remove('selected');
+      if (String(selectedLineIndex) === li.dataset.effIndex) {
+        li.classList.add('selected');
+      }
+    });
+  }
+}
+
+
+      function setEditorMode(mode) {
+  currentEffectMode = mode === 'background' ? 'background' : 'text';
+
+  if (currentEffectMode === 'text') {
+    effectToolbarTipPrefix.textContent = '当前选中行：';
+    selectedLineLabel.textContent = selectedLineIndex == null
+      ? '无'
+      : `第 ${selectedLineIndex + 1} 句（按阅读端计数）`;
+
+    effectInsertLabel.textContent = '插入特效：';
+    textEffectGroup.classList.remove('hidden');
+    bgEffectGroup.classList.add('hidden');
+    bgPanel.classList.add('hidden');
+
+  } else {
+    // 背景模式：提示行完全由 selectedLineLabel 文本负责
+    effectToolbarTipPrefix.textContent = '';
+    selectedLineLabel.textContent = '请选择一个背景图片';
+
+    effectInsertLabel.textContent = '插入背景变化特效：';
+    textEffectGroup.classList.add('hidden');
+    bgEffectGroup.classList.remove('hidden');
+    bgPanel.classList.remove('hidden');
+
+    // 进入背景模式时不再强调“当前选中行”
+    selectedLineIndex = null;
+    document.querySelectorAll('.effect-line-item.selected')
+      .forEach(li => li.classList.remove('selected'));
+  }
+}
+
+      // 把 File 对象转成 base64 纯数据（不带 data:image/... 前缀）
+function fileToBase64Data(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target.result; // data:image/png;base64,xxxx
+      const parts = String(result).split(',');
+      if (parts.length < 2) {
+        return reject(new Error('读取文件失败，base64 格式不正确'));
+      }
+      resolve(parts[1]); // 只要逗号后面的 base64 部分
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+      // ⭐ 上传背景图片到自己服务器的 /api/works/upload，返回 { url, name }
+async function uploadBgImageToServer(file, name) {
+  // 1️⃣ 组装 FormData
+  const formData = new FormData();
+  formData.append('image', file);
+
+  // 2️⃣ 发送到后端
+  const res = await fetch(WORK_UPLOAD_URL, {
+    method: 'POST',
+    // 这个接口目前不校验登录的话，可以不带头；带上 Authorization 也没关系：
+    // headers: authHeaders(false),
+    body: formData,
+  });
+
+  const data = await res.json().catch(function () { return {}; });
+
+  if (!res.ok) {
+    throw new Error(data.message || '上传失败');
+  }
+
+  if (!data.imageUrl) {
+    throw new Error('服务器未返回 imageUrl');
+  }
+
+  // 为了和之前代码一致，这里也返回 { url, name }
+  return {
+    url: data.imageUrl,        // 例如 https://api.anchorx.ca/uploads/image-1759....jpg
+    name: name || '',
+  };
+}
+
+      
+// ⭐ 上传背景图片到 imgbb，返回 { url, name } 已经舍弃！！！
+async function uploadBgImageToImgbb(file, name) {
+  if (!IMGBB_API_KEY || IMGBB_API_KEY === '在 imgBB 后台复制来的完整 API Key') {
+    throw new Error('尚未配置 IMGBB_API_KEY');
+  }
+
+  // 1️⃣ 读取成 base64
+  const base64Data = await fileToBase64Data(file);
+
+  // 2️⃣ 发送到 imgbb
+  const formData = new FormData();
+  formData.append('image', base64Data);
+  if (name) {
+    formData.append('name', name);
+  }
+
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data || !data.success) {
+    console.error('imgbb 上传失败:', data);
+    throw new Error('上传到图床失败');
+  }
+
+  const d = data.data;
+  const url = d.display_url || d.url;
+  const finalName = name || d.title || '背景图片';
+
+  if (!url) {
+    throw new Error('图床未返回有效图片链接');
+  }
+
+  return { url, name: finalName };
+}
+
+            /* ---------- 自定义特效：与后端交互 ---------- */
+
+      async function fetchCustomEffects() {
+        try {
+          const res = await fetch(EFFECT_API_BASE_URL, {
+            headers: authHeaders(false),
+          });
+          if (res.status === 401) {
+            alert('请先登录后再使用自定义特效功能');
+            return [];
+          }
+          const j = await res.json().catch(() => []);
+          if (!res.ok) {
+            alert('获取自定义特效失败：' + (j.message || res.status));
+            return [];
+          }
+          customEffects = Array.isArray(j) ? j : [];
+          return customEffects;
+        } catch (e) {
+          console.error(e);
+          alert('网络错误，无法加载自定义特效');
+          return [];
+        }
+      }
+
+            async function fetchCustomEffects() {
+        try {
+          const res = await fetch(EFFECT_API_BASE_URL, {
+            headers: authHeaders(false),
+          });
+          if (res.status === 401) {
+            alert('请先登录后再使用自定义特效功能');
+            return [];
+          }
+          const j = await res.json().catch(() => []);
+          if (!res.ok) {
+            alert('获取自定义特效失败：' + (j.message || res.status));
+            return [];
+          }
+          customEffects = Array.isArray(j) ? j : [];
+          return customEffects;
+        } catch (e) {
+          console.error(e);
+          alert('网络错误，无法加载自定义特效');
+          return [];
+        }
+      }
+
+      function renderCustomEffectManageList() {
+        // ... 你的原代码 ...
+      }
+
+      // ⭐ 新增：根据 key 在当前 customEffects 里找到代码并执行 applyEffect
+      function runCustomEffectOnElement(effectKey, targetEl) {
+        if (!effectKey || !targetEl) return;
+        const effect = customEffects.find(e => e.key === effectKey);
+        if (!effect || !effect.code) return;
+
+        try {
+          const wrapped = new Function(
+            'targetEl',
+            effect.code + `
+              if (typeof applyEffect === 'function') {
+                applyEffect(targetEl);
+              }
+            `
+          );
+          wrapped(targetEl);
+        } catch (err) {
+          console.error('自定义特效执行失败:', err);
+        }
+      }
+
+
+      function renderCustomEffectManageList() {
+        customEffectListEl.innerHTML = '';
+
+        if (!customEffects.length) {
+          customEffectEmptyTip.style.display = 'block';
+          return;
+        }
+        customEffectEmptyTip.style.display = 'none';
+
+        customEffects.forEach(effect => {
+          const li = document.createElement('li');
+          li.className = 'custom-effect-item' + (effect._id === currentCustomEffectId ? ' active' : '');
+          li.dataset.id = effect._id;
+          li.innerHTML = `
+            <span class="custom-effect-name">${escapeHtml(effect.name || '(未命名特效)')}</span>
+            <span class="custom-effect-meta">${escapeHtml(effect.key || '')}</span>
+          `;
+          customEffectListEl.appendChild(li);
+        });
+      }
+
+      function resetCustomEffectEditorToEmpty() {
+  currentCustomEffectId = null;
+  customEffectNameInput.value = '';
+  customEffectKeyInput.value = '';
+  customEffectCodeInput.value = '';
+  customEffectEditorTitle.textContent = '请选择左侧特效，或点击“新建自定义特效”';
+
+  // ⭐ 默认隐藏右侧编辑器
+  if (customEffectEditorPanel) {
+    customEffectEditorPanel.classList.add('hidden');
+  }
+}
+
+
+      async function openCustomEffectPage() {
+        listPage.classList.add('hidden');
+        editorPage.classList.add('hidden');
+        customEffectPage.classList.remove('hidden');
+
+        resetCustomEffectEditorToEmpty();
+        await fetchCustomEffects();
+        renderCustomEffectManageList();
+      }
+
+      /* ---------- 自定义特效管理页：事件绑定 ---------- */
+
+      if (customEffectManageBtn) {
+        customEffectManageBtn.addEventListener('click', () => {
+          openCustomEffectPage();
+        });
+      }
+
+      if (customEffectBackBtn) {
+        customEffectBackBtn.addEventListener('click', () => {
+          customEffectPage.classList.add('hidden');
+          editorPage.classList.add('hidden');
+          listPage.classList.remove('hidden');
+        });
+      }
+
+      if (customEffectNewBtn) {
+  customEffectNewBtn.addEventListener('click', () => {
+    currentCustomEffectId = null;
+    customEffectNameInput.value = '';
+    customEffectKeyInput.value = '';
+    customEffectCodeInput.value = DEFAULT_SAMPLE_CODE;
+    customEffectEditorTitle.textContent = '新建自定义特效';
+
+    // ⭐ 显示编辑器
+    if (customEffectEditorPanel) {
+      customEffectEditorPanel.classList.remove('hidden');
+    }
+
+    renderCustomEffectManageList();
+  });
+}
+
+
+      customEffectListEl.addEventListener('click', (e) => {
+  const item = e.target.closest('.custom-effect-item');
+  if (!item) return;
+
+  const id = item.dataset.id;
+  const effect = customEffects.find(x => x._id === id);
+  if (!effect) return;
+
+  currentCustomEffectId = id;
+  customEffectNameInput.value = effect.name || '';
+  customEffectKeyInput.value = effect.key || '';
+  customEffectCodeInput.value = effect.code || '';
+  customEffectEditorTitle.textContent = '正在编辑：' + (effect.name || '(未命名特效)');
+
+  // ⭐ 显示编辑器
+  if (customEffectEditorPanel) {
+    customEffectEditorPanel.classList.remove('hidden');
+  }
+
+  renderCustomEffectManageList();
+});
+
+
+      if (customEffectSaveBtn) {
+        customEffectSaveBtn.addEventListener('click', async () => {
+          const name = customEffectNameInput.value.trim();
+          const key = customEffectKeyInput.value.trim();
+          const code = customEffectCodeInput.value;
+
+          if (!name || !key || !code.trim()) {
+            alert('名称、key 和代码都不能为空');
+            return;
+          }
+
+          const payload = { name, key, code };
+
+          try {
+            let res;
+            if (currentCustomEffectId) {
+              res = await fetch(`${EFFECT_API_BASE_URL}/${currentCustomEffectId}`, {
+                method: 'PATCH',
+                headers: authHeaders(true),
+                body: JSON.stringify(payload),
+              });
+            } else {
+              res = await fetch(EFFECT_API_BASE_URL, {
+                method: 'POST',
+                headers: authHeaders(true),
+                body: JSON.stringify(payload),
+              });
+            }
+
+            const j = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              alert('保存自定义特效失败：' + (j.message || res.status));
+              return;
+            }
+
+            alert('自定义特效已保存！');
+
+            // 更新当前 id（新建时返回的 _id）
+            if (j && j._id) {
+              currentCustomEffectId = j._id;
+            }
+
+            await fetchCustomEffects();
+            renderCustomEffectManageList();
+          } catch (err) {
+            console.error(err);
+            alert('保存失败，请检查网络');
+          }
+        });
+      }
+
+      if (customEffectDeleteBtn) {
+        customEffectDeleteBtn.addEventListener('click', async () => {
+          if (!currentCustomEffectId) {
+            alert('请先在左侧选择一个要删除的自定义特效');
+            return;
+          }
+          if (!confirm('确定删除当前自定义特效？该操作不可恢复。')) return;
+
+          try {
+            const res = await fetch(`${EFFECT_API_BASE_URL}/${currentCustomEffectId}`, {
+              method: 'DELETE',
+              headers: authHeaders(false),
+            });
+            const j = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              alert('删除失败：' + (j.message || res.status));
+              return;
+            }
+
+            alert('自定义特效已删除');
+            resetCustomEffectEditorToEmpty();
+            await fetchCustomEffects();
+            renderCustomEffectManageList();
+          } catch (err) {
+            console.error(err);
+            alert('删除失败，请检查网络');
+          }
+        });
+      }
+
+      /* ---------- 编辑器顶部：展开自定义特效下拉 ---------- */
+
+      function renderCustomEffectDropdownList() {
+        customEffectDropdownList.innerHTML = '';
+
+        if (!customEffects.length) {
+          const li = document.createElement('li');
+          li.innerHTML = '<span style="font-size:0.8rem;color:#999;">暂无自定义特效，请点击下方“管理自定义特效”新建。</span>';
+          customEffectDropdownList.appendChild(li);
+          return;
+        }
+
+        customEffects.forEach(effect => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <button type="button" data-effect-key="${effect.key}">
+              ${escapeHtml(effect.name || '(未命名特效)')} (${escapeHtml(effect.key)})
+            </button>
+          `;
+          customEffectDropdownList.appendChild(li);
+        });
+      }
+
+      if (customEffectToggleBtn) {
+        customEffectToggleBtn.addEventListener('click', async () => {
+          const isHidden = customEffectDropdownPanel.classList.contains('hidden');
+          if (isHidden) {
+            await fetchCustomEffects();
+            renderCustomEffectDropdownList();
+            customEffectDropdownPanel.classList.remove('hidden');
+          } else {
+            customEffectDropdownPanel.classList.add('hidden');
+          }
+        });
+      }
+
+      if (customEffectDropdownClose) {
+        customEffectDropdownClose.addEventListener('click', () => {
+          customEffectDropdownPanel.classList.add('hidden');
+        });
+      }
+
+      customEffectDropdownList.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-effect-key]');
+        if (!btn) return;
+
+        if (selectedLineIndex == null) {
+          alert('请先点击左侧某一行，再应用自定义特效');
+          return;
+        }
+
+        const key = btn.dataset.effectKey;
+        if (!key) return;
+
+        // ⭐ 约定：自定义特效在 effectsDraft 中的标记方式
+        const effectType = 'custom:' + key;
+
+        setEffectForLine(selectedLineIndex, effectType);
+      });
+
+      if (customEffectOpenManageBtn) {
+        customEffectOpenManageBtn.addEventListener('click', () => {
+          customEffectDropdownPanel.classList.add('hidden');
+          openCustomEffectPage();
+        });
+      }
+
+      
+      function escapeHtml(str) {
+        return str.replace(/[&<>"']/g, s => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[s]));
+      }
+
+            function effectTypeLabel(type) {
+        if (!type) return '';
+
+        // ⭐ 新增：custom:xxx 类型的显示
+        if (typeof type === 'string' && type.startsWith('custom:')) {
+          const key = type.slice('custom:'.length) || '';
+          return '自定义：' + key;
+        }
+
+        switch (type) {
+          case 'shake': return '震动';
+          case 'flash': return '闪烁';
+          case 'fade': return '淡入';
+          case 'highlight': return '高亮';
+          default: return type;
+        }
+      }
+
+
+            lineListEl.addEventListener('click', e => {
+  const item = e.target.closest('.effect-line-item');
+  if (!item) return;
+
+  const effStr = item.dataset.effIndex;
+  if (!effStr && effStr !== '0') {
+    alert('该行为空行或不可设置特效');
+    return;
+  }
+  const effIdx = Number(effStr);
+  if (Number.isNaN(effIdx)) return;
+
+  if (currentEffectMode === 'text') {
+    // ===== 文字特效模式：保留原来的行为 =====
+    selectedLineIndex = effIdx;
+
+    document.querySelectorAll('.effect-line-item').forEach(li => {
+      li.classList.remove('selected');
+    });
+    item.classList.add('selected');
+
+    selectedLineLabel.textContent = `第 ${effIdx + 1} 句（按阅读端计数）`;
+    return;
+  }
+
+  // ===== 背景特效模式 =====
+  // 背景模式下不使用 selectedLineIndex 高亮，用提示行 + 起始/结束 tag
+  document.querySelectorAll('.effect-line-item').forEach(li => {
+    li.classList.remove('selected');
+  });
+  item.classList.add('selected');
+
+  if (bgSelectionPhase === 'chooseStart') {
+    // 选择起始句
+    bgTempStartLine = effIdx;
+    bgSelectionPhase = 'chooseEnd';
+    selectedLineLabel.textContent = `请选中背景结束应用的句子（当前起始：第 ${effIdx + 1} 句）`;
+    return;
+  }
+
+  if (bgSelectionPhase === 'chooseEnd') {
+    // 选择结束句
+    if (bgTempStartLine == null || currentBgImageId == null) {
+      alert('请选择背景图片，并重新选择起始句。');
+      resetBgSelectionState();
+      return;
+    }
+    if (effIdx < bgTempStartLine) {
+      alert('结束句必须在起始句之后。');
+      return;
+    }
+
+    // 检查是否与现有背景区间重叠
+    const newStart = bgTempStartLine;
+    const newEnd   = effIdx;
+    const overlap = bgBindings.some(b =>
+      !(newEnd < b.startLine || newStart > b.endLine)
+    );
+    if (overlap) {
+      alert('起始句和结束句之间已经有其它背景区间，不能叠加设置。');
+      return;
+    }
+
+    bgBindings.push({
+      imageId:   currentBgImageId,
+      imageName: currentBgImageName,
+      startLine: newStart,
+      endLine:   newEnd,
+    });
+
+    renderLineList();
+    updateDebugJson();
+    resetBgSelectionState();
+    return;
+  }
+
+  if (bgSelectionPhase === 'chooseTransitionEnd') {
+    // 选择“结束句”（上一段背景的结束句）
+    const bindAsEnd = bgBindings.find(b => b.endLine === effIdx);
+    if (!bindAsEnd) {
+      alert('这一句还没有作为背景的结束句，请先完成背景区间设置。');
+      return;
+    }
+
+    // 找“下一句”有新的起始句（忽略空行 → 我们用 startLine > endLine 来找）
+    const nextBinding = bgBindings
+      .filter(b => b.startLine > effIdx)
+      .sort((a, b) => a.startLine - b.startLine)[0];
+
+    if (!nextBinding) {
+      alert('请先把下一个非空行设置出背景，然后再设置背景变化特效。');
+      return;
+    }
+
+    bgTransitions.push({
+      fromLine: effIdx,
+      toLine:   nextBinding.startLine,
+      effectType: currentTransitionEffectType || 'crossfade',
+    });
+
+    renderLineList();
+    updateDebugJson();
+    resetBgSelectionState();
+    return;
+  }
+
+  // 其它情况：比如 idle
+  if (bgImages.length === 0) {
+    selectedLineLabel.textContent = '请先在右侧上传一张背景图片';
+  } else {
+    selectedLineLabel.textContent = '请先在右侧选择一张背景图片';
+  }
+});
+
+function resetBgSelectionState() {
+  bgSelectionPhase = 'idle';
+  currentBgImageId = null;
+  currentBgImageName = '';
+  bgTempStartLine = null;
+  currentTransitionEffectType = null;
+
+  document.querySelectorAll('.bg-image-item').forEach(li => {
+    li.classList.remove('active');
+  });
+  document.querySelectorAll('.effect-line-item').forEach(li => {
+    li.classList.remove('selected');
+  });
+
+  if (currentEffectMode === 'background') {
+    selectedLineLabel.textContent = bgImages.length
+      ? '请选择一个背景图片'
+      : '请先上传一张背景图片';
+  }
+}
+
+function renderBgImageList() {
+  bgImageListEl.innerHTML = '';
+
+  if (!bgImages.length) {
+    bgImageListEl.innerHTML = '<li class="bg-image-empty">暂无背景图片，请先本地上传。</li>';
+    return;
+  }
+
+  bgImages.forEach(img => {
+    const li = document.createElement('li');
+    li.className = 'bg-image-item';
+    li.dataset.id = img.id;
+
+    if (img.id === currentBgImageId) {
+      li.classList.add('active');
+    }
+
+    li.innerHTML = `
+      <img class="bg-image-thumb" src="${img.url}" alt="${escapeHtml(img.name)}">
+      <span class="bg-image-name">${escapeHtml(img.name)}</span>
+    `;
+    bgImageListEl.appendChild(li);
+  });
+}
+
+// 本地上传
+if (bgUploadLocalBtn && bgUploadInput) {
+  bgUploadLocalBtn.addEventListener('click', () => {
+    if (currentEffectMode !== 'background') {
+      alert('请先通过“编辑背景特效”进入背景模式再上传背景图片。');
+      return;
+    }
+    bgUploadInput.click();
+  });
+
+  bgUploadInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    // 让用户给这张背景起个名字
+    let name = prompt(
+      '请为该背景图片设置一个名称：',
+      file.name ? file.name.replace(/\.[^.]+$/, '') : ''
+    );
+    if (!name) {
+      name = '未命名背景';
+    }
+
+        try {
+      // UI 提示：正在上传
+      selectedLineLabel.textContent = '图片上传中，请稍候...';
+
+      // ⭐ 改成上传到自己服务器，拿到 /uploads/... 的 URL
+      const result = await uploadBgImageToServer(file, name);
+      const url = result.url;
+      const finalName = result.name || name;
+
+      // 在本地背景图库中登记一条记录
+      const id = 'bg-' + (bgImageAutoId++);
+      bgImages.push({
+        id: id,
+        name: finalName,
+        url: url,
+      });
+
+      // 设为当前选中的背景，并进入「选择起始句」阶段
+      currentBgImageId = id;
+      currentBgImageName = finalName;
+      bgSelectionPhase = 'chooseStart';
+
+      // 重新渲染右侧「背景图库上传」列表
+      renderBgImageList();
+
+      // 更新提示行：下一步请选起始句
+      selectedLineLabel.textContent = '请选中背景开始应用的句子';
+
+      // 更新调试 JSON
+      updateDebugJson();
+    } catch (err) {
+      console.error('上传背景图片失败:', err);
+      alert('上传背景图片失败：' + (err.message || '网络错误'));
+      resetBgSelectionState();
+    } finally {
+      // 清空 input，方便下次选同一张图
+      bgUploadInput.value = '';
+    }
+  });
+}
+
+// 列表选择图片
+if (bgImageListEl) {
+  bgImageListEl.addEventListener('click', e => {
+    const item = e.target.closest('.bg-image-item');
+    if (!item) return;
+
+    const id = item.dataset.id;
+    const img = bgImages.find(x => x.id === id);
+    if (!img) return;
+
+    currentBgImageId = img.id;
+    currentBgImageName = img.name;
+    bgSelectionPhase = 'chooseStart';
+
+    document.querySelectorAll('.bg-image-item').forEach(li => {
+      li.classList.remove('active');
+    });
+    item.classList.add('active');
+
+    selectedLineLabel.textContent = '请选中背景开始应用的句子';
+  });
+}
+
+// 移除图片
+if (bgRemoveImageBtn) {
+  bgRemoveImageBtn.addEventListener('click', () => {
+    if (!currentBgImageId) {
+      alert('请先在「背景图库上传」中选中要移除的图片。');
+      return;
+    }
+
+    const img = bgImages.find(x => x.id === currentBgImageId);
+    const name = img ? img.name : '';
+
+    if (!confirm(`确定要删除背景「${name || currentBgImageId}」吗？\n该背景绑定的所有背景区间和转场都会一并移除。`)) {
+      return;
+    }
+
+    // 移除图片
+    bgImages = bgImages.filter(x => x.id !== currentBgImageId);
+
+    // 移除绑定和转场
+    const validImageIds = new Set(bgImages.map(x => x.id));
+    bgBindings = bgBindings.filter(b => validImageIds.has(b.imageId));
+    bgTransitions = bgTransitions.filter(t => {
+      // 转场按句子连接，这里简单保留；如果对应背景句子都没了，也可以后续整体清理
+      return true;
+    });
+
+    renderBgImageList();
+    renderLineList();
+    updateDebugJson();
+    resetBgSelectionState();
+  });
+}
+
+// 共享图库占位
+if (bgAddFromSharedBtn) {
+  bgAddFromSharedBtn.addEventListener('click', () => {
+    alert('「从共享图库中添加」暂时先搁置，后续接好后台接口后再启用。');
+  });
+}
+
+
+      // 设置/清除某一行特效
+      function setEffectForLine(lineIndex, effectType) {
+        const existingIndex = effectsDraft.findIndex(e => e.lineIndex === lineIndex);
+        if (!effectType) {
+          if (existingIndex >= 0) effectsDraft.splice(existingIndex, 1);
+        } else {
+          if (existingIndex >= 0) {
+            effectsDraft[existingIndex].effectType = effectType;
+          } else {
+            effectsDraft.push({ lineIndex, effectType });
+          }
+        }
+        updateDebugJson();
+        renderLineList();
+      }
+
+      document.querySelectorAll('.effect-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (currentEffectMode !== 'text') {
+      alert('当前处于“背景特效”模式，请点击作品列表中的「编辑文字特效」进入文字模式后再插入文字特效。');
+      return;
+    }
+    if (selectedLineIndex == null) {
+      alert('请先点击左侧某一行再插入特效');
+      return;
+    }
+    const effectType = btn.dataset.effect;
+    setEffectForLine(selectedLineIndex, effectType);
+  });
+});
+
+      // 背景变化特效按钮
+document.querySelectorAll('.effect-bg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (currentEffectMode !== 'background') {
+      alert('请先通过「编辑背景特效」进入背景模式。');
+      return;
+    }
+    if (!bgBindings.length) {
+      alert('请先为至少两段文字设置背景，再设置背景变化特效。');
+      return;
+    }
+
+    currentTransitionEffectType = btn.dataset.bgEffect || 'crossfade';
+    bgSelectionPhase = 'chooseTransitionEnd';
+    selectedLineLabel.textContent = '请选择对应结束句（上一段背景的结束行）';
+
+    document.querySelectorAll('.effect-line-item').forEach(li => {
+      li.classList.remove('selected');
+    });
+  });
+});
+
+
+      removeEffectBtn.addEventListener('click', () => {
+        if (selectedLineIndex == null) {
+          alert('请先选择一行');
+          return;
+        }
+        setEffectForLine(selectedLineIndex, null);
+      });
+
+      /* ---------- 预览特效 ---------- */
+
+            function applyPreviewClasses() {
+        document.querySelectorAll('.effect-line-item').forEach(li => {
+          const textEl = li.querySelector('.effect-line-text');
+          if (!textEl) return;
+
+          // 先清理内置特效用到的 class
+          textEl.classList.remove('effect-shake', 'effect-flash', 'effect-fade', 'effect-highlight');
+
+          const effStr = li.dataset.effIndex;
+          if (!effStr && effStr !== '0') return; // 空行 / 无效行
+
+          const effIdx = Number(effStr);
+          if (Number.isNaN(effIdx)) return;
+
+          const tag = effectsDraft.find(e => e.lineIndex === effIdx);
+          if (!tag) return;
+
+          const type = tag.effectType;
+
+          // ⭐ 新增：自定义特效预览（effectType 形如 custom:damie）
+          if (typeof type === 'string' && type.startsWith('custom:')) {
+            const key = type.slice('custom:'.length);
+            if (key) {
+              runCustomEffectOnElement(key, textEl);
+            }
+            // 自定义特效不再往下走 switch
+            return;
+          }
+
+          // 原来的内置特效逻辑
+          switch (type) {
+            case 'shake':     textEl.classList.add('effect-shake'); break;
+            case 'flash':     textEl.classList.add('effect-flash'); break;
+            case 'fade':      textEl.classList.add('effect-fade'); break;
+            case 'highlight': textEl.classList.add('effect-highlight'); break;
+          }
+        });
+      }
+
+
+      function clearPreviewClasses() {
+        document.querySelectorAll('.effect-line-text').forEach(el => {
+          el.classList.remove('effect-shake', 'effect-flash', 'effect-fade', 'effect-highlight');
+        });
+      }
+
+        previewBtn.addEventListener('click', async () => {
+        isPreviewing = !isPreviewing;
+        if (isPreviewing) {
+          // ⭐ 进入预览时，确保拿到最新的自定义特效列表
+          await fetchCustomEffects();
+          applyPreviewClasses();
+          previewBtn.textContent = '关闭预览';
+        } else {
+          clearPreviewClasses();
+          previewBtn.textContent = '预览特效';
+        }
+      });
+
+
+      /* ---------- 保存草稿 / 发布特效 ---------- */
+      function updateDebugJson() {
+  const payload = {
+    textEffects: effectsDraft,
+    backgroundDraft: {
+      images: bgImages,
+      bindings: bgBindings,
+      transitions: bgTransitions,
+    },
+  };
+  debugJsonEl.textContent = JSON.stringify(payload, null, 2);
+}
+
+
+
+      // ⭐ 修改后：发布时同时更新 effectsDraft 和 effectsPublished
+async function saveEffectsDraft(isPublish) {
+  if (!currentWorkId) {
+    alert('未选择作品');
+    return;
+  }
+
+  // ⬇️ 这里改成根据 isPublish 构造不同的 payload
+// 组装背景配置
+// 组装背景配置（带 imageId）
+const backgroundPayload = {
+  images: bgImages.map(function (img, idx) {
+    var imageId = img.id;
+    if (!imageId) {
+      imageId = 'bg-' + String(idx);
+    }
+    return {
+      imageId: imageId,           // ⭐ 关键：把 id 写进 imageId
+      name: img.name || '',
+      url: img.url || '',
+    };
+  }),
+  bindings: bgBindings.map(function (b) {
+    return {
+      imageId: b.imageId,         // 和上面的 imageId 对应
+      imageName: b.imageName || '',
+      startLine: Number(b.startLine),
+      endLine: Number(b.endLine),
+    };
+  }),
+  transitions: bgTransitions.map(function (t) {
+    return {
+      fromLine: Number(t.fromLine),
+      toLine: Number(t.toLine),
+      effectType: t.effectType || 'fade',
+    };
+  }),
+};
+
+
+const payload = isPublish
+  ? {
+      // 发布：文字 + 背景 都同步草稿 & 已发布
+      effectsDraft: effectsDraft,
+      effectsPublished: effectsDraft,
+      backgroundDraft: backgroundPayload,
+      backgroundPublished: backgroundPayload,
+    }
+  : {
+      // 只保存草稿：只更新草稿
+      effectsDraft: effectsDraft,
+      backgroundDraft: backgroundPayload,
+    };
+
+
+  try {
+    const res = await fetch(API_BASE_URL + '/' + currentWorkId, {
+      method: 'PATCH',
+      headers: authHeaders(true),
+      body: JSON.stringify(payload),
+    });
+
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert((isPublish ? '发布' : '保存草稿') + '失败：' + (j.message || res.status));
+      return;
+    }
+
+    alert(
+      isPublish
+        ? '特效已发布，并已同步保存为草稿！'
+        : '草稿已保存！'
+    );
+
+    // 🔥 自动刷新数据，回填 UI
+    // 自动刷新数据，回填 UI（保持当前模式）
+enterEffectEditor(currentWorkId, currentEffectMode);
+
+// 若在背景模式，重置提示行
+if (currentEffectMode === 'background') {
+  resetBgSelectionState();
+}
+
+  } catch (e) {
+    console.error(e);
+    alert((isPublish ? '发布' : '保存') + '失败，请检查网络');
+  }
+}
+
+
+      saveDraftBtn.addEventListener('click', () => saveEffectsDraft(false));
+      publishBtn.addEventListener('click', () => {
+        if (!confirm('确定发布当前特效配置？')) return;
+        saveEffectsDraft(true);
+      });
+
+      /* ---------- 初始化 ---------- */
+      loadWorkList();
+    });
+  </script>

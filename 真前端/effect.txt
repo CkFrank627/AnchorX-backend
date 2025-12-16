@@ -1448,6 +1448,136 @@
       }
     }
 
+  .effect-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.effect-bg-btn {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+  background-color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.effect-bg-btn:hover {
+  background-color: #e6f7ff;
+  border-color: #0077cc;
+}
+
+.bg-panel {
+  margin-top: 16px;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: #f1f3f5;
+  border: 1px solid #dee2e6;
+}
+
+.bg-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.bg-panel .back-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.bg-danger-btn {
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.bg-danger-btn:hover {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.bg-image-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 6px;
+  border: 1px dashed #ced4da;
+  background-color: #fff;
+}
+
+.bg-image-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f1f3f5;
+  cursor: pointer;
+}
+
+.bg-image-item:last-child {
+  border-bottom: none;
+}
+
+.bg-image-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  margin-right: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.bg-image-name {
+  flex: 1;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.bg-image-item.active {
+  background-color: #e6f7ff;
+}
+
+.bg-image-empty {
+  padding: 10px;
+  font-size: 0.9rem;
+  color: #999;
+}
+
+.bg-panel-tip {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+/* 行里的起始/结束标签 + 转场行 */
+.bg-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.bg-tag-start {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+}
+
+.bg-tag-end {
+  background-color: #fce4ec;
+  color: #880e4f;
+}
+
+.bg-transition-item {
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  color: #6c757d;
+  text-align: center;
+}
+
 </style>
   
 <body>
@@ -1725,40 +1855,43 @@ function applyEffect(targetEl) {
         </div>
 
         <div class="effect-toolbar">
-          <div class="effect-toolbar-left">
-            <span>当前选中行：</span>
-            <span id="effect-selected-line-label">无</span>
-          </div>
-          <div class="effect-toolbar-right">
-            <span style="margin-right:8px;">插入特效：</span>
-            <button class="effect-btn" data-effect="shake">震动</button>
-            <button class="effect-btn" data-effect="flash">闪烁</button>
-            <button class="effect-btn" data-effect="fade">淡入</button>
-            <button class="effect-btn" data-effect="highlight">高亮</button>
-            <button id="effect-remove-btn" class="back-button">清除特效</button>
+  <div class="effect-toolbar-left">
+    <!-- 这个位置以后就是“提示行” -->
+    <span id="effect-toolbar-tip-prefix">当前选中行：</span>
+    <span id="effect-selected-line-label">无</span>
+  </div>
 
-            <div class="custom-effect-dropdown" id="custom-effect-dropdown">
-              <button id="custom-effect-toggle-btn" class="back-button">
-                展开自定义特效
-              </button>
-              <div class="custom-effect-dropdown-panel hidden" id="custom-effect-dropdown-panel">
-                <div class="custom-effect-dropdown-header">
-                  <h4>自定义特效</h4>
-                  <button class="close-btn" id="custom-effect-dropdown-close">&times;</button>
-                </div>
-                <p style="font-size:0.8rem;color:#666;margin:0 0 4px;">
-                  选择一个自定义特效，应用到当前选中句子：
-                </p>
-                <ul class="custom-effect-dropdown-list" id="custom-effect-dropdown-list"></ul>
-                <div class="custom-effect-dropdown-footer">
-                  <button id="custom-effect-open-manage-btn" class="back-button">
-                    管理自定义特效
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+  <div class="effect-toolbar-right">
+    <span id="effect-insert-label" style="margin-right:8px;">插入特效：</span>
+
+    <!-- 文字特效按钮组 -->
+    <div id="text-effect-toolbar-group" class="effect-toolbar-group">
+      <button class="effect-btn" data-effect="shake">震动</button>
+      <button class="effect-btn" data-effect="flash">闪烁</button>
+      <button class="effect-btn" data-effect="fade">淡入淡出</button>
+      <button class="effect-btn" data-effect="highlight">高亮</button>
+
+      <!-- ✅ 保留自定义特效下拉 -->
+      <div class="custom-effect-dropdown">
+        <button id="custom-effect-toggle-btn" type="button">
+          自定义特效 ▾
+        </button>
+        <div id="custom-effect-dropdown-list" class="custom-effect-dropdown-list hidden">
+          <!-- 这里由 JS 填充自定义特效按钮 -->
         </div>
+      </div>
+
+      <button id="effect-remove-btn">移除特效</button>
+    </div>
+
+    <!-- 背景变化特效按钮组（默认隐藏，在“编辑背景特效”模式显示） -->
+    <div id="bg-effect-toolbar-group" class="effect-toolbar-group hidden">
+      <button class="effect-bg-btn" data-bg-effect="crossfade">交叉淡入淡出</button>
+      <button class="effect-bg-btn" data-bg-effect="matrix">矩阵</button>
+      <button class="effect-bg-btn" data-bg-effect="ink">墨染</button>
+    </div>
+  </div>
+</div>
 
         <div class="effect-editor-layout">
           <div class="effect-line-panel">
@@ -1766,12 +1899,38 @@ function applyEffect(targetEl) {
               </ul>
           </div>
           <div class="effect-preview-panel">
-            <h3>说明 / 小提示</h3>
-            <p>点击左侧某一行 → 再点击上方“震动 / 闪烁 / 淡入 / 高亮”按钮，即可给该行绑定特效。</p>
-            <p>点“预览特效”可以在本页面看到动画效果；发布后可在阅读端按你设计的触发规则去真正播放。</p>
+             <h3>说明 / 小提示</h3>
+  <p id="effect-tip-text">
+    「编辑文字特效」模式：点击左侧句子，再在上方插入特效。<br>
+    「编辑背景特效」模式：先在下方背景图库选择图片，再依次点起始句 / 结束句。
+  </p>
 
-            <h4>当前特效配置（调试用）</h4>
-            <pre id="effect-debug-json" class="effect-debug-json">{}</pre>
+  <!-- ✅ 新增：背景图库上传面板 -->
+  <div id="bg-panel" class="bg-panel hidden">
+    <h4>背景图库上传</h4>
+
+    <div class="bg-panel-actions">
+      <button id="bg-upload-local-btn" class="back-button">本地上传</button>
+      <button id="bg-add-from-shared-btn" class="back-button" disabled>
+        从共享图库中添加（开发中）
+      </button>
+      <button id="bg-remove-image-btn" class="back-button bg-danger-btn">
+        移除
+      </button>
+      <input type="file" id="bg-upload-input" accept="image/*" style="display:none;">
+    </div>
+
+    <ul id="bg-image-list" class="bg-image-list">
+      <li class="bg-image-empty">暂无背景图片，请先本地上传。</li>
+    </ul>
+
+    <p class="bg-panel-tip">
+      点击上方图片条目来选择要应用的背景。
+    </p>
+  </div>
+
+  <h4>当前特效配置（调试用）</h4>
+  <pre id="effect-debug-json">{}</pre>
           </div>
         </div>
       </section>
@@ -1935,6 +2094,24 @@ function applyEffect(targetEl) {
       .effect-editor-layout { flex-direction:column; }
       .effect-preview-panel { order:-1; }
     }
+
+    .work-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.work-bg-button {
+  background-color: #6c757d;
+}
+
+.work-bg-button:hover {
+  background-color: #545b62;
+}
+
+  </style>
+
+  <!-- ⭐ JS：作品列表 + 特效编辑逻辑 -->
   </style>
 
   <!-- ⭐ JS：作品列表 + 特效编辑逻辑 -->
@@ -1942,6 +2119,8 @@ function applyEffect(targetEl) {
     // 和 write 保持一致的 API 地址
     const API_BASE_URL = 'https://api.anchorx.ca/api/works';
      const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects'; // ⭐ 新增这一行
+      const IMGBB_API_KEY = '040dbc9e6e680f321e09d9e05f447094';
+    const WORK_UPLOAD_URL = 'https://api.anchorx.ca/api/works/upload';
 
     // 生成带 Authorization 的请求头
     function authHeaders(json) {
@@ -1978,6 +2157,37 @@ function applyEffect(targetEl) {
       const publishBtn = document.getElementById('effect-publish-btn');
       const removeEffectBtn = document.getElementById('effect-remove-btn');
 
+      // ====== 模式 / 背景图库相关 ======
+let currentEffectMode = 'text'; // 'text' | 'background'
+
+const effectToolbarTipPrefix = document.getElementById('effect-toolbar-tip-prefix');
+const effectInsertLabel      = document.getElementById('effect-insert-label');
+const textEffectGroup        = document.getElementById('text-effect-toolbar-group');
+const bgEffectGroup          = document.getElementById('bg-effect-toolbar-group');
+const bgPanel                = document.getElementById('bg-panel');
+
+const bgUploadLocalBtn   = document.getElementById('bg-upload-local-btn');
+const bgUploadInput      = document.getElementById('bg-upload-input');
+const bgAddFromSharedBtn = document.getElementById('bg-add-from-shared-btn');
+const bgRemoveImageBtn   = document.getElementById('bg-remove-image-btn');
+const bgImageListEl      = document.getElementById('bg-image-list');
+
+      const bgBindingListEl    = document.getElementById('bg-binding-list');      // ⭐ 新增
+const bgTransitionListEl = document.getElementById('bg-transition-list');   // ⭐ 新增
+
+
+// 背景相关数据结构
+let bgImages = [];      // [{ id, name, url }]
+let bgBindings = [];    // [{ imageId, imageName, startLine, endLine }]
+let bgTransitions = []; // [{ fromLine, toLine, effectType }]
+
+let bgSelectionPhase = 'idle'; // 'idle' | 'chooseStart' | 'chooseEnd' | 'chooseTransitionEnd'
+let currentBgImageId   = null;
+let currentBgImageName = '';
+let bgTempStartLine    = null;
+let currentTransitionEffectType = null;
+let bgImageAutoId = 1;
+
       // ⭐ 新增：自定义特效管理页 DOM
       const customEffectPage = document.getElementById('custom-effect-page');
       const customEffectManageBtn = document.getElementById('custom-effect-manage-btn');
@@ -2006,6 +2216,7 @@ function applyEffect(targetEl) {
       let selectedLineIndex = null;  // 当前选中行（按“有效句子编号”计数）
       let effectsDraft = [];         // [{ lineIndex, effectType }]，lineIndex 存的是“有效句子编号”
       let isPreviewing = false;
+
 
        // ⭐ 新增：自定义特效状态
       let customEffects = [];
@@ -2047,43 +2258,57 @@ function applyEffect(targetEl) {
       }
 
       async function loadWorkList() {
-        workListEl.innerHTML = '<p style="text-align:center;color:#999;margin-top:50px;">正在加载作品...</p>';
-        const works = await fetchMyWorks();
-        if (!works || works.length === 0) {
-          workListEl.innerHTML = '<p style="text-align:center;color:#999;margin-top:50px;">暂无作品。</p>';
-          workCountEl.textContent = '0';
-          return;
-        }
+  workListEl.innerHTML = '<p style="text-align:center;color:#999;margin-top:50px;">正在加载作品...</p>';
+  const works = await fetchMyWorks();
+  if (!works || works.length === 0) {
+    workListEl.innerHTML = '<p style="text-align:center;color:#999;margin-top:50px;">暂无作品。</p>';
+    workCountEl.textContent = '0';
+    return;
+  }
 
-        workListEl.innerHTML = '';
-        works.forEach(w => {
-          const div = document.createElement('div');
-          div.className = 'work-item-wrapper';
-          div.dataset.id = w._id;
-          div.innerHTML = `
-            <div class="work-item">
-              <div class="work-info">
-                <div class="work-date">${new Date(w.updatedAt).toLocaleString()}</div>
-                <div class="work-details">
-                  <span class="work-title">${w.title}</span>
-                </div>
-              </div>
-              <button class="create-button" data-action="edit-effects">编辑特效</button>
-            </div>
-          `;
-          workListEl.appendChild(div);
-        });
-        workCountEl.textContent = String(works.length);
-      }
+  workListEl.innerHTML = '';
+  works.forEach(w => {
+    const div = document.createElement('div');
+    div.className = 'work-item-wrapper';
+    div.dataset.id = w._id;
+    div.innerHTML = `
+      <div class="work-item">
+        <div class="work-info">
+          <div class="work-date">${new Date(w.updatedAt).toLocaleString()}</div>
+          <div class="work-details">
+            <span class="work-title">${w.title}</span>
+          </div>
+        </div>
+
+        <div class="work-actions">
+          <button class="create-button" data-action="edit-text-effects">
+            编辑文字特效
+          </button>
+          <button class="create-button work-bg-button" data-action="edit-bg-effects">
+            编辑背景特效
+          </button>
+        </div>
+      </div>
+    `;
+    workListEl.appendChild(div);
+  });
+  workCountEl.textContent = String(works.length);
+}
+
 
       workListEl.addEventListener('click', async e => {
-        const btn = e.target.closest('[data-action="edit-effects"]');
-        if (!btn) return;
-        const wrapper = btn.closest('.work-item-wrapper');
-        if (!wrapper) return;
-        const id = wrapper.dataset.id;
-        await enterEffectEditor(id);
-      });
+  const textBtn = e.target.closest('[data-action="edit-text-effects"]');
+  const bgBtn   = e.target.closest('[data-action="edit-bg-effects"]');
+  const btn = textBtn || bgBtn;
+  if (!btn) return;
+
+  const wrapper = btn.closest('.work-item-wrapper');
+  if (!wrapper) return;
+  const id = wrapper.dataset.id;
+
+  const mode = bgBtn ? 'background' : 'text';
+  await enterEffectEditor(id, mode);
+});
 
       /* ---------- 进入特效编辑器 ---------- */
 
@@ -2101,11 +2326,12 @@ function applyEffect(targetEl) {
         }
       }
 
-      async function enterEffectEditor(workId) {
+      async function enterEffectEditor(workId, mode = 'text') {
         const work = await fetchWorkById(workId);
         if (!work) return;
 
         currentWorkId = workId;
+        setEditorMode(mode);
         editorTitleEl.textContent = work.title || '';
         // 读取已有草稿/已发布特效（如果你在后端加了字段）
         // 优先加载 effectsDraft；若草稿为空则加载已发布
@@ -2125,6 +2351,90 @@ if (Array.isArray(work.effectsDraft)) {
     effectsDraft = [];
 }
 
+// ===== 背景配置：优先用 backgroundDraft，若未定义再 fallback 到 backgroundPublished =====
+// ===== 背景配置：优先用 backgroundDraft，若未定义再 fallback 到 backgroundPublished =====
+function pickBackgroundConfig(work) {
+  if (work.backgroundDraft && typeof work.backgroundDraft === 'object') {
+    return work.backgroundDraft;
+  }
+  if (work.backgroundPublished && typeof work.backgroundPublished === 'object') {
+    return work.backgroundPublished;
+  }
+  return { images: [], bindings: [], transitions: [] };
+}
+
+const bgCfg = pickBackgroundConfig(work);
+
+// ---------- 把接口里的 backgroundXXX 映射成前端内部使用的结构 ----------
+// 内部约定：
+//   bgImages:     [{ id, name, url }]
+//   bgBindings:   [{ imageId, imageName, startLine, endLine }]
+//   bgTransitions:[{ fromLine, toLine, effectType }]
+
+// 1）图片列表
+if (Array.isArray(bgCfg.images) && bgCfg.images.length > 0) {
+  bgImages = bgCfg.images.map(function (img, idx) {
+    // 兼容老数据：可能只有 name+url，或者只有 imageId
+    var id = img.id || img.imageId;
+    if (!id) {
+      // 老数据完全没有 id，就按顺序补一个
+      id = 'bg-' + String(idx + 1);
+    }
+    return {
+      id: id,
+      // 顺手把 imageId 也带一份，方便调试
+      imageId: id,
+      name: img.name || img.imageName || '',
+      url: img.url || ''
+    };
+  });
+
+  // 根据已有 id 计算下一个自增值：bgImageAutoId
+  var maxNum = 0;
+  bgImages.forEach(function (img) {
+    var m = String(img.id).match(/^bg-(\d+)$/);
+    if (m) {
+      var n = parseInt(m[1], 10);
+      if (n > maxNum) maxNum = n;
+    }
+  });
+  bgImageAutoId = maxNum + 1;
+
+  // 默认选中第一张，方便后面绑定
+  currentBgImageId = bgImages[0] ? bgImages[0].id : null;
+} else {
+  bgImages = [];
+  bgImageAutoId = 1;
+  currentBgImageId = null;
+}
+
+// 2）绑定区间
+bgBindings = Array.isArray(bgCfg.bindings)
+  ? bgCfg.bindings.map(function (b) {
+      return {
+        imageId: b.imageId,
+        imageName: b.imageName || '',
+        startLine: Number(b.startLine),
+        endLine: Number(b.endLine),
+      };
+    })
+  : [];
+
+// 3）转场特效
+bgTransitions = Array.isArray(bgCfg.transitions)
+  ? bgCfg.transitions.map(function (t) {
+      return {
+        fromLine: Number(t.fromLine),
+        toLine: Number(t.toLine),
+        effectType: t.effectType || 'crossfade',
+      };
+    })
+  : [];
+
+// 4）把数据回填到右侧背景面板
+renderBgImageList();
+renderBgBindingList();
+renderBgTransitionList();
 
 
         // 合并所有页面文本
@@ -2161,63 +2471,216 @@ if (Array.isArray(work.effectsDraft)) {
 
       /* ---------- 行列表 / 选中行 / 设置特效 ---------- */
 
-      function renderLineList() {
-        lineListEl.innerHTML = '';
+      function bgEffectLabel(type) {
+  switch (type) {
+    case 'crossfade': return '交叉淡入淡出';
+    case 'matrix':    return '矩阵';
+    case 'ink':       return '墨染';
+    default:          return type || '背景变化';
+  }
+}
 
-        // 重新构建：原始行号 -> 有效句子编号（空行为 null）
-        rawToEffectiveIndex = [];
-        let eff = 0; // 有效句子计数（和阅读端保持一致）
+function renderLineList() {
+  lineListEl.innerHTML = '';
 
-        currentLines.forEach((lineText, rawIdx) => {
-          const text = lineText || '';
-          const trimmed = text.trim();
-          let effectiveIdx = null;
+  if (!currentLines || currentLines.length === 0) {
+    lineListEl.innerHTML = '<li>暂无内容，请先在创作端写作。</li>';
+    return;
+  }
 
-          if (trimmed !== '') {
-            // 只有真正有内容的行才参与编号
-            effectiveIdx = eff++;
-          }
-          rawToEffectiveIndex[rawIdx] = effectiveIdx;
+  rawToEffectiveIndex = [];
+  let effIndexCounter = 0;
 
-          const li = document.createElement('li');
-          li.className = 'effect-line-item';
-          li.dataset.index = rawIdx; // 原始行号（仅用于调试）
-          if (effectiveIdx !== null) {
-            li.dataset.effIndex = String(effectiveIdx); // 真正写入后端的“句子编号”
-          }
+  currentLines.forEach((line, rawIdx) => {
+    const trimmed = line.replace(/\r?\n$/, '');
+    let effIndex = null;
+    if (trimmed.trim()) {
+      effIndex = effIndexCounter++;
+    }
+    rawToEffectiveIndex[rawIdx] = effIndex;
 
-          // 只有有效句子才会去找特效标签
-          const tag = (effectiveIdx === null)
-            ? null
-            : effectsDraft.find(e => e.lineIndex === effectiveIdx);
+    const li = document.createElement('li');
+    li.className = 'effect-line-item';
+    li.dataset.index = String(rawIdx);
+    if (effIndex != null) li.dataset.effIndex = String(effIndex);
 
-          const displayNum = (effectiveIdx === null) ? '' : (effectiveIdx + 1);
-          const displayText = (text === '')
-            ? '&nbsp;'
-            : escapeHtml(text);
+    const displayNum  = effIndex != null ? (effIndex + 1) : '-';
+    const displayText = trimmed ? trimmed : '（空行）';
 
-          li.innerHTML = `
-            <div class="effect-line-num">${displayNum}</div>
-            <div class="effect-line-text">${displayText}</div>
-            <div class="effect-line-tags">
-              ${tag ? `<span class="effect-tag">${effectTypeLabel(tag.effectType)}</span>` : ''}
-            </div>
-          `;
+    const tags = [];
 
-          // 根据“有效句子编号”来决定是否高亮
-          if (effectiveIdx !== null && effectiveIdx === selectedLineIndex) {
-            li.classList.add('selected');
-          }
-
-          lineListEl.appendChild(li);
-        });
-
-        if (isPreviewing) {
-          applyPreviewClasses();
-        }
-
-        lineListEl.scrollTop = 0;
+    // 文字特效 tag
+    if (effIndex != null) {
+      const tag = effectsDraft.find(e => e.lineIndex === effIndex);
+      if (tag) {
+        tags.push(`<span class="effect-tag">${escapeHtml(effectTypeLabel(tag.effectType))}</span>`);
       }
+
+      // 背景起始 / 结束 tag
+      const bindingsForLine = bgBindings.filter(
+        b => b.startLine === effIndex || b.endLine === effIndex
+      );
+      bindingsForLine.forEach(b => {
+        const isStart = b.startLine === effIndex;
+        const label = (isStart ? '起始' : '结束') + `：【${escapeHtml(b.imageName)}】`;
+        tags.push(
+          `<span class="bg-tag ${isStart ? 'bg-tag-start' : 'bg-tag-end'}">${label}</span>`
+        );
+      });
+    }
+
+    const tagsHtml = tags.join(' ');
+
+    li.innerHTML = `
+      <span class="effect-line-num">${displayNum}</span>
+      <span class="effect-line-text">${escapeHtml(displayText)}</span>
+      <span class="effect-line-tags">${tagsHtml}</span>
+    `;
+    lineListEl.appendChild(li);
+
+    // 在这一行后面插入背景转场行（fromLine = 当前句）
+    if (effIndex != null) {
+      const transitions = bgTransitions.filter(t => t.fromLine === effIndex);
+      transitions.forEach(t => {
+        const trLi = document.createElement('li');
+        trLi.className = 'bg-transition-item';
+        trLi.dataset.from = String(t.fromLine);
+        trLi.dataset.to   = String(t.toLine);
+        trLi.textContent  = `【${bgEffectLabel(t.effectType)}】`;
+        lineListEl.appendChild(trLi);
+      });
+    }
+  });
+
+  // 文字模式下，重新高亮当前行
+  if (currentEffectMode === 'text' && selectedLineIndex != null) {
+    document.querySelectorAll('.effect-line-item').forEach(li => {
+      li.classList.remove('selected');
+      if (String(selectedLineIndex) === li.dataset.effIndex) {
+        li.classList.add('selected');
+      }
+    });
+  }
+}
+
+
+      function setEditorMode(mode) {
+  currentEffectMode = mode === 'background' ? 'background' : 'text';
+
+  if (currentEffectMode === 'text') {
+    effectToolbarTipPrefix.textContent = '当前选中行：';
+    selectedLineLabel.textContent = selectedLineIndex == null
+      ? '无'
+      : `第 ${selectedLineIndex + 1} 句（按阅读端计数）`;
+
+    effectInsertLabel.textContent = '插入特效：';
+    textEffectGroup.classList.remove('hidden');
+    bgEffectGroup.classList.add('hidden');
+    bgPanel.classList.add('hidden');
+
+  } else {
+    // 背景模式：提示行完全由 selectedLineLabel 文本负责
+    effectToolbarTipPrefix.textContent = '';
+    selectedLineLabel.textContent = '请选择一个背景图片';
+
+    effectInsertLabel.textContent = '插入背景变化特效：';
+    textEffectGroup.classList.add('hidden');
+    bgEffectGroup.classList.remove('hidden');
+    bgPanel.classList.remove('hidden');
+
+    // 进入背景模式时不再强调“当前选中行”
+    selectedLineIndex = null;
+    document.querySelectorAll('.effect-line-item.selected')
+      .forEach(li => li.classList.remove('selected'));
+  }
+}
+
+      // 把 File 对象转成 base64 纯数据（不带 data:image/... 前缀）
+function fileToBase64Data(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target.result; // data:image/png;base64,xxxx
+      const parts = String(result).split(',');
+      if (parts.length < 2) {
+        return reject(new Error('读取文件失败，base64 格式不正确'));
+      }
+      resolve(parts[1]); // 只要逗号后面的 base64 部分
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+      // ⭐ 上传背景图片到自己服务器的 /api/works/upload，返回 { url, name }
+async function uploadBgImageToServer(file, name) {
+  // 1️⃣ 组装 FormData
+  const formData = new FormData();
+  formData.append('image', file);
+
+  // 2️⃣ 发送到后端
+  const res = await fetch(WORK_UPLOAD_URL, {
+    method: 'POST',
+    // 这个接口目前不校验登录的话，可以不带头；带上 Authorization 也没关系：
+    // headers: authHeaders(false),
+    body: formData,
+  });
+
+  const data = await res.json().catch(function () { return {}; });
+
+  if (!res.ok) {
+    throw new Error(data.message || '上传失败');
+  }
+
+  if (!data.imageUrl) {
+    throw new Error('服务器未返回 imageUrl');
+  }
+
+  // 为了和之前代码一致，这里也返回 { url, name }
+  return {
+    url: data.imageUrl,        // 例如 https://api.anchorx.ca/uploads/image-1759....jpg
+    name: name || '',
+  };
+}
+
+      
+// ⭐ 上传背景图片到 imgbb，返回 { url, name } 已经舍弃！！！
+async function uploadBgImageToImgbb(file, name) {
+  if (!IMGBB_API_KEY || IMGBB_API_KEY === '在 imgBB 后台复制来的完整 API Key') {
+    throw new Error('尚未配置 IMGBB_API_KEY');
+  }
+
+  // 1️⃣ 读取成 base64
+  const base64Data = await fileToBase64Data(file);
+
+  // 2️⃣ 发送到 imgbb
+  const formData = new FormData();
+  formData.append('image', base64Data);
+  if (name) {
+    formData.append('name', name);
+  }
+
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data || !data.success) {
+    console.error('imgbb 上传失败:', data);
+    throw new Error('上传到图床失败');
+  }
+
+  const d = data.data;
+  const url = d.display_url || d.url;
+  const finalName = name || d.title || '背景图片';
+
+  if (!url) {
+    throw new Error('图床未返回有效图片链接');
+  }
+
+  return { url, name: finalName };
+}
 
             /* ---------- 自定义特效：与后端交互 ---------- */
 
@@ -2570,27 +3033,362 @@ if (Array.isArray(work.effectsDraft)) {
 
 
             lineListEl.addEventListener('click', e => {
-        const item = e.target.closest('.effect-line-item');
-        if (!item) return;
+  const item = e.target.closest('.effect-line-item');
+  if (!item) return;
 
-        const effStr = item.dataset.effIndex;
-        // 空行（只有空格/换行）是没有 effIndex 的，不参与特效计数
-        if (!effStr && effStr !== '0') {
-          alert('这一行是空行（或只有空格），在阅读端不会算作一句，不能直接绑定特效。\n\n请点一行真正有文字的句子。');
-          return;
-        }
+  const effStr = item.dataset.effIndex;
+  if (!effStr && effStr !== '0') {
+    alert('该行为空行或不可设置特效');
+    return;
+  }
+  const effIdx = Number(effStr);
+  if (Number.isNaN(effIdx)) return;
 
-        const effIdx = Number(effStr);
-        if (Number.isNaN(effIdx)) return;
+  if (currentEffectMode === 'text') {
+    // ===== 文字特效模式：保留原来的行为 =====
+    selectedLineIndex = effIdx;
 
-        selectedLineIndex = effIdx;
+    document.querySelectorAll('.effect-line-item').forEach(li => {
+      li.classList.remove('selected');
+    });
+    item.classList.add('selected');
 
-        // 更新选中样式
-        document.querySelectorAll('.effect-line-item').forEach(li => li.classList.remove('selected'));
-        item.classList.add('selected');
+    selectedLineLabel.textContent = `第 ${effIdx + 1} 句（按阅读端计数）`;
+    return;
+  }
 
-        selectedLineLabel.textContent = '第 ' + (effIdx + 1) + ' 句（按阅读端计数）';
+  // ===== 背景特效模式 =====
+  // 背景模式下不使用 selectedLineIndex 高亮，用提示行 + 起始/结束 tag
+  document.querySelectorAll('.effect-line-item').forEach(li => {
+    li.classList.remove('selected');
+  });
+  item.classList.add('selected');
+
+  if (bgSelectionPhase === 'chooseStart') {
+    // 选择起始句
+    bgTempStartLine = effIdx;
+    bgSelectionPhase = 'chooseEnd';
+    selectedLineLabel.textContent = `请选中背景结束应用的句子（当前起始：第 ${effIdx + 1} 句）`;
+    return;
+  }
+
+  if (bgSelectionPhase === 'chooseEnd') {
+    // 选择结束句
+    if (bgTempStartLine == null || currentBgImageId == null) {
+      alert('请选择背景图片，并重新选择起始句。');
+      resetBgSelectionState();
+      return;
+    }
+    if (effIdx < bgTempStartLine) {
+      alert('结束句必须在起始句之后。');
+      return;
+    }
+
+    // 检查是否与现有背景区间重叠
+    const newStart = bgTempStartLine;
+    const newEnd   = effIdx;
+    const overlap = bgBindings.some(b =>
+      !(newEnd < b.startLine || newStart > b.endLine)
+    );
+    if (overlap) {
+      alert('起始句和结束句之间已经有其它背景区间，不能叠加设置。');
+      return;
+    }
+
+    bgBindings.push({
+      imageId:   currentBgImageId,
+      imageName: currentBgImageName,
+      startLine: newStart,
+      endLine:   newEnd,
+    });
+
+    renderLineList();
+    updateDebugJson();
+    resetBgSelectionState();
+    return;
+  }
+
+  if (bgSelectionPhase === 'chooseTransitionEnd') {
+    // 选择“结束句”（上一段背景的结束句）
+    const bindAsEnd = bgBindings.find(b => b.endLine === effIdx);
+    if (!bindAsEnd) {
+      alert('这一句还没有作为背景的结束句，请先完成背景区间设置。');
+      return;
+    }
+
+    // 找“下一句”有新的起始句（忽略空行 → 我们用 startLine > endLine 来找）
+    const nextBinding = bgBindings
+      .filter(b => b.startLine > effIdx)
+      .sort((a, b) => a.startLine - b.startLine)[0];
+
+    if (!nextBinding) {
+      alert('请先把下一个非空行设置出背景，然后再设置背景变化特效。');
+      return;
+    }
+
+    bgTransitions.push({
+      fromLine: effIdx,
+      toLine:   nextBinding.startLine,
+      effectType: currentTransitionEffectType || 'crossfade',
+    });
+
+    renderLineList();
+    updateDebugJson();
+    resetBgSelectionState();
+    return;
+  }
+
+  // 其它情况：比如 idle
+  if (bgImages.length === 0) {
+    selectedLineLabel.textContent = '请先在右侧上传一张背景图片';
+  } else {
+    selectedLineLabel.textContent = '请先在右侧选择一张背景图片';
+  }
+});
+
+function resetBgSelectionState() {
+  bgSelectionPhase = 'idle';
+  currentBgImageId = null;
+  currentBgImageName = '';
+  bgTempStartLine = null;
+  currentTransitionEffectType = null;
+
+  document.querySelectorAll('.bg-image-item').forEach(li => {
+    li.classList.remove('active');
+  });
+  document.querySelectorAll('.effect-line-item').forEach(li => {
+    li.classList.remove('selected');
+  });
+
+  if (currentEffectMode === 'background') {
+    selectedLineLabel.textContent = bgImages.length
+      ? '请选择一个背景图片'
+      : '请先上传一张背景图片';
+  }
+}
+
+function renderBgImageList() {
+  bgImageListEl.innerHTML = '';
+
+  if (!bgImages.length) {
+    bgImageListEl.innerHTML = '<li class="bg-image-empty">暂无背景图片，请先本地上传。</li>';
+    return;
+  }
+
+  bgImages.forEach(img => {
+    const li = document.createElement('li');
+    li.className = 'bg-image-item';
+    li.dataset.id = img.id;
+
+    if (img.id === currentBgImageId) {
+      li.classList.add('active');
+    }
+
+    li.innerHTML = `
+      <img class="bg-image-thumb" src="${img.url}" alt="${escapeHtml(img.name)}">
+      <span class="bg-image-name">${escapeHtml(img.name)}</span>
+    `;
+    bgImageListEl.appendChild(li);
+  });
+}
+function renderBgBindingList() {
+  // 如果右侧面板还没放这个列表，直接跳过，防止报错
+  if (!bgBindingListEl) return;
+
+  bgBindingListEl.innerHTML = '';
+
+  if (!bgBindings.length) {
+    bgBindingListEl.innerHTML =
+      '<li class="bg-binding-empty">暂无背景区间。</li>';
+    return;
+  }
+
+  // 按起始句从小到大排序展示
+  const sorted = bgBindings.slice().sort(function (a, b) {
+    return Number(a.startLine) - Number(b.startLine);
+  });
+
+  sorted.forEach(function (b, idx) {
+    const li = document.createElement('li');
+    li.className = 'bg-binding-item';
+    li.dataset.imageId = b.imageId;
+    li.dataset.startLine = String(b.startLine);
+    li.dataset.endLine = String(b.endLine);
+
+    const label =
+      (b.imageName || b.imageId || '未命名背景') +
+      '：第 ' +
+      (Number(b.startLine) + 1) +
+      ' 句 ~ 第 ' +
+      (Number(b.endLine) + 1) +
+      ' 句';
+
+    li.textContent = label;
+    bgBindingListEl.appendChild(li);
+  });
+}
+
+function renderBgTransitionList() {
+  if (!bgTransitionListEl) return;
+
+  bgTransitionListEl.innerHTML = '';
+
+  if (!bgTransitions.length) {
+    bgTransitionListEl.innerHTML =
+      '<li class="bg-transition-empty">暂无背景变化特效。</li>';
+    return;
+  }
+
+  const sorted = bgTransitions.slice().sort(function (a, b) {
+    return Number(a.fromLine) - Number(b.fromLine);
+  });
+
+  sorted.forEach(function (t) {
+    const li = document.createElement('li');
+    li.className = 'bg-transition-item';
+    li.dataset.from = String(t.fromLine);
+    li.dataset.to = String(t.toLine);
+
+    const label =
+      '【' +
+      bgEffectLabel(t.effectType || 'crossfade') +
+      '】 第 ' +
+      (Number(t.fromLine) + 1) +
+      ' 句 → 第 ' +
+      (Number(t.toLine) + 1) +
+      ' 句';
+
+    li.textContent = label;
+    bgTransitionListEl.appendChild(li);
+  });
+}
+
+// 本地上传
+if (bgUploadLocalBtn && bgUploadInput) {
+  bgUploadLocalBtn.addEventListener('click', () => {
+    if (currentEffectMode !== 'background') {
+      alert('请先通过“编辑背景特效”进入背景模式再上传背景图片。');
+      return;
+    }
+    bgUploadInput.click();
+  });
+
+  bgUploadInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    // 让用户给这张背景起个名字
+    let name = prompt(
+      '请为该背景图片设置一个名称：',
+      file.name ? file.name.replace(/\.[^.]+$/, '') : ''
+    );
+    if (!name) {
+      name = '未命名背景';
+    }
+
+        try {
+      // UI 提示：正在上传
+      selectedLineLabel.textContent = '图片上传中，请稍候...';
+
+      // ⭐ 改成上传到自己服务器，拿到 /uploads/... 的 URL
+      const result = await uploadBgImageToServer(file, name);
+      const url = result.url;
+      const finalName = result.name || name;
+
+      // 在本地背景图库中登记一条记录
+      const id = 'bg-' + (bgImageAutoId++);
+      bgImages.push({
+        id: id,
+        name: finalName,
+        url: url,
       });
+
+      // 设为当前选中的背景，并进入「选择起始句」阶段
+      currentBgImageId = id;
+      currentBgImageName = finalName;
+      bgSelectionPhase = 'chooseStart';
+
+      // 重新渲染右侧「背景图库上传」列表
+      renderBgImageList();
+
+      // 更新提示行：下一步请选起始句
+      selectedLineLabel.textContent = '请选中背景开始应用的句子';
+
+      // 更新调试 JSON
+      updateDebugJson();
+    } catch (err) {
+      console.error('上传背景图片失败:', err);
+      alert('上传背景图片失败：' + (err.message || '网络错误'));
+      resetBgSelectionState();
+    } finally {
+      // 清空 input，方便下次选同一张图
+      bgUploadInput.value = '';
+    }
+  });
+}
+
+// 列表选择图片
+if (bgImageListEl) {
+  bgImageListEl.addEventListener('click', e => {
+    const item = e.target.closest('.bg-image-item');
+    if (!item) return;
+
+    const id = item.dataset.id;
+    const img = bgImages.find(x => x.id === id);
+    if (!img) return;
+
+    currentBgImageId = img.id;
+    currentBgImageName = img.name;
+    bgSelectionPhase = 'chooseStart';
+
+    document.querySelectorAll('.bg-image-item').forEach(li => {
+      li.classList.remove('active');
+    });
+    item.classList.add('active');
+
+    selectedLineLabel.textContent = '请选中背景开始应用的句子';
+  });
+}
+
+// 移除图片
+if (bgRemoveImageBtn) {
+  bgRemoveImageBtn.addEventListener('click', () => {
+    if (!currentBgImageId) {
+      alert('请先在「背景图库上传」中选中要移除的图片。');
+      return;
+    }
+
+    const img = bgImages.find(x => x.id === currentBgImageId);
+    const name = img ? img.name : '';
+
+    if (!confirm(`确定要删除背景「${name || currentBgImageId}」吗？\n该背景绑定的所有背景区间和转场都会一并移除。`)) {
+      return;
+    }
+
+    // 移除图片
+    bgImages = bgImages.filter(x => x.id !== currentBgImageId);
+
+    // 移除绑定和转场
+    const validImageIds = new Set(bgImages.map(x => x.id));
+    bgBindings = bgBindings.filter(b => validImageIds.has(b.imageId));
+    bgTransitions = bgTransitions.filter(t => {
+      // 转场按句子连接，这里简单保留；如果对应背景句子都没了，也可以后续整体清理
+      return true;
+    });
+
+    renderBgImageList();
+    renderLineList();
+    updateDebugJson();
+    resetBgSelectionState();
+  });
+}
+
+// 共享图库占位
+if (bgAddFromSharedBtn) {
+  bgAddFromSharedBtn.addEventListener('click', () => {
+    alert('「从共享图库中添加」暂时先搁置，后续接好后台接口后再启用。');
+  });
+}
 
 
       // 设置/清除某一行特效
@@ -2610,15 +3408,42 @@ if (Array.isArray(work.effectsDraft)) {
       }
 
       document.querySelectorAll('.effect-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          if (selectedLineIndex == null) {
-            alert('请先点击左侧某一行再插入特效');
-            return;
-          }
-          const effectType = btn.dataset.effect;
-          setEffectForLine(selectedLineIndex, effectType);
-        });
-      });
+  btn.addEventListener('click', () => {
+    if (currentEffectMode !== 'text') {
+      alert('当前处于“背景特效”模式，请点击作品列表中的「编辑文字特效」进入文字模式后再插入文字特效。');
+      return;
+    }
+    if (selectedLineIndex == null) {
+      alert('请先点击左侧某一行再插入特效');
+      return;
+    }
+    const effectType = btn.dataset.effect;
+    setEffectForLine(selectedLineIndex, effectType);
+  });
+});
+
+      // 背景变化特效按钮
+document.querySelectorAll('.effect-bg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (currentEffectMode !== 'background') {
+      alert('请先通过「编辑背景特效」进入背景模式。');
+      return;
+    }
+    if (!bgBindings.length) {
+      alert('请先为至少两段文字设置背景，再设置背景变化特效。');
+      return;
+    }
+
+    currentTransitionEffectType = btn.dataset.bgEffect || 'crossfade';
+    bgSelectionPhase = 'chooseTransitionEnd';
+    selectedLineLabel.textContent = '请选择对应结束句（上一段背景的结束行）';
+
+    document.querySelectorAll('.effect-line-item').forEach(li => {
+      li.classList.remove('selected');
+    });
+  });
+});
+
 
       removeEffectBtn.addEventListener('click', () => {
         if (selectedLineIndex == null) {
@@ -2692,8 +3517,18 @@ if (Array.isArray(work.effectsDraft)) {
 
       /* ---------- 保存草稿 / 发布特效 ---------- */
       function updateDebugJson() {
-        debugJsonEl.textContent = JSON.stringify(effectsDraft, null, 2);
-      }
+  const payload = {
+    textEffects: effectsDraft,
+    backgroundDraft: {
+      images: bgImages,
+      bindings: bgBindings,
+      transitions: bgTransitions,
+    },
+  };
+  debugJsonEl.textContent = JSON.stringify(payload, null, 2);
+}
+
+
 
       // ⭐ 修改后：发布时同时更新 effectsDraft 和 effectsPublished
 async function saveEffectsDraft(isPublish) {
@@ -2703,16 +3538,52 @@ async function saveEffectsDraft(isPublish) {
   }
 
   // ⬇️ 这里改成根据 isPublish 构造不同的 payload
-  const payload = isPublish
-    ? {
-        // 发布时：既更新已发布配置，也同步一份到草稿
-        effectsDraft: effectsDraft,
-        effectsPublished: effectsDraft,
-      }
-    : {
-        // 只保存草稿时：只动草稿字段
-        effectsDraft: effectsDraft,
-      };
+// 组装背景配置
+// 组装背景配置（带 imageId）
+const backgroundPayload = {
+  images: bgImages.map(function (img, idx) {
+    var imageId = img.id;
+    if (!imageId) {
+      imageId = 'bg-' + String(idx);
+    }
+    return {
+      imageId: imageId,           // ⭐ 关键：把 id 写进 imageId
+      name: img.name || '',
+      url: img.url || '',
+    };
+  }),
+  bindings: bgBindings.map(function (b) {
+    return {
+      imageId: b.imageId,         // 和上面的 imageId 对应
+      imageName: b.imageName || '',
+      startLine: Number(b.startLine),
+      endLine: Number(b.endLine),
+    };
+  }),
+  transitions: bgTransitions.map(function (t) {
+    return {
+      fromLine: Number(t.fromLine),
+      toLine: Number(t.toLine),
+      effectType: t.effectType || 'fade',
+    };
+  }),
+};
+
+
+const payload = isPublish
+  ? {
+      // 发布：文字 + 背景 都同步草稿 & 已发布
+      effectsDraft: effectsDraft,
+      effectsPublished: effectsDraft,
+      backgroundDraft: backgroundPayload,
+      backgroundPublished: backgroundPayload,
+    }
+  : {
+      // 只保存草稿：只更新草稿
+      effectsDraft: effectsDraft,
+      backgroundDraft: backgroundPayload,
+    };
+
 
   try {
     const res = await fetch(API_BASE_URL + '/' + currentWorkId, {
@@ -2734,7 +3605,14 @@ async function saveEffectsDraft(isPublish) {
     );
 
     // 🔥 自动刷新数据，回填 UI
-    enterEffectEditor(currentWorkId);
+    // 自动刷新数据，回填 UI（保持当前模式）
+enterEffectEditor(currentWorkId, currentEffectMode);
+
+// 若在背景模式，重置提示行
+if (currentEffectMode === 'background') {
+  resetBgSelectionState();
+}
+
   } catch (e) {
     console.error(e);
     alert((isPublish ? '发布' : '保存') + '失败，请检查网络');

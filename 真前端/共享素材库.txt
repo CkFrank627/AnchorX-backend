@@ -469,6 +469,16 @@
                 <span class="nav-text">共享素材库</span>
             </a>
 
+          <a href="https://zhidianworld.com/effect/" class="nav-link">
+    <div class="nav-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+            fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2L15 8l6 .5-4.5 4 1 6-5-3-5 3 1-6L3 8.5 9 8z" />
+        </svg>
+    </div>
+    <span class="nav-text">⭐渲染特效</span>
+</a>
+
             <a href="https://zhidianworld.com/usercenter/" class="nav-link">
                 <div class="nav-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"

@@ -1,6 +1,4 @@
 https://zhidianworld.com/
-https://zhidianworld.com/book
-https://zhidianworld.com/editor/
 https://zhidianworld.com/login/
 https://zhidianworld.com/%e5%85%a5%e7%ab%99%e9%a0%88%e7%9f%a5/
 https://zhidianworld.com/register/
@@ -8,10 +6,7 @@ https://zhidianworld.com/picshare/
 https://zhidianworld.com/%e8%ae%a8%e8%ae%ba%e5%8c%ba/
 https://zhidianworld.com/home/
 https://zhidianworld.com/topic/
-https://zhidianworld.com/usercenter/
-https://zhidianworld.com/pictureshare/
 https://zhidianworld.com/read/
-https://zhidianworld.com/effect
 https://zhidianworld.com/write/
 https://zhidianworld.com/read/?id=68e0a89e88a0652caf997bd4
 https://zhidianworld.com/read/?id=68e4dfad3124f02ec46ff2ff

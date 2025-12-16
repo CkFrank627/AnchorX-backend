@@ -316,6 +316,28 @@
     transition: left 0.3s ease-in-out, top 0.3s ease-in-out;
 }
 
+/* 新增：手机端“回到顶部”按钮，默认隐藏（桌面不显示） */
+#back-to-top-mobile {
+    display: none;
+}
+
+#back-to-top-mobile-btn {
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+}
+
+      /* 新增：手机端“背景透视”按钮，默认隐藏（桌面不显示） */
+#bg-peek-mobile {
+  display: none;
+}
+#bg-peek-mobile-btn {
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+}
+
+      
 /* 按钮样式 */
 #sidebar-toggle-btn {
     padding: 0;
@@ -379,6 +401,33 @@
     #sidebar-toggle-btn[aria-expanded="false"] {
         color: #0077cc;
     }
+
+    /* 新增：手机端独立“回到顶部”按钮，浮在工具栏按钮上方 */
+    #back-to-top-mobile {
+        position: fixed;
+        top: 80px;          /* 比 toggle 按钮（120px）略高一点 */
+        left: 12px;
+        z-index: 1200;
+        background: rgba(245, 245, 245, 0.95);
+        border-radius: 50%;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        padding: 6px;
+        display: flex;      /* 覆盖默认的 display:none */
+        align-items: center;
+        justify-content: center;
+    }
+
+    #back-to-top-mobile-btn {
+        font-size: 1.4rem;
+        color: #333;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+  
 }
 
 
@@ -904,68 +953,221 @@ body.dark-mode #global-loading-bar {
     50% { text-shadow: 0 0 10px rgba(255,255,255,1); }
 }
 
+      /* 背景层：铺满全屏，在最底下 */
+#read-bg-wrapper {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.read-bg-image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+/* 其它内容：浮在背景图之上 */
+/* 原来是把 sidebar / comment-panel 也一起写进来了 */
+/* 改成只给外层容器和书本容器提 z-index */
+
+.read-page-wrapper,
+.book-container {
+    position: relative;
+    z-index: 1;
+}
+
+/* ===================
+阅读页整体样式（新增背景支持）
+=================== */
+
+/* 外层容器：保证阅读内容在背景图上方 */
+.read-page-wrapper {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+}
+
+/* 背景包裹层：固定覆盖整屏，放在最底层 */
+#read-bg-wrapper {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0; /* 内容层在 z=1，上面 */
+}
+
+/* 背景图片双层：做淡入淡出 */
+.read-bg-layer,
+#read-bg-layer-a,
+#read-bg-layer-b {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity 0.7s ease;
+}
+
+      /* =========================
+   背景透视模式（PC）：除背景外全部虚化
+   ========================= */
+body.bg-peek-mode #global-loading-bar,
+body.bg-peek-mode .read-page-wrapper > :not(#read-bg-wrapper) {
+  opacity: 0.12;              /* 透明度调高很多（更“淡”） */
+  filter: blur(2px);          /* 轻微虚化 */
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+/* 工具栏按钮激活态（可选，但建议加） */
+#bg-peek-btn.active {
+  background-color: #e6f7ff;
+}
+#bg-peek-btn.active:hover {
+  background-color: #d7f1ff;
+}
+#bg-peek-btn.active button {
+  color: #0077cc;
+}
+
+      @media (max-width: 1050px) {
+  /* 新增：手机端“背景透视”按钮，浮在回到顶部按钮上方 */
+  #bg-peek-mobile {
+    position: fixed;
+    top: 40px;         /* ✅ 比回到顶部（80px）更靠上 */
+    left: 12px;
+    z-index: 1200;
+    background: rgba(245, 245, 245, 0.95);
+    border-radius: 50%;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #bg-peek-mobile-btn {
+    font-size: 1.2rem;
+    color: #333;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 激活态（可选） */
+  #bg-peek-mobile.active {
+    outline: 2px solid rgba(0,119,204,0.35);
+  }
+}
+/* =========================
+   移动端：背景透视模式（只保留背景 + 这个按钮不虚化）
+   ========================= */
+body.bg-peek-mobile-mode #global-loading-bar,
+body.bg-peek-mobile-mode .read-page-wrapper > :not(#read-bg-wrapper):not(#bg-peek-mobile) {
+  opacity: 0.12;
+  filter: blur(2px);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
       
     </style>
+<div id="global-loading-bar"></div>
 
-  <div id="global-loading-bar"></div>
+<!-- ⭐ 新增：阅读页外层容器 -->
+<div class="read-page-wrapper">
 
-    <div class="book-container">
-        <div class="book-header">
-            <h1 id="work-title">正在加载...</h1>
-            <p id="work-info">作者：<span id="work-author">未知</span> | 更新时间：<span id="work-date">未知</span></p>
-        </div>
-        <div class="book-content" id="book-content">
-          <!-- ✅ 新增查看评论按钮 -->
+  <!-- ⭐ 新增：背景层（A/B 两层做淡入淡出） -->
+  <div id="read-bg-wrapper">
+    <div id="read-bg-layer-a" class="read-bg-layer"></div>
+    <div id="read-bg-layer-b" class="read-bg-layer"></div>
+  </div>
+
+  <!-- 下面是原来的内容，结构不变，只是包进 read-page-wrapper 里 -->
+  <div class="book-container">
+      <div class="book-header">
+          <h1 id="work-title">正在加载...</h1>
+          <p id="work-info">作者：<span id="work-author">未知</span> | 更新时间：<span id="work-date">未知</span></p>
+      </div>
+      <div class="book-content" id="book-content">
+        <!-- ✅ 新增查看评论按钮 -->
         <button class="page-view-comment-btn" id="open-comment-panel-btn">查看评论</button>
-            <p>作品内容正在加载中...</p>
-        </div>
-    </div>
+        <p>作品内容正在加载中...</p>
+      </div>
+  </div>
 
   <div id="sidebar-toggle-container">
     <button id="sidebar-toggle-btn" aria-expanded="true" title="收起侧边栏">
-        <span id="sidebar-toggle-icon">⮝</span>
+      <span id="sidebar-toggle-icon">⮝</span>
     </button>
+  </div>
+
+  <!-- 新增：手机端“背景透视”按钮（PC 端被 CSS 隐藏） -->
+<div id="bg-peek-mobile">
+  <button id="bg-peek-mobile-btn" title="背景透视（虚化除背景外内容）">👁</button>
 </div>
 
-    <aside id="sidebar">
-        <div class="sidebar-btn-group" id="scroll-mode-btn">
-            <button>&#x1F4DC;</button>
-            <span>楼层模式</span>
-        </div>
-        <div class="sidebar-btn-group" id="page-mode-btn">
-            <button>&#x1F4D6;</button>
-            <span>翻页模式</span>
-        </div>
-        <div class="sidebar-btn-group" id="nav-toggle-btn">
-            <button class="nav-toggle-icon">&#8635;</button>
-            <span>导航</span>
-        </div>
-        <div class="sidebar-btn-group" id="light-switch-btn">
-            <button>&#x1F311;</button>
-            <span>夜间模式</span>
-        </div>
-        <div class="sidebar-btn-group" id="like-work-btn">
-            <button class="like-icon">❤</button>
-            <span class="like-counter">0</span>
-            <span>点赞</span>
-        </div>
-    </aside>
+  <!-- 新增：手机端独立“回到顶部”按钮（PC 端被 CSS 隐藏） -->
+  <div id="back-to-top-mobile">
+    <button id="back-to-top-mobile-btn" title="回到顶部">↑</button>
+  </div>
 
-    <aside id="comment-panel" class="comment-panel">
-        <div class="comment-panel-header">
-            <h4>评论</h4>
-            <button id="close-comment-panel-btn">×</button>
-        </div>
-        <div id="comment-list" class="comment-list">
-            <p class="no-comments-tip">暂无评论</p>
-        </div>
-        <div class="comment-input-area">
-            <textarea id="comment-textarea" placeholder="写下你的评论..."></textarea>
-            <button id="submit-comment-btn">发表</button>
-        </div>
-    </aside>
+  <aside id="sidebar">
+    <div class="sidebar-btn-group" id="scroll-mode-btn">
+      <button>&#x1F4DC;</button>
+      <span>楼层模式</span>
+    </div>
+    <div class="sidebar-btn-group" id="page-mode-btn">
+      <button>&#x1F4D6;</button>
+      <span>翻页模式</span>
+    </div>
+    <div class="sidebar-btn-group" id="bg-peek-btn">
+  <button title="Shift：背景透视">⇧</button>
+  <span>背景透视</span>
+</div>
 
-    <div class="nav-grid-popup" id="nav-grid-popup"></div>
+    <div class="sidebar-btn-group" id="nav-toggle-btn">
+      <button class="nav-toggle-icon">&#8635;</button>
+      <span>导航</span>
+    </div>
+    <div class="sidebar-btn-group" id="back-to-top-btn">
+      <button>↑</button>
+      <span>回到顶部</span>
+    </div>
+    <div class="sidebar-btn-group" id="light-switch-btn">
+      <button>&#x1F311;</button>
+      <span>夜间模式</span>
+    </div>
+    <div class="sidebar-btn-group" id="like-work-btn">
+      <button class="like-icon">❤</button>
+      <span class="like-counter">0</span>
+      <span>点赞</span>
+    </div>
+  </aside>
+
+  <aside id="comment-panel" class="comment-panel">
+    <div class="comment-panel-header">
+      <h4>评论</h4>
+      <button id="close-comment-panel-btn">×</button>
+    </div>
+    <div id="comment-list" class="comment-list">
+      <p class="no-comments-tip">暂无评论</p>
+    </div>
+    <div class="comment-input-area">
+      <textarea id="comment-textarea" placeholder="写下你的评论..."></textarea>
+      <button id="submit-comment-btn">发表</button>
+    </div>
+  </aside>
+
+  <div class="nav-grid-popup" id="nav-grid-popup"></div>
+</div>
+
 
   <script src="https://cdn.jsdelivr.net/npm/quill-image-resize-module@3.0.0/image-resize.min.js"></script>
      <script src="https://api.anchorx.ca/vendor_assets/quill.js"></script>
@@ -1042,6 +1244,7 @@ let customEffectFnMap = {};
 let customEffectsLoaded = false;
 
       const EFFECT_DEBUG = true;           // ⭐ 打开调试日志
+      const EFFECT_BG_DEBUG = true;        // ⭐ 新增：背景系统调试开关
 const EFFECT_USE_OBSERVER = true;    // ⭐ 开启 IntersectionObserver 滚动触发模式
 
 
@@ -1241,6 +1444,69 @@ function registerEffectTrigger(targetEl, cb) {
     effectObserver.observe(targetEl);
 }
 
+      function sanitizeEffectCode(raw) {
+  if (raw == null) return '';
+  var s = String(raw);
+
+  // 统一换行
+  s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // 去 BOM / 零宽字符 / 软连字符
+  if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
+  s = s.replace(/[\u200B-\u200D\u2060\u00AD]/g, '');
+
+  // 某些环境会把 U+2028/U+2029 当“非法换行”
+  s = s.replace(/\u2028/g, '\n').replace(/\u2029/g, '\n');
+
+  // 智能引号 → 普通引号（特别常见：从富文本/文档里复制代码）
+  s = s.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+
+  // 常见全角标点（可选但建议）
+  s = s.replace(/；/g, ';').replace(/，/g, ',').replace(/（/g, '(').replace(/）/g, ')');
+
+  // 如果明显像被 HTML/富文本包过，尝试“还原成纯文本”
+  var looksHtml = false;
+  if (s.indexOf('&lt;') !== -1) looksHtml = true;
+  if (s.indexOf('&gt;') !== -1) looksHtml = true;
+  if (s.indexOf('&nbsp;') !== -1) looksHtml = true;
+  if (s.indexOf('<br') !== -1) looksHtml = true;
+  if (s.indexOf('<div') !== -1) looksHtml = true;
+  if (looksHtml) {
+    var div = document.createElement('div');
+    div.innerHTML = s;
+    // innerText 比 textContent 更像“复制出来的代码”，会保留换行
+    s = div.innerText || div.textContent || s;
+  }
+
+  return s;
+}
+
+function findFirstSuspiciousChar(raw) {
+  if (raw == null) return null;
+  var s = String(raw);
+  for (var i = 0; i < s.length; i++) {
+    var code = s.charCodeAt(i);
+
+    // 控制字符：除 tab / \n / \r 外都可疑
+    if (code < 32) {
+      if (code !== 9) {
+  if (code !== 10) {
+    if (code !== 13) {
+      return { index: i, code: code };
+    }
+  }
+}
+
+    }
+
+    // BOM / 行分隔符 / 零宽
+    if (code === 0xFEFF || code === 0x2028 || code === 0x2029) return { index: i, code: code };
+    if (code >= 0x200B && code <= 0x200D) return { index: i, code: code };
+    if (code === 0x2060 || code === 0x00AD) return { index: i, code: code };
+  }
+  return null;
+}
+
 
 // 只在第一次需要时，从后端加载自定义特效列表
 async function ensureCustomEffectsLoaded() {
@@ -1253,22 +1519,56 @@ async function ensureCustomEffectsLoaded() {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.data || []);
 
-        customEffectFnMap = {};
-        list.forEach(item => {
-            if (!item || !item.key || !item.code) return;
-            try {
-                // 约定：代码中定义 function applyEffect(targetEl) { ... }
-                customEffectFnMap[item.key] = new Function('targetEl', `
-                    "use strict";
-                    ${item.code}
-                    if (typeof applyEffect === 'function') {
-                        return applyEffect(targetEl);
-                    }
-                `);
-            } catch (err) {
-                console.error('编译自定义特效失败：', item.key, err);
-            }
-        });
+        customEffectFnMap = Object.create(null);
+
+list.forEach(function (item) {
+  if (!item) return;
+
+  var key = '';
+  if (item.key != null) key = String(item.key).trim();
+  if (!key) return;
+
+  var rawCode = '';
+  if (item.code != null) rawCode = String(item.code);
+  if (!rawCode) return;
+
+  var code = sanitizeEffectCode(rawCode);
+  var srcURL = '\n//# sourceURL=anchorx-custom-effect/' + encodeURIComponent(key) + '.js\n';
+  var keyLiteral = JSON.stringify(key); // 安全嵌入到动态代码里
+
+  // 先 strict 模式尝试（更容易暴露问题）
+  try {
+    var bodyStrict =
+      '"use strict";\n' +
+      code + '\n' +
+      'if (typeof applyEffect === "function") { return applyEffect(targetEl); }\n' +
+      'throw new Error("Custom effect " + ' + keyLiteral + ' + " must define applyEffect(targetEl)");\n' +
+      srcURL;
+
+    customEffectFnMap[key] = new Function('targetEl', bodyStrict);
+    return;
+  } catch (err1) {
+    // fallback：非 strict 再试一次（有些人会写 with / 一些严格模式不允许的东西）
+    try {
+      var bodyLoose =
+        code + '\n' +
+        'if (typeof applyEffect === "function") { return applyEffect(targetEl); }\n' +
+        'throw new Error("Custom effect " + ' + keyLiteral + ' + " must define applyEffect(targetEl)");\n' +
+        srcURL;
+
+      customEffectFnMap[key] = new Function('targetEl', bodyLoose);
+      console.warn('⚠️ [effects] 特效在非 strict 模式下才编译通过:', key);
+      return;
+    } catch (err2) {
+      var bad = findFirstSuspiciousChar(rawCode);
+      console.error('编译自定义特效失败：', key, err2, {
+        badChar: bad,
+        preview: rawCode.slice(0, 200)
+      });
+    }
+  }
+});
+
 
         customEffectsLoaded = true;
     } catch (err) {
@@ -1292,12 +1592,19 @@ async function ensureCustomEffectsLoaded() {
         const likeIcon = likeWorkBtn.querySelector('.like-icon');
         const sidebar = document.getElementById('sidebar');
 
+        // 【新增】回到顶部按钮（PC + Mobile）
+        const backToTopBtn = document.getElementById('back-to-top-btn');
+        const backToTopMobileBtn = document.getElementById('back-to-top-mobile-btn');
+
       // 【新增代码】：侧边栏折叠按钮
         const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
         const sidebarToggleIcon = document.getElementById('sidebar-toggle-icon');
 
         const API_WORKS = 'https://api.anchorx.ca/api/works';
         const API_COMMENTS = 'https://api.anchorx.ca/api/comments';
+
+      const bgPeekMobile = document.getElementById('bg-peek-mobile');
+const bgPeekMobileBtn = document.getElementById('bg-peek-mobile-btn');
 
 
                 // 全局状态
@@ -1315,6 +1622,83 @@ async function ensureCustomEffectsLoaded() {
         let floorLazyScrollHandler = null;   // 楼层模式滚动监听器
 
         let contentIndexCounter = 0; // 全局计数器，用于生成唯一ID
+
+       // ========== 新增：记录阅读位置（楼层/页码） ==========
+        let lastSavedView = null;     // { mode: 'scroll' | 'page', pageIndex: number, ts: number }
+        let hasAppliedLastView = false;
+
+              // ===== 背景图相关 DOM =====
+        const bgWrapper = document.getElementById('read-bg-wrapper');
+        const bgLayerA = document.getElementById('read-bg-layer-a');
+        const bgLayerB = document.getElementById('read-bg-layer-b');
+
+        // ===== 背景系统状态 =====
+        let bgConfig = { images: [], bindings: [], transitions: [] };
+        let bgSegments = [];          // 每一段背景区间：{ imageId, imageUrl, startLine, endLine, startEl, endEl, startTop, endBottom }
+        let currentBgSegment = null;  // 当前正在生效的区间
+        let currentBgImageId = null;  // 当前背景图片对应的 imageId
+        let currentBgLayerFlag = 'A'; // 用 A/B 两层交替做淡入淡出
+        let bgScrollTicking = false;
+
+      // ===== 背景心跳（自动纠偏） =====
+let bgHeartbeatTimer = null;
+let bgHeartbeatFastUntil = 0;
+let bgHeartbeatLastScrollY = -1;
+let bgHeartbeatLastDocH = -1;
+let bgHeartbeatMismatchStreak = 0;
+
+
+        function getLastViewStorageKey() {
+            if (!activeWork) return null;
+            const workId = activeWork._id || activeWork.workId || getWorkIdFromUrl();
+            if (!workId) return null;
+            return `anchorx_read_last_view_${workId}`;
+        }
+
+        function loadLastViewFromStorage() {
+            const key = getLastViewStorageKey();
+            if (!key) return null;
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch (e) {
+                console.warn('解析阅读位置失败:', e);
+                return null;
+            }
+        }
+
+        function saveLastViewToStorage(mode, pageIndex) {
+            const key = getLastViewStorageKey();
+            if (!key) return;
+            const total = Array.isArray(activePages) ? activePages.length : 0;
+            if (total <= 0) return;
+
+            const idx = Math.min(Math.max(pageIndex || 0, 0), total - 1);
+
+            // 如果没有变化就不写 localStorage，减少频率
+            if (lastSavedView) {
+    if (lastSavedView.mode === mode) {
+        if (lastSavedView.pageIndex === idx) {
+            return;
+        }
+    }
+}
+
+
+            const payload = {
+                mode,
+                pageIndex: idx,
+                ts: Date.now()
+            };
+            lastSavedView = payload;
+
+            try {
+                localStorage.setItem(key, JSON.stringify(payload));
+            } catch (e) {
+                console.warn('保存阅读位置失败:', e);
+            }
+        }
 
 
       // 【新增核心状态】
@@ -1673,6 +2057,7 @@ activePages.forEach(page => {
 });
 
         renderCurrentMode();
+      initReadingBackgroundSystem();
 
         // ✅ 加载完成
         updateGlobalLoadingProgress(100, '加载完成！');
@@ -1688,38 +2073,54 @@ activePages.forEach(page => {
 }
 
 
+// ⭐ 工具函数：为内容按“有效句子”编号并写入 data-sentence-id / data-sentence-index
 function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = rawHtmlContent;
   let counter = startIndex;
 
-  // ✅ 和 applyEffectsToBlocks 用同一套“行”的定义
+  // 和 applyEffectsToBlocks 用同一套“行”的定义
   const blocks = tempDiv.querySelectorAll('p, h1, h2, h3, li, blockquote, pre');
 
   blocks.forEach(function (el) {
+    const text = el.textContent.trim();
+
     // 跳过纯空白
-    if (el.textContent.trim() !== '') {
-      if (!el.hasAttribute('data-sentence-id')) {
-        const sentenceId = 's_' + workId + '_' + (counter++);
-        el.setAttribute('data-sentence-id', sentenceId);
-      }
+    if (text === '') {
+      return;
     }
+
+    // 生成 / 保留 data-sentence-id
+    if (!el.hasAttribute('data-sentence-id')) {
+      const sentenceId = 's_' + workId + '_' + counter;
+      el.setAttribute('data-sentence-id', sentenceId);
+    }
+    // 同步到 dataset，方便后面使用
+    el.dataset.sentenceId = el.getAttribute('data-sentence-id');
+
+    // ⭐ 新增：记录“阅读端句子编号”，给背景用
+    el.dataset.sentenceIndex = String(counter);
+
+    counter = counter + 1;
   });
 
+  // ⭐ 调试：打印前 30 条句子的 行号 + ID + 文本片段
   if (window.READER_DEBUG_VERBOSE) {
-  console.log(
-    '🧩 segmentContentAndAddIds 生成的 ID（前 30 条示例）:',
-    Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
+    const sample = Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
       .slice(0, 30)
       .map(function (el) {
-        return el.dataset.sentenceId;
-      })
-  );
-}
+        return {
+          index: el.dataset.sentenceIndex,
+          id: el.dataset.sentenceId,
+          text: el.textContent.trim().slice(0, 20)
+        };
+      });
+
+    console.log('🧩 segmentContentAndAddIds 示例（前 30 条）:', sample);
+  }
 
   return { element: tempDiv, nextIndex: counter };
 }
-
 
       // 【新增函数】：获取作品所有评论，并更新全局状态
 async function fetchAllWorkComments(workId) {
@@ -1804,8 +2205,124 @@ function renderFloorsRange(startIndex, endIndex) {
         // 给新渲染的楼层绑定评论句子点击
         processContentForSentenceIds(floorBody);
     }
+  // ⭐ 新增：每次渲染完一批楼层后，重建背景区间
+    if (typeof initReadingBackgroundSystem === 'function') {
+        initReadingBackgroundSystem();
+    } else if (typeof recalcBgSegmentPositions === 'function' &&
+               typeof updateReadingBackgroundByScroll === 'function') {
+        // 极端情况下 init 没定义，就至少重算一下位置
+        recalcBgSegmentPositions();
+        updateReadingBackgroundByScroll(false);
+    }
 }
 
+      // ====== 背景透视（Shift） ======
+const bgPeekBtn = document.getElementById('bg-peek-btn');
+let isBgPeekMode = false;
+
+// 桌面端判断：和你现有的 1050px 断点保持一致（见你的移动端媒体查询 :contentReference[oaicite:4]{index=4}）
+function isDesktop() {
+  return !window.matchMedia('(max-width: 1050px)').matches;
+}
+
+function setBgPeekMode(on) {
+  isBgPeekMode = !!on;
+  document.body.classList.toggle('bg-peek-mode', isBgPeekMode);
+  if (bgPeekBtn) bgPeekBtn.classList.toggle('active', isBgPeekMode);
+}
+
+
+function isMobile() {
+  return window.matchMedia('(max-width: 1050px)').matches;
+}
+
+function setBgPeekMode(on) {
+  isBgPeekMode = !!on;
+
+  // 只做移动端这个模式（PC 的 Shift 模式你之前那套可以继续用）
+  document.body.classList.toggle('bg-peek-mobile-mode', isBgPeekMode && isMobile());
+
+  if (bgPeekMobile) bgPeekMobile.classList.toggle('active', isBgPeekMode && isMobile());
+}
+
+function toggleBgPeekMode() {
+  setBgPeekMode(!isBgPeekMode);
+}
+
+if (bgPeekMobileBtn) {
+  bgPeekMobileBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleBgPeekMode();
+  });
+}
+
+// 屏幕尺寸切换时：如果处在开启状态，自动把 class 挂到正确端
+window.addEventListener('resize', () => {
+  if (!isBgPeekMode) return;
+  // 先清干净再按当前端重新加
+  document.body.classList.remove('bg-peek-mobile-mode');
+  setBgPeekMode(true);
+});
+
+      
+function toggleBgPeekMode() {
+  setBgPeekMode(!isBgPeekMode);
+}
+
+// 手动按钮：点击切换
+if (bgPeekBtn) {
+  bgPeekBtn.addEventListener('click', () => toggleBgPeekMode());
+}
+
+/**
+ * ✅ 关键点：只在“单独按一下 Shift（没有搭配其它按键/鼠标动作）”时触发
+ * 这样 Shift+方向键、Shift+字母（打大写）、Shift+点击选区 都不会误触发
+ */
+let shiftDown = false;
+let shiftUsedWithOther = false;
+
+function shouldIgnoreKeyTarget(target) {
+  if (!target) return false;
+  const tag = (target.tagName || '').toUpperCase();
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (target.isContentEditable) return true;
+  return false;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!isDesktop()) return;
+
+  if (e.key === 'Shift') {
+    if (shiftDown) return; // 已经按住了，忽略重复
+    if (shouldIgnoreKeyTarget(e.target)) return;
+
+    shiftDown = true;
+    shiftUsedWithOther = false;
+    return;
+  }
+
+  // Shift 按住期间按了其它键：标记为“组合键”，不触发切换
+  if (shiftDown) shiftUsedWithOther = true;
+});
+
+document.addEventListener('mousedown', () => {
+  // Shift+鼠标点击（常用于选区）：也视为组合操作，不触发
+  if (shiftDown) shiftUsedWithOther = true;
+}, true);
+
+document.addEventListener('keyup', (e) => {
+  if (!isDesktop()) return;
+  if (e.key !== 'Shift') return;
+
+  if (!shouldIgnoreKeyTarget(e.target)) {
+    if (shiftDown && !shiftUsedWithOther) {
+      toggleBgPeekMode();
+    }
+  }
+
+  shiftDown = false;
+  shiftUsedWithOther = false;
+});
 
 
 // 初始化 / 重新渲染楼层模式
@@ -1837,9 +2354,12 @@ function renderScrollMode(initialTargetPageIndex = 0) {
     if (safeTarget > 0) {
         const targetFloor = document.querySelector(`.floor[data-page-index="${safeTarget}"]`);
         if (targetFloor) {
+          boostBgHeartbeat(6000);
             targetFloor.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     }
+  // 新增：无论是否跳楼层，记录一下当前推荐位置（初次进入也会记为第 1 楼）
+    saveLastViewToStorage('scroll', safeTarget);
 }
 
 // 确保某一楼已经被渲染（供导航/外部跳转使用）
@@ -1860,9 +2380,7 @@ function ensureFloorRendered(targetPageIndex) {
     }
 }
 
-// 注册滚动懒加载
 function setupFloorLazyLoading() {
-    // 先解绑旧的，避免重复监听
     if (floorLazyScrollHandler) {
         window.removeEventListener('scroll', floorLazyScrollHandler);
     }
@@ -1870,23 +2388,50 @@ function setupFloorLazyLoading() {
     floorLazyScrollHandler = () => {
         if (currentMode !== 'scroll') return;
 
+        // ⭐ 新增：根据视口位置计算当前楼层，并记录
+        if (bookContent) {
+            const floorEls = bookContent.querySelectorAll('.floor');
+            if (floorEls.length > 0) {
+                const viewportTop = window.scrollY;
+                const viewportMiddle = viewportTop + window.innerHeight * 0.3;
+
+                let nearestIndex = 0;
+                let minDiff = Infinity;
+
+                floorEls.forEach(el => {
+                    const rect = el.getBoundingClientRect();
+                    const floorTop = rect.top + window.scrollY;
+                    const diff = Math.abs(floorTop - viewportMiddle);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        const idxStr = el.getAttribute('data-page-index') || '0';
+                        const idx = parseInt(idxStr, 10);
+                        if (!isNaN(idx)) {
+                            nearestIndex = idx;
+                        }
+                    }
+                });
+
+                saveLastViewToStorage('scroll', nearestIndex);
+            }
+        }
+
+        // 原有：靠近底部时懒加载后续楼层
         const scrollPos = window.scrollY + window.innerHeight;
         const docHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
 
-        // 距离底部 300px 以内时加载下一批
         if (scrollPos + 300 >= docHeight) {
-            const total = activePages ? activePages.length : 0;
-            if (renderedFloorCount >= total) return;
-
-            const nextEnd = Math.min(total, renderedFloorCount + FLOOR_BATCH_SIZE);
-            renderFloorsRange(renderedFloorCount, nextEnd);
-            renderedFloorCount = nextEnd;
+            const total = activePages.length;
+            if (renderedFloorCount < total) {
+                const nextEnd = Math.min(total, renderedFloorCount + FLOOR_BATCH_SIZE);
+                renderFloorsRange(renderedFloorCount, nextEnd);
+                renderedFloorCount = nextEnd;
+            }
         }
     };
 
     window.addEventListener('scroll', floorLazyScrollHandler);
 }
-
 
         /* ---------- 渲染器：翻页（单页）模式 ---------- */
         function destroyPageModeQuill() {
@@ -2038,7 +2583,8 @@ if (pageCommentBtn) {
     pageCommentBtn.textContent = `查看评论 (${commentCount})`;
 }
   processContentForSentenceIds(pageQuill.root);
-
+  // 新增：翻页模式下记录当前页
+    saveLastViewToStorage('page', pageIndex);
 }
 
 // 【修改 script.txt: 87 行附近，在 renderPageMode 函数体内部】
@@ -2054,6 +2600,571 @@ if (pageContainer) {
 
     });
 }
+              // 阅读端用的背景配置选择：优先已发布，其次草稿（作者预览时也能看到）
+        function pickBackgroundConfigForRead(work) {
+            if (!work || typeof work !== 'object') {
+                return { images: [], bindings: [], transitions: [] };
+            }
+            if (work.backgroundPublished && typeof work.backgroundPublished === 'object') {
+                return work.backgroundPublished;
+            }
+            if (work.backgroundDraft && typeof work.backgroundDraft === 'object') {
+                return work.backgroundDraft;
+            }
+            return { images: [], bindings: [], transitions: [] };
+        }
+        // 当前模式下真正显示句子的容器
+        function getCurrentReadingContainer() {
+            // scroll 模式：整篇楼层列表
+            if (currentMode === 'scroll') {
+                return bookContent; // 你原来的楼层容器
+            }
+            // page 模式：翻页区域
+            const pageView = document.getElementById('page-view');
+            return pageView || bookContent;
+        }
+        // 初始化 / 重建 背景区间列表（起始句 / 结束句 -> 垂直位置）
+function initReadingBackgroundSystem() {
+  // 1️⃣ 作品是否存在
+  if (!activeWork) {
+    if (EFFECT_BG_DEBUG) {
+      console.log('🧩 [BG] 没有 activeWork，跳过背景系统');
+    }
+    return;
+  }
+
+  // 2️⃣ 背景 DOM 是否就绪
+  if (!bgWrapper || !bgLayerA || !bgLayerB) {
+    if (EFFECT_BG_DEBUG) {
+      console.log('🧩 [BG] 背景 DOM 不完整，wrapper / layerA / layerB 有缺失：', {
+        bgWrapper: !!bgWrapper,
+        bgLayerA: !!bgLayerA,
+        bgLayerB: !!bgLayerB
+      });
+    }
+    return;
+  }
+
+  // 3️⃣ 读取作品里的背景配置
+  const conf = pickBackgroundConfigForRead(activeWork);
+  const images = Array.isArray(conf.images) ? conf.images : [];
+  const bindings = Array.isArray(conf.bindings) ? conf.bindings : [];
+
+   // ⭐ 新增：把当前配置记到全局，给 pickBgTransitionEffect 用
+  bgConfig = {
+    images,
+    bindings,
+    transitions: Array.isArray(conf.transitions) ? conf.transitions : []
+  };
+
+  if (EFFECT_BG_DEBUG) {
+    console.log('🧩 [BG] 原始 background 配置:', conf);
+    console.log('🧩 [BG] images:', images);
+    console.log('🧩 [BG] bindings:', bindings);
+  }
+
+  bgSegments = [];
+  const imageMap = {};
+
+  // 4️⃣ 建立 imageId -> 图片信息 的映射
+  images.forEach(function (img, idx) {
+    if (!img) {
+      return;
+    }
+
+    var key = img.imageId || img.id;
+    if (!key) {
+      key = 'bg-' + String(idx);
+    }
+
+    imageMap[String(key)] = {
+      id: String(key),
+      url: img.url,
+      name: img.name || ''
+    };
+  });
+
+  if (EFFECT_BG_DEBUG) {
+    console.log('🧩 [BG] imageMap:', imageMap);
+  }
+
+  // 5️⃣ 找到当前真正显示句子的容器
+  const containerEl = getCurrentReadingContainer();
+  if (!containerEl) {
+    if (EFFECT_BG_DEBUG) {
+      console.log('🧩 [BG] 找不到阅读容器');
+    }
+    return;
+  }
+
+  if (EFFECT_BG_DEBUG) {
+    const allNodes = containerEl.querySelectorAll('[data-sentence-index]');
+    let maxIdx = -1;
+    allNodes.forEach(el => {
+      const n = Number(el.dataset.sentenceIndex);
+      if (!Number.isNaN(n) && n > maxIdx) maxIdx = n;
+    });
+    console.log('🧩 [BG] 当前 DOM 里句子节点数量 =', allNodes.length, '，最大 index =', maxIdx);
+  }
+
+  // 6️⃣ 按绑定生成每一段背景区间
+  bindings.forEach(function (b, idx) {
+    if (!b) {
+      return;
+    }
+
+    const startLine = Number(b.startLine);
+    const endLine = Number(b.endLine);
+    const img = imageMap[String(b.imageId)];
+
+    const startSelector = '[data-sentence-index="' + startLine + '"]';
+    const endSelector   = '[data-sentence-index="' + endLine + '"]';
+    const startEl = containerEl.querySelector(startSelector);
+    const endEl   = containerEl.querySelector(endSelector);
+
+    if (EFFECT_BG_DEBUG) {
+      console.log('🧩 [BG] 处理绑定 #' + idx, {
+        imageId: b.imageId,
+        imageName: b.imageName,
+        startLine: startLine,
+        endLine: endLine,
+        startSelector: startSelector,
+        endSelector: endSelector,
+        hasImg: !!img,
+        hasStartEl: !!startEl,
+        hasEndEl: !!endEl,
+        startText: startEl ? startEl.textContent.trim().slice(0, 20) : null,
+        endText: endEl ? endEl.textContent.trim().slice(0, 20) : null
+      });
+    }
+
+    if (!img) {
+      return;
+    }
+    if (!startEl) {
+      return;
+    }
+    if (!endEl) {
+      return;
+    }
+
+    bgSegments.push({
+      imageId: img.id,
+      imageUrl: img.url,
+      imageName: b.imageName || img.name,
+      startLine: startLine,
+      endLine: endLine,
+      startEl: startEl,
+      endEl: endEl,
+      startTop: 0,
+      endBottom: 0
+    });
+  });
+
+  if (EFFECT_BG_DEBUG) {
+    console.log('🧩 [BG] 最终生成的 bgSegments:', bgSegments);
+  }
+
+  if (!bgSegments.length) {
+    if (EFFECT_BG_DEBUG) {
+      console.log('🧩 [BG] 没有任何有效的背景区间，保持默认灰色背景');
+    }
+    clearReadingBackground();
+    return;
+  }
+
+  // 7️⃣ 先计算一次各区间的位置，再按当前滚动位置更新一次背景
+  recalcBgSegmentPositions();
+  updateReadingBackgroundByScroll(true);
+
+  // 8️⃣ 只在第一次调用时绑定 scroll / resize 事件
+  if (!window.__BG_SCROLL_BOUND__) {
+    window.addEventListener(
+      'scroll',
+      function () {
+        boostBgHeartbeat(900); 
+        updateReadingBackgroundByScroll(false);
+      },
+      { passive: true }
+    );
+
+    window.addEventListener('resize', function () {
+      boostBgHeartbeat(1500); 
+      recalcBgSegmentPositions();
+      updateReadingBackgroundByScroll(false);
+    });
+
+    window.__BG_SCROLL_BOUND__ = true;
+    startBgHeartbeat();
+
+    if (EFFECT_BG_DEBUG) {
+      console.log('🧩 [BG] 已绑定 scroll / resize 事件');
+    }
+  }
+}
+
+        // 重新计算每个“背景区间”的起始 / 结束 Y 坐标（绝对位置）
+        function recalcBgSegmentPositions() {
+            if (!bgSegments.length) return;
+            const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+
+            bgSegments.forEach(seg => {
+                if (!seg.startEl || !seg.endEl) return;
+                const startRect = seg.startEl.getBoundingClientRect();
+                const endRect = seg.endEl.getBoundingClientRect();
+                seg.startTop = startRect.top + scrollY;
+                seg.endBottom = endRect.bottom + scrollY;
+            });
+        }
+
+function boostBgHeartbeat(ms) {
+  const dur = (typeof ms === 'number') ? ms : 3000;
+  const until = Date.now() + dur;
+  if (until > bgHeartbeatFastUntil) {
+    bgHeartbeatFastUntil = until;
+  }
+}
+
+function startBgHeartbeat() {
+  if (bgHeartbeatTimer) return;
+  bgHeartbeatLastScrollY = -1;
+  bgHeartbeatLastDocH = -1;
+  bgHeartbeatMismatchStreak = 0;
+
+  bgHeartbeatTimer = setInterval(bgHeartbeatTick, 250);
+}
+
+function stopBgHeartbeat() {
+  if (!bgHeartbeatTimer) return;
+  clearInterval(bgHeartbeatTimer);
+  bgHeartbeatTimer = null;
+}
+
+function bgHeartbeatTick() {
+  if (!bgSegments) return;
+  if (bgSegments.length === 0) return;
+  if (!bgLayerA) return;
+  if (!bgLayerB) return;
+
+  const now = Date.now();
+  const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  const docH = document.documentElement.scrollHeight || 0;
+
+  // 页面静止且不在“快速纠偏窗口” → 不做事（省性能）
+  if (now >= bgHeartbeatFastUntil) {
+    if (scrollY === bgHeartbeatLastScrollY) {
+      if (docH === bgHeartbeatLastDocH) {
+        return;
+      }
+    }
+  }
+  bgHeartbeatLastScrollY = scrollY;
+  bgHeartbeatLastDocH = docH;
+
+  const centerY = scrollY + window.innerHeight * 0.4;
+
+  // currentBgSegment 可能在重建 bgSegments 后“引用失效”
+  if (currentBgSegment) {
+    if (bgSegments.indexOf(currentBgSegment) === -1) {
+      currentBgSegment = null;
+    }
+  }
+
+  // 1) 先快速判断：当前段用“实时 rect”是否仍覆盖 centerY
+  if (currentBgSegment) {
+    const seg = currentBgSegment;
+    if (seg.startEl) {
+      if (seg.endEl) {
+        const sRect = seg.startEl.getBoundingClientRect();
+        const eRect = seg.endEl.getBoundingClientRect();
+        const freshStart = sRect.top + scrollY;
+        const freshEnd = eRect.bottom + scrollY;
+
+        if (centerY >= freshStart) {
+          if (centerY <= freshEnd) {
+            if (currentBgImageId === seg.imageId) {
+              bgHeartbeatMismatchStreak = 0;
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2) 找到“实时位置”下，centerY 应该属于哪一段（或最近段）
+  let expectedSeg = null;
+  let nearestSeg = null;
+  let minDist = Infinity;
+
+  for (let i = 0; i < bgSegments.length; i++) {
+    const seg2 = bgSegments[i];
+    if (!seg2) continue;
+    if (!seg2.startEl) continue;
+    if (!seg2.endEl) continue;
+
+    const sRect2 = seg2.startEl.getBoundingClientRect();
+    const eRect2 = seg2.endEl.getBoundingClientRect();
+    const start2 = sRect2.top + scrollY;
+    const end2 = eRect2.bottom + scrollY;
+
+    if (centerY >= start2) {
+      if (centerY <= end2) {
+        expectedSeg = seg2;
+        break;
+      }
+    }
+
+    let dist = 0;
+    if (centerY < start2) dist = start2 - centerY;
+    else if (centerY > end2) dist = centerY - end2;
+    else dist = 0;
+
+    if (dist < minDist) {
+      minDist = dist;
+      nearestSeg = seg2;
+    }
+  }
+
+  if (!expectedSeg) expectedSeg = nearestSeg;
+  if (!expectedSeg) return;
+
+  // 3) 连续错两次（或处于 fast 窗口）才纠偏，避免 smooth scroll 中间态抖动
+  if (currentBgImageId !== expectedSeg.imageId) {
+    bgHeartbeatMismatchStreak++;
+  } else {
+    bgHeartbeatMismatchStreak = 0;
+  }
+
+  let shouldFix = false;
+  if (bgHeartbeatMismatchStreak >= 2) shouldFix = true;
+  if (now < bgHeartbeatFastUntil) shouldFix = true;
+
+  if (!shouldFix) return;
+
+  bgHeartbeatMismatchStreak = 0;
+
+  // ✅ 核心：重算区间坐标 + 立即按滚动位置刷新背景
+  recalcBgSegmentPositions();
+  updateReadingBackgroundByScroll(true);
+}
+
+      
+        function handleBgScrollThrottled() {
+            if (bgScrollTicking) return;
+            bgScrollTicking = true;
+            requestAnimationFrame(() => {
+                bgScrollTicking = false;
+                updateReadingBackgroundByScroll(false);
+            });
+        }
+
+        // 根据当前滚动位置（视口中心）决定应该使用哪个背景
+        function updateReadingBackgroundByScroll(isImmediate) {
+    // 1️⃣ 没有任何背景区间，直接保持默认灰色
+    if (!bgSegments.length) {
+        clearReadingBackground();
+        return;
+    }
+
+    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    const centerY = scrollY + vh / 2;   // 视口中心作为“判定点”
+
+    // 2️⃣ 先按正常逻辑，看看 centerY 是否落在某个区间内
+    let targetSeg = null;
+    for (let i = 0; i < bgSegments.length; i++) {
+        const seg = bgSegments[i];
+        if (seg.startTop <= centerY) {
+            if (centerY <= seg.endBottom) {
+                targetSeg = seg;
+                break;
+            }
+        }
+    }
+
+    // 3️⃣ 如果没命中任何区间：尝试选择“距离最近的一段”
+    if (!targetSeg) {
+        let nearestSeg = null;
+        let minDist = Infinity;
+
+        for (let j = 0; j < bgSegments.length; j++) {
+            const seg2 = bgSegments[j];
+
+            let dist = 0;
+            if (centerY < seg2.startTop) {
+                dist = seg2.startTop - centerY;   // 在该段上方
+            } else if (centerY > seg2.endBottom) {
+                dist = centerY - seg2.endBottom;  // 在该段下方
+            } else {
+                dist = 0;
+            }
+
+            if (dist < minDist) {
+                minDist = dist;
+                nearestSeg = seg2;
+            }
+        }
+
+        const threshold = vh * 0.5;
+
+        // ⭐ 新增：判断是否“允许退回灰色背景”
+        // 如果 bindings 总数 > 已成功生成的 bgSegments 数，说明有一部分绑定还没被懒加载到 DOM 里，
+        // 这时候不要清空背景，否则就会出现你现在遇到的“提前变灰一下”的情况。
+        let allowClearToDefault = true;
+        if (bgConfig && Array.isArray(bgConfig.bindings)) {
+            if (bgConfig.bindings.length > bgSegments.length) {
+                allowClearToDefault = false;
+            }
+        }
+
+        if (nearestSeg) {
+            // 是否采用最近的一段背景
+            let useNearest = false;
+
+            if (minDist < threshold) {
+                useNearest = true;
+            } else {
+                // 即使离得比较远，只要还有“未落地的绑定”，也强行用最近的一段，
+                // 避免在懒加载过程中出现莫名其妙的灰色闪一下
+                if (!allowClearToDefault) {
+                    useNearest = true;
+                }
+            }
+
+            if (useNearest) {
+                targetSeg = nearestSeg;
+            } else {
+                // 真正离所有背景都很远，且已经确认“所有绑定都落地”时，才退回默认灰色
+                if (allowClearToDefault) {
+                    if (currentBgImageId !== null) {
+                        playBackgroundTransition(null, 'fade', isImmediate);
+                        currentBgImageId = null;
+                        currentBgSegment = null;
+                    }
+                }
+                return;
+            }
+        } else {
+            // 连最近的一段都没有（极端情况），同样只有在允许的前提下才清空
+            if (allowClearToDefault) {
+                if (currentBgImageId !== null) {
+                    playBackgroundTransition(null, 'fade', isImmediate);
+                    currentBgImageId = null;
+                    currentBgSegment = null;
+                }
+            }
+            return;
+        }
+    }
+
+    // 4️⃣ 如果判定结果和当前背景完全一样，就不重复切换（保持你之前的“无 &&”写法）
+    if (currentBgSegment) {
+        if (currentBgSegment === targetSeg) {
+            if (currentBgImageId === targetSeg.imageId) {
+                return;
+            }
+        }
+    }
+
+    // 5️⃣ 根据 from / to 决定转场特效
+    const effectType = pickBgTransitionEffect(currentBgSegment, targetSeg);
+
+    currentBgSegment = targetSeg;
+    currentBgImageId = targetSeg.imageId;
+    playBackgroundTransition(targetSeg.imageUrl, effectType, isImmediate);
+}
+
+
+        // 根据 fromSeg / toSeg 和 bgTransitions 决定转场特效类型
+        function pickBgTransitionEffect(fromSeg, toSeg) {
+            if (!bgConfig || !Array.isArray(bgConfig.transitions)) {
+                return 'fade';
+            }
+            if (!fromSeg || !toSeg) {
+                // 从默认灰背景进入某一段，或从某一段退出到默认背景：用普通淡入淡出
+                return 'fade';
+            }
+            const fromLine = fromSeg.endLine;
+            const toLine = toSeg.startLine;
+            const found = bgConfig.transitions.find(t =>
+                Number(t.fromLine) === fromLine &&
+                Number(t.toLine) === toLine
+            );
+            return (found && found.effectType) || 'fade';
+        }
+        function clearReadingBackground() {
+            if (!bgLayerA || !bgLayerB) return;
+            bgLayerA.style.opacity = '0';
+            bgLayerB.style.opacity = '0';
+            bgLayerA.style.backgroundImage = '';
+            bgLayerB.style.backgroundImage = '';
+            currentBgImageId = null;
+            currentBgSegment = null;
+        }
+
+        // 根据 effectType 切换背景图片
+        function playBackgroundTransition(nextImageUrl, effectType, isImmediate) {
+    if (!bgLayerA || !bgLayerB) return;
+
+    if (EFFECT_BG_DEBUG) {
+        console.log('🧩 [BG] playBackgroundTransition 调用', {
+            nextImageUrl,
+            effectType,
+            isImmediate,
+            currentBgLayerFlag
+        });
+    }
+
+    const currentLayer = currentBgLayerFlag === 'A' ? bgLayerA : bgLayerB;
+    const nextLayer = currentBgLayerFlag === 'A' ? bgLayerB : bgLayerA;
+
+    if (!nextImageUrl) {
+        currentLayer.style.opacity = '0';
+        nextLayer.style.opacity = '0';
+        return;
+    }
+
+    nextLayer.style.backgroundImage = `url("${nextImageUrl}")`;
+
+    if (isImmediate) {
+                nextLayer.style.transition = 'none';
+                currentLayer.style.transition = 'none';
+
+                nextLayer.style.opacity = '1';
+                currentLayer.style.opacity = '0';
+
+                requestAnimationFrame(() => {
+                    nextLayer.style.transition = '';
+                    currentLayer.style.transition = '';
+                });
+
+                currentBgLayerFlag = currentBgLayerFlag === 'A' ? 'B' : 'A';
+      if (EFFECT_BG_DEBUG) {
+            console.log('🧩 [BG] 立即切换到背景', {
+                layerId: nextLayer.id,
+                bg: nextLayer.style.backgroundImage,
+                opacity: nextLayer.style.opacity
+            });
+        }
+                return;
+            }
+
+
+    nextLayer.style.opacity = '1';
+    currentLayer.style.opacity = '0';
+    currentBgLayerFlag = currentBgLayerFlag === 'A' ? 'B' : 'A';
+
+    if (EFFECT_BG_DEBUG) {
+        console.log('🧩 [BG] 动画切换到背景', {
+            layerId: nextLayer.id,
+            bg: nextLayer.style.backgroundImage,
+            opacity: nextLayer.style.opacity
+        });
+    }
+}
+
+
 
 
     // 【删除或注释掉旧的 addCommentListenersToContainer 调用】
@@ -2100,7 +3211,10 @@ function renderSidebar(total, type) {
                     const targetFloor = document.querySelector(selector);
                     if (targetFloor) {
                         targetFloor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+               
                     }
+                  // ⭐ 点击导航后立刻记录当前楼层
+                    saveLastViewToStorage('scroll', i);
                 }, 0);
             } else {
                 // 翻页模式：切换 currentPageIndex 并重新渲染
@@ -2108,6 +3222,8 @@ function renderSidebar(total, type) {
                 currentMode = 'page';
                 renderCurrentMode();
                 window.scrollTo(0, 0);
+              // ⭐ 翻页模式导航后记录页码
+                saveLastViewToStorage('page', i);
             }
         });
 
@@ -2399,17 +3515,61 @@ async function openCommentPanelForViewerMode(workId, pageIndex) {
         submitCommentBtn.addEventListener('click', submitComment);
 
         /* ---------- 切换/渲染当前模式 ---------- */
+/* ---------- 切换/渲染当前模式 ---------- */
 function renderCurrentMode() {
     if (!activeWork) return;
+
+    // ⭐ 首次渲染时，尝试根据本地记录恢复阅读位置
+    if (!hasAppliedLastView) {
+        const lastView = loadLastViewFromStorage();
+        if (lastView && typeof lastView.pageIndex === 'number') {
+            // 优先恢复到当时的模式（page / scroll）
+            if (lastView.mode === 'page') {
+                currentMode = 'page';
+                currentPageIndex = Math.min(
+                    Math.max(lastView.pageIndex, 0),
+                    (activePages?.length || 1) - 1
+                );
+            } else {
+                currentMode = 'scroll';
+            }
+
+            hasAppliedLastView = true;
+
+            if (currentMode === 'scroll') {
+                // 楼层模式：把目标楼层传给渲染函数，让它优先加载并滚动过去
+                renderScrollMode(lastView.pageIndex);
+            } else {
+                renderPageMode();
+            }
+
+            setTimeout(() => {
+                const root = currentMode === 'scroll'
+                    ? bookContent
+                    : (pageQuill?.root || bookContent);
+                if (root) {
+                    processContentForSentenceIds(root);
+                    console.log('✅ 评论句子点击绑定完成（恢复阅读位置）');
+                }
+            }, 50);
+            return; // 已按记录渲染，不再走下面的默认逻辑
+        }
+
+        // 没有记录，也标记已处理，之后切换模式不用再检查
+        hasAppliedLastView = true;
+    }
+
+    // 默认：按当前模式渲染
     if (currentMode === 'scroll') {
         renderScrollMode();
     } else {
         renderPageMode();
     }
 
-    // ✅ 延迟绑定，确保 Quill/HTML 完全渲染后再执行
     setTimeout(() => {
-        const root = currentMode === 'scroll' ? bookContent : (pageQuill?.root || bookContent);
+        const root = currentMode === 'scroll'
+            ? bookContent
+            : (pageQuill?.root || bookContent);
         if (root) {
             processContentForSentenceIds(root);
             console.log('✅ 评论句子点击绑定完成');
@@ -2513,6 +3673,26 @@ function renderCurrentMode() {
         sidebarToggleBtn.setAttribute('title', isCollapsed ? '展开侧边栏' : '收起侧边栏');
     }
 });
+
+              // 新增：统一的“回到顶部”函数
+        function scrollToTopSmooth() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        if (backToTopBtn) {
+            backToTopBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                scrollToTopSmooth();
+            });
+        }
+
+        if (backToTopMobileBtn) {
+            backToTopMobileBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                scrollToTopSmooth();
+            });
+        }
+
 
 function getCommentsCountForPage(pageIndex) {
   const pageObj = activePages[pageIndex];

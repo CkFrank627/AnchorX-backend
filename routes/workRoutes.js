@@ -233,40 +233,56 @@ router.post('/', auth, async (req, res) => {
 
 // **修改：更新作品的路由**
 router.put('/:id', auth, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { content } = req.body; 
-        
-        if (!Array.isArray(content)) {
-            return res.status(400).json({ message: '内容格式不正确，需要是一个页面数组' });
-        }
+    try {
+        const { id } = req.params;
+        const { content, pages, title } = req.body;
 
-        // 新增：计算更新后的字数
-        const newWordCount = calculateWordCount(content);
+        // ✅ 兼容：优先 pages；否则回退到 content
+        const pageArray = Array.isArray(pages) ? pages : content;
 
-        const updatedWork = await Work.findOneAndUpdate(
-            { _id: id, author: req.userId },
-            // 更新内容、更新时间和字数
-            {
-    content: content.map(p => ({
-        ...p,
-        updatedAt: new Date()
-    })),
-    updatedAt: new Date(),
-    wordCount: newWordCount
-},
-            { new: true, timestamps: true }
-        );
+        if (!Array.isArray(pageArray)) {
+            return res.status(400).json({ message: '内容格式不正确，需要是一个页面数组' });
+        }
 
-        if (!updatedWork) {
-            return res.status(404).json({ message: '作品不存在或无权修改' });
-        }
+        const normalizedPages = pageArray.map(p => ({
+            ...p,
+            updatedAt: new Date()
+        }));
 
-        res.json(updatedWork);
-    } catch (error) {
-        res.status(500).json({ message: '更新作品失败', error: error.message });
-    }
+        const newWordCount = calculateWordCount(pageArray);
+
+        const updateDoc = {
+            // 旧字段（兼容老前端/老数据）
+            content: normalizedPages,
+
+            // ✅ 新字段（要真正落库：Work schema 里需要有 pages 字段）
+            pages: normalizedPages,
+
+            updatedAt: new Date(),
+            wordCount: newWordCount
+        };
+
+        // ✅ PUT 也允许更新 title（不传就不动）
+        if (title !== undefined) {
+            updateDoc.title = title;
+        }
+
+        const updatedWork = await Work.findOneAndUpdate(
+            { _id: id, author: req.userId },
+            updateDoc,
+            { new: true, timestamps: true }
+        );
+
+        if (!updatedWork) {
+            return res.status(404).json({ message: '作品不存在或无权修改' });
+        }
+
+        res.json(updatedWork);
+    } catch (error) {
+        res.status(500).json({ message: '更新作品失败', error: error.message });
+    }
 });
+
 
 // **新增：支持页面(pages)删除/更新的 PATCH 路由**
 // 前端使用 PATCH /api/works/:id 发送 { pages: newPages }
@@ -322,6 +338,13 @@ router.patch('/:id', auth, async (req, res) => {
                 ...p,
                 updatedAt: new Date(),
             }));
+
+            // ✅ 同步写入 pages 字段（真正落库）
+updateFields.pages = pages.map((p) => ({
+    ...p,
+    updatedAt: new Date(),
+}));
+
             updateFields.wordCount = calculateWordCount(pages);
             updateFields.updatedAt = new Date(); // 记录作品更新时间
         }
