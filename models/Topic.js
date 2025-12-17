@@ -35,6 +35,19 @@ const topicSchema = new mongoose.Schema({
     },
 
     // ===================================
+// 新增：置顶功能
+// ===================================
+isPinned: {
+  type: Boolean,
+  default: false
+},
+pinnedAt: {
+  type: Date,
+  default: null
+},
+
+
+    // ===================================
     // 新增：点赞功能
     // ===================================
     likesCount: {
@@ -73,5 +86,8 @@ const topicSchema = new mongoose.Schema({
 
 // 为标题创建索引，提高查询速度
 topicSchema.index({ title: 'text' });
+
+topicSchema.index({ section: 1, isPinned: -1, pinnedAt: -1, lastReplyAt: -1, createdAt: -1 });
+
 
 module.exports = mongoose.model('Topic', topicSchema);

@@ -422,6 +422,22 @@
     display: block;
 }
 
+      .pin-badge{
+  display:inline-block;
+  font-size:12px;
+  padding:2px 6px;
+  border-radius:999px;
+  border:1px solid #f5c542;
+  background: rgba(245, 197, 66, 0.15);
+  margin-right:8px;
+  vertical-align:middle;
+}
+
+.topic-item.topic-pinned{
+  border-left: 4px solid #f5c542;
+  background: rgba(245, 197, 66, 0.06);
+}
+
       
     </style>
 </head>
@@ -534,6 +550,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let replyCurrentPage = 1;
     let replyTotalPages = 1;
     let isLiked = false; 
+  let topicFetchSeq = 0;
+let topicFetchAbort = null;
+
 
     // -------------------------------------------------------------------
     // --- DOM & Quill 初始化 ---
@@ -775,62 +794,74 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 渲染函数 ---
     // -------------------------------------------------------------------
 
- function renderTopicDetail(topic, _isLiked) {
-    document.getElementById('topicTitle').textContent = topic.title;
+function renderTopicDetail(topic, _isLiked) {
+  const titleEl = document.getElementById('topicTitle');
+  if (!titleEl) return; // ✅ DOM 不在就别渲染，避免 null
 
-    const topicAuthorEl = document.getElementById('topicAuthor');
-    const topicAuthorAvatarEl = document.getElementById('topicAuthorAvatar');
+  // ✅ 置顶样式：标题前加 📌
+  const pinPrefix = topic?.isPinned ? '📌 ' : '';
+  titleEl.textContent = pinPrefix + (topic?.title || '');
 
-    if (topic.author) {
-        const statusHtml = renderUserStatusBadge(topic.author.lastActiveAt);
-        topicAuthorEl.innerHTML = `作者: ${escapeHtml(topic.author.username)} ${statusHtml}`;
+    const topicAuthorEl = $('topicAuthor');
+    const topicAuthorAvatarEl = $('topicAuthorAvatar');
 
-        if (topic.author.avatarUrl) {
-            topicAuthorAvatarEl.innerHTML =
-                `<img src="${escapeHtml(topic.author.avatarUrl)}" alt="${escapeHtml(topic.author.username)}">`;
+    if (topicAuthorEl) {
+        if (topic?.author?.username) {
+            const statusHtml = renderUserStatusBadge(topic.author.lastActiveAt);
+            topicAuthorEl.innerHTML = `作者: ${escapeHtml(topic.author.username)} ${statusHtml}`;
         } else {
-            const initial = escapeHtml(topic.author.username[0] || 'U').toUpperCase();
-            topicAuthorAvatarEl.textContent = initial;
+            topicAuthorEl.textContent = '作者: 匿名';
         }
-    } else {
-        topicAuthorEl.textContent = '作者: 匿名';
-        topicAuthorAvatarEl.textContent = 'U';
     }
 
-        document.getElementById('topicCreatedAt').textContent = formatDate(topic.createdAt);
-        document.getElementById('topicViews').textContent = topic.viewsCount || 0;
-        document.getElementById('topicRepliesCount').textContent = topic.repliesCount || 0;
-        document.getElementById('replyCountHeader').textContent = topic.repliesCount || 0;
+    if (topicAuthorAvatarEl) {
+        if (topic?.author?.avatarUrl) {
+            topicAuthorAvatarEl.innerHTML =
+                `<img src="${escapeHtml(topic.author.avatarUrl)}" alt="${escapeHtml(topic.author.username || 'user')}">`;
+        } else {
+            const initial = escapeHtml((topic?.author?.username || 'U')[0]).toUpperCase();
+            topicAuthorAvatarEl.textContent = initial;
+        }
+    }
 
-        const topicSectionEl = document.getElementById('topicSection');
-        if (topic.section && topic.section.name) {
+
+    setText('topicCreatedAt', formatDate(topic?.createdAt));
+    setText('topicViews', topic?.viewsCount ?? 0);
+    setText('topicRepliesCount', topic?.repliesCount ?? 0);
+    setText('replyCountHeader', topic?.repliesCount ?? 0);
+
+    const topicSectionEl = $('topicSection');
+    if (topicSectionEl) {
+        if (topic?.section?.name) {
             topicSectionEl.textContent = topic.section.name;
             topicSectionEl.style.display = 'inline-block';
         } else {
             topicSectionEl.style.display = 'none';
         }
-
-        const likeCountEl = document.getElementById('likeCount');
-        likeCountEl.textContent = topic.likesCount || 0;
-        isLiked = _isLiked;
-
-        if (isLiked) {
-            likeButton.classList.add('liked');
-            likeButton.innerHTML = `🧡 <span>${likeCountEl.textContent}</span>`;
-        } else {
-            likeButton.classList.remove('liked');
-            likeButton.innerHTML = `❤️ <span>${likeCountEl.textContent}</span>`;
-        }
-        likeButton.disabled = false;
-
-        const contentContainer = document.getElementById('topicContent');
-        if (topic.content) {
-            contentContainer.innerHTML = topic.content;
-        } else {
-            contentContainer.innerHTML = '<p>主题内容为空。</p>';
-        }
     }
 
+    const likeCountEl = $('likeCount');
+    if (likeCountEl) likeCountEl.textContent = String(topic?.likesCount ?? 0);
+
+    // likeButton 也要防 null（防止某些模板页没有点赞区）
+    if (typeof likeButton !== 'undefined' && likeButton) {
+        isLiked = !!_isLiked;
+        if (isLiked) {
+            likeButton.classList.add('liked');
+            likeButton.innerHTML = `🧡 <span>${escapeHtml(likeCountEl?.textContent || '0')}</span>`;
+        } else {
+            likeButton.classList.remove('liked');
+            likeButton.innerHTML = `❤️ <span>${escapeHtml(likeCountEl?.textContent || '0')}</span>`;
+        }
+        likeButton.disabled = false;
+    }
+
+    // 内容区
+    const contentContainer = $('topicContent');
+    if (contentContainer) {
+        contentContainer.innerHTML = topic?.content ? topic.content : '<p>主题内容为空。</p>';
+    }
+}
 
 
     /**
@@ -1012,65 +1043,96 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-async function fetchTopicAndReplies() {
+async function fetchTopicAndReplies(options = {}) {
+    const { page = 1, showProgress = true } = options;
+
+    // 只允许最后一次请求生效（防止并发/过期回包写 DOM）
+    const mySeq = ++topicFetchSeq;
+
+    // 取消上一轮请求
+    if (topicFetchAbort) {
+        try { topicFetchAbort.abort(); } catch (_) {}
+    }
+    const controller = new AbortController();
+    topicFetchAbort = controller;
+
+    // 进度条（可能不存在：页面被切走/DOM 被替换）
     const progressContainer = document.getElementById('topic-load-progress-container');
     const progressText = document.getElementById('topic-load-progress-text');
     const progressBar = document.getElementById('topic-load-progress-bar');
 
-    // 启动加载条
-    progressContainer.style.display = 'block';
-    progressText.textContent = '正在请求主题数据...';
-    progressBar.style.width = '10%';
+    const setProgress = (pct, msg, color) => {
+        if (!showProgress) return;
+        if (!progressContainer || !progressText || !progressBar) return;
+        progressContainer.style.display = 'block';
+        progressText.textContent = msg;
+        progressBar.style.width = `${pct}%`;
+        if (color) progressBar.style.background = color;
+    };
+
+    const hideProgressSoon = () => {
+        if (!showProgress) return;
+        if (!progressContainer || !progressBar) return;
+        setTimeout(() => {
+            if (progressContainer) progressContainer.style.display = 'none';
+            if (progressBar) progressBar.style.background = '#0077cc';
+        }, 1000);
+    };
 
     try {
+        setProgress(10, '正在请求主题数据...');
+
         const token = getAuthToken();
-        const topicUrl = `${API_BASE_URL}/${topicId}?page=1&limit=${REPLIES_PER_PAGE}`;
-        
+        const topicUrl = `${API_BASE_URL}/${topicId}?page=${page}&limit=${REPLIES_PER_PAGE}`;
+
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const response = await fetch(topicUrl, { headers });
+        const response = await fetch(topicUrl, { headers, signal: controller.signal });
 
-        if (!response.ok) throw new Error(`您的浏览器似乎想和我们对着干！请手动刷新页面 (${response.status})`);
-        progressText.textContent = '正在解析数据...';
-        progressBar.style.width = '40%';
+        // 如果这不是最新一次请求，直接丢弃
+        if (mySeq !== topicFetchSeq) return;
 
+        if (!response.ok) {
+            throw new Error(`您的浏览器似乎想和我们对着干！请手动刷新页面 (${response.status})`);
+        }
+
+        setProgress(40, '正在解析数据...');
         const data = await response.json();
 
-        // 渲染主题部分
-        renderTopicDetail(data.topic, !!data.isLiked);
-        progressText.textContent = '正在渲染主题内容...';
-        progressBar.style.width = '60%';
+        if (mySeq !== topicFetchSeq) return;
 
-        // 渲染回复部分
-        if (Array.isArray(data.replies)) {
-            renderReplies(data.replies);
-            renderReplyPagination();
-        }
-        progressText.textContent = '正在加载回复...';
-        progressBar.style.width = '80%';
+        // 页面关键节点不存在（例如用户已经离开/DOM 被替换），就别继续写了
+        const topicContentEl = document.getElementById('topicContent');
+        const topicTitleEl = document.getElementById('topicTitle');
+        if (!topicContentEl || !topicTitleEl) return;
 
-        // 回复页数信息
         replyCurrentPage = data.replyPage || 1;
         replyTotalPages = data.replyTotalPages || 1;
 
-        // 完成状态
-        progressText.textContent = '加载完成！';
-        progressBar.style.width = '100%';
-        progressBar.style.background = '#4caf50';
-        setTimeout(() => {
-            progressContainer.style.display = 'none';
-            progressBar.style.background = '#0077cc';
-        }, 1000);
+        setProgress(60, '正在渲染主题内容...');
+        renderTopicDetail(data.topic, !!data.isLiked);
+
+        setProgress(80, '正在渲染回复...');
+        renderReplies(Array.isArray(data.replies) ? data.replies : []);
+        renderReplyPagination();
+
+        setProgress(100, '加载完成！', '#4caf50');
+        hideProgressSoon();
 
     } catch (error) {
+        // 被主动取消的请求不算错误（例如连续刷新、提交后立刻又触发刷新）
+        if (error && error.name === 'AbortError') return;
+
         console.error('加载主题或回复失败:', error);
+
         const headerEl = document.querySelector('.topic-header');
         if (headerEl) headerEl.style.display = 'none';
 
         const contentContainer = document.getElementById('topicContent');
         if (contentContainer) {
-            contentContainer.innerHTML = `<p style="color:red; text-align:center;">请手动刷新页面（你的浏览器比较松弛）：${escapeHtml(error.message)}</p>`;
+            contentContainer.innerHTML =
+                `<p style="color:red; text-align:center;">请手动刷新页面（你的浏览器比较松弛）：${escapeHtml(error.message)}</p>`;
         }
 
         const loadingMsg = ensureReplyLoadingMessage('主题加载失败，回复无法显示。');
@@ -1079,11 +1141,16 @@ async function fetchTopicAndReplies() {
         const pagination = document.getElementById('replyPaginationContainer');
         if (pagination) pagination.style.display = 'none';
 
-        progressText.textContent = '加载失败';
-        progressBar.style.background = '#e53935';
-        setTimeout(() => (progressContainer.style.display = 'none'), 1200);
+        // 进度条失败状态也要“安全写入”
+        setProgress(100, '加载失败', '#e53935');
+        if (progressContainer) setTimeout(() => (progressContainer.style.display = 'none'), 1200);
+
+    } finally {
+        // 只清理属于自己的 controller
+        if (topicFetchAbort === controller) topicFetchAbort = null;
     }
 }
+
 
     
     // ... fetchReplies (保持不变) ...
@@ -1172,7 +1239,13 @@ async function fetchTopicAndReplies() {
                     replyStatusMessage.textContent = '';
                     submitReplyBtn.disabled = false;
                     // 重新加载主题和回复，最好是定位到新回复所在页
-                    fetchTopicAndReplies(); 
+                    // 目标页：尽量跳到最后一页（让用户看到自己刚发的回复）
+const currentCount = parseInt(document.getElementById('topicRepliesCount')?.textContent || '0', 10);
+const targetPage = Math.max(1, Math.ceil((currentCount + 1) / REPLIES_PER_PAGE));
+
+// 提交后刷新：不抢戏（可把 showProgress 设为 false）
+fetchTopicAndReplies({ page: targetPage, showProgress: false });
+
                 }, 1000);
 
             } else {

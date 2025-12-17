@@ -98,7 +98,7 @@ router.get('/', async (req, res) => {
         }
 
 const topics = await Topic.find(filter)
-    .sort({ lastReplyAt: -1, createdAt: -1 })
+    .sort({ isPinned: -1, pinnedAt: -1, lastReplyAt: -1, createdAt: -1 })
     .skip(skip)
     .limit(limit)
     // 带上作者的 lastActiveAt + avatarUrl
@@ -384,6 +384,46 @@ router.post('/replies/:replyId/like', auth, async (req, res) => {
         res.status(500).json({ message: '回复点赞操作失败', error: error.message });
     }
 });
+
+// ===================================
+// 接口 X: 置顶/取消置顶主题（管理员）
+// POST /api/topics/:topicId/pin
+// body: { isPinned: true/false }
+// ===================================
+router.post('/:topicId/pin', auth, async (req, res) => {
+  try {
+    const { topicId } = req.params;
+    const { isPinned } = req.body;
+
+    // TODO：这里按你实际的管理员字段改
+    // 例如你 authMiddleware 里如果有 req.userData.isAdmin：
+    // if (!req.userData?.isAdmin) return res.status(403).json({ message: '无权限' });
+
+    const topic = await Topic.findById(topicId);
+    if (!topic) return res.status(404).json({ message: '主题不存在' });
+
+    if (isPinned) {
+      // ✅ 强制它是置顶的那个：同一 section 先全部取消
+      await Topic.updateMany(
+        { section: topic.section, _id: { $ne: topic._id } },
+        { $set: { isPinned: false, pinnedAt: null } }
+      );
+
+      topic.isPinned = true;
+      topic.pinnedAt = new Date();
+    } else {
+      topic.isPinned = false;
+      topic.pinnedAt = null;
+    }
+
+    await topic.save();
+    res.json({ message: 'ok', topicId: topic._id, isPinned: topic.isPinned });
+  } catch (error) {
+    console.error('置顶操作失败:', error);
+    res.status(500).json({ message: '置顶操作失败', error: error.message });
+  }
+});
+
 
 
 module.exports = router;

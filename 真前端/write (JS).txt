@@ -311,6 +311,8 @@ hiddenTextSecretOption.addEventListener('click', () => {
         let selectedRoleColor = null;
         let isQuillActive = true;
 
+      let pageHistories = {};
+
         /* ---------- API 基础地址 ---------- */
         const API_BASE_URL = 'https://api.anchorx.ca/api/works';
 
@@ -803,93 +805,103 @@ function renderDiceHistory(history) {
 async function loadWorkById(id) {
     const work = await fetchWorkById(id);
     if (!work) return;
-    // 避免短路写法（规避 CMS 转义），用中间变量
-    let validContent;
-   if (Array.isArray(work.content)) { // [cite: 607]
-        validContent = work.content;
+
+    // ✅【改动 1：后端字段兼容读取】
+    // 优先读 work.pages，如果为空或不存在，再尝试读 work.content
+    let loadedPages = [];
+    if (Array.isArray(work.pages) && work.pages.length > 0) {
+        loadedPages = work.pages;
+    } else if (Array.isArray(work.content) && work.content.length > 0) {
+        loadedPages = work.content;
     } else {
-        validContent = [];// [cite: 608]
+        loadedPages = [{ content: { ops: [] } }];
     }
-   if (validContent.length > 0) { // [cite: 609]
-        pages = validContent;
-    } else {
-        pages = [{ content: {} }];// [cite: 610]
-    }
-    currentPageIndex = 0;// [cite: 611]
+    
+    // 赋值给全局变量
+    pages = loadedPages;
+    currentPageIndex = 0;
+
+    // ✅【改动 2：重置历史记录栈】
+    pageHistories = {}; // 换作品了，清空所有页的历史
+    if (quill.history) quill.history.clear(); // 清空当前编辑器历史
 
     await switchToEditor(work);
-  startAutoSave();
+    
+    // 暂时关闭自动保存，防止加载过程触发保存
+    const wasAutoSave = autoSaveEnabled;
+    autoSaveEnabled = false; 
 
-                   // ====== 新增：加载骰子历史记录 ====== 
-         const diceHistory = await fetchDiceHistory(id); 
-         renderDiceHistory(diceHistory); 
-         // ===================================
+    // 加载骰子历史
+    const diceHistory = await fetchDiceHistory(id); 
+    renderDiceHistory(diceHistory);
 
-            // 把第一页内容加载进编辑器（content 应该是 Quill 的 Delta 或兼容的 structure）
-            try {
-                // guard: 如果 content 不是对象/Delta，先设置为空 Delta
-                const first = pages[0] && pages[0].content ? pages[0].content : { ops: [] };
-                quill.setContents(first);
-            } catch (err) {
-                console.warn('quill.setContents failed, try empty content', err);
-                quill.setContents({ ops: [] });
-            }
-            // 更新页码 UI
-            updatePageDisplay();
-            renderPageList();
-        }
+    // ✅【改动 3：加载第一页内容】
+    try {
+        const firstPageContent = pages[0]?.content || { ops: [] };
+        // 使用 'silent' 模式设置内容，不触发 text-change 事件，也不计入 history
+        quill.setContents(firstPageContent, 'silent');
+    } catch (err) {
+        console.warn('quill.setContents failed', err);
+        quill.setContents({ ops: [] }, 'silent');
+    }
+
+    updatePageDisplay();
+    renderPageList();
+    
+    // 恢复自动保存状态（如果是开启的）
+    // 延迟一点点确保 Quill 稳定
+    setTimeout(() => {
+        autoSaveEnabled = wasAutoSave;
+        startAutoSave();
+    }, 100);
+}
 
       /* ---------- 保存作品的核心逻辑 (返回是否成功) ---------- */
+/* ---------- 保存作品的核心逻辑 ---------- */
 async function performSave() { 
-    if (!currentWorkId) { 
-        return false; 
-    }
+    if (!currentWorkId) return false;
 
-  // ----------------------------------------------------
-// 【新增：Quill 内容变动事件监听】
-// ----------------------------------------------------
-quill.on('text-change', (delta, oldDelta, source) => {
-    // 仅在用户输入（source === 'user'）时标记，不因程序设置内容而标记
-    if (source === 'user') {
-        markAsChanged(); 
-    }
-});
-// ----------------------------------------------------
-  
-    // 把当前页的内容写回 pages
+    // 1. 确保当前编辑器内容同步到内存 pages 数组
     if (isQuillActive) {
-        pages[currentPageIndex].content = quill.getContents(); //
+        pages[currentPageIndex].content = quill.getContents();
     } else {
-        // 把純文本转成 Delta 格式
-        const lines = plainEditor.value.split('\n'); //
-        const ops = lines.map(line => ({ insert: line + '\n' })); //
-        pages[currentPageIndex].content = { ops: ops }; //
+        const lines = plainEditor.value.split('\n');
+        const ops = lines.map(line => ({ insert: line + '\n' }));
+        pages[currentPageIndex].content = { ops: ops };
     }
 
-    const data = { title: editorTitle.textContent.replace('正在编辑：', ''), content: pages }; //
+    // 2. 构造数据包：同时发送 pages 和 content
+    // 这样无论后端读哪个字段，都能拿到最新的多页数组
+    const data = { 
+        title: editorTitle.textContent.replace('正在编辑：', ''), 
+        pages: pages,    // 新标准
+        content: pages   // 兼容旧标准（防止后端校验 content 必填）
+    };
     
     try {
-        isSaving = true; // 【新增：设置保存状态】
-        const res = await fetch(`${API_BASE_URL}/${currentWorkId}`, { //
-            method: 'PUT',
-            headers: authHeaders(true), //
-            body: JSON.stringify(data) //
+        isSaving = true;
+        const res = await fetch(`${API_BASE_URL}/${currentWorkId}`, {
+            method: 'PUT', // 使用 PUT 确保全量更新
+            headers: authHeaders(true),
+            body: JSON.stringify(data)
         });
-        isSaving = false; // 【新增：清除保存状态】
+        isSaving = false;
 
         if (!res.ok) {
-            const j = await res.json(); //
-            throw new Error(j && j.message ? j.message : '保存失败'); //
+            const j = await res.json();
+            throw new Error(j.message || '保存失败');
         }
-        const updated = await res.json();
-        currentWorkId = updated._id || currentWorkId; //
         
-        return true; // Success
+        // 更新 IDs 等元数据
+        const updated = await res.json();
+        currentWorkId = updated._id || currentWorkId;
+        
+        return true;
     } catch (err) {
-        isSaving = false; // 【新增：清除保存状态】
-        console.error('保存失败', err); //
-        alert('保存失败：' + (err.message || err)); // 只有失败时才弹窗
-        return false; // Failure
+        isSaving = false;
+        console.error('保存失败', err);
+        alert('保存失败：' + err.message);
+        return false;
     }
 }
 
@@ -1044,7 +1056,37 @@ if (localSaveBtn) {
         });
     }
 
+/* ---------- 修复：history 序列化/反序列化（防止 delta.invert 丢失） ---------- */
+const Delta = Quill.import('delta');
 
+function _toOps(deltaLike) {
+  if (!deltaLike) return [];
+  if (Array.isArray(deltaLike)) return deltaLike;              // 直接就是 ops 数组
+  if (Array.isArray(deltaLike.ops)) return deltaLike.ops;      // Delta 或 {ops:[]}
+  return [];
+}
+
+function serializeHistoryStack(stack) {
+  const pack = (list) => (Array.isArray(list) ? list : []).map(item => ({
+    // 只存 ops，避免丢失 Delta 原型方法
+    deltaOps: _toOps(item && item.delta),
+    range: item && item.range ? { index: item.range.index, length: item.range.length } : null,
+  }));
+  return { undo: pack(stack && stack.undo), redo: pack(stack && stack.redo) };
+}
+
+function deserializeHistoryStack(saved) {
+  const unpack = (list) => (Array.isArray(list) ? list : []).map(item => {
+    // 兼容你旧的 JSON.stringify 版本：{ delta: { ops:[...] }, range:... }
+    const ops = (item && item.deltaOps) || _toOps(item && item.delta) || [];
+    return {
+      delta: new Delta(ops),
+      range: item && item.range ? { index: item.range.index, length: item.range.length } : null,
+    };
+  });
+  return { undo: unpack(saved && saved.undo), redo: unpack(saved && saved.redo) };
+}
+      
 /* ---------- 发布（手动保存 + 禁用按钮）---------- */
 publishBtn.addEventListener('click', async () => {
     if (!currentWorkId) {
@@ -1113,64 +1155,99 @@ publishBtn.addEventListener('click', async () => {
 /* ------------------- 最终稳定版：删除当前页面 ------------------- */
 async function deleteCurrentPage() {
     if (!currentWorkId || !Array.isArray(pages) || pages.length === 0) {
-        alert('错误（请在讨论页/贴吧汇报给站长！你将会收获一份诚心诚意土下座大礼包以及修复方案）：作品数据未加载或页面数组异常。');
+        alert('数据异常，无法删除。');
+        return;
+    }
+    if (pages.length === 1) {
+        alert('至少保留一页。');
         return;
     }
 
     const deleteIndex = currentPageIndex;
-    if (pages.length === 1) {
-        alert('姐/兄啊，你连唯一的一页都要删了你不如把整个作品删了');
-        return;
-    }
-
     if (!confirm(`确定要删除第 ${deleteIndex + 1} 页吗？此操作不可恢复。`)) return;
 
-    // ✅ 1. 保存当前页内容
-    pages[deleteIndex].content = quill.getContents();
+    // 1. 🛑 彻底暂停自动保存，防止“抢跑”保存了还未处理完的脏数据
+    const wasAutoSave = autoSaveEnabled;
+    autoSaveEnabled = false;
+    if (autoSaveTimer) clearInterval(autoSaveTimer); // 强制清除计时器
 
-    // ✅ 2. 删除页并更新索引
-    const newPages = pages.filter((_, idx) => idx !== deleteIndex);
-    const nextIndex = deleteIndex > 0 ? deleteIndex - 1 : 0;
-
-    // ✅ 3. 立即更新全局变量
-    pages = newPages;
-    currentPageIndex = nextIndex;
-
-    // ✅ 4. 强制重新加载新页内容
-    const nextContent = pages[currentPageIndex]?.content;
-    if (nextContent && typeof nextContent === 'object' && nextContent.ops) {
-        quill.setContents(nextContent);
-    } else {
-        quill.setContents({ ops: [] });
-    }
-
-    // ✅ 5. 更新 UI
-    renderPageList();
-    updatePageDisplay();
-    console.log(`✅ 删除第 ${deleteIndex + 1} 页成功，现在显示第 ${currentPageIndex + 1} 页`);
-    console.log('After splice:', pages.map((p, i) => ({
-        i,
-        text: p.content?.ops?.[0]?.insert?.slice(0, 20)
-    })));
-
-    // ✅ 6. 保存到后端
     try {
-        const res = await fetch(`${API_BASE_URL}/${currentWorkId}`, {
-            method: 'PATCH',
-            headers: authHeaders(true),
-            body: JSON.stringify({ pages })
+        // 2. ✅【更新 Pages 数组】
+        // 注意：这里不需要保存当前 quill 内容，因为我们要删掉它
+        const newPages = pages.filter((_, idx) => idx !== deleteIndex);
+        
+        // 3. ✅【重构 History 对象】
+        // 因为数组索引变了（比如删了第2页，原来的第3页变成了第2页）
+        // 所以 history 的 key 也必须跟着移位，否则撤销记录会串台
+        const newHistories = {};
+        Object.keys(pageHistories).forEach(key => {
+            const idx = parseInt(key);
+            if (idx < deleteIndex) {
+                // 删页之前的页码不变
+                newHistories[idx] = pageHistories[idx];
+            } else if (idx > deleteIndex) {
+                // 删页之后的页码 -1
+                newHistories[idx - 1] = pageHistories[idx];
+            }
+            // 等于 deleteIndex 的直接丢弃
         });
+        pageHistories = newHistories; // 应用新的历史记录表
 
-        if (!res.ok) throw new Error((await res.json()).message || '删除失败');
-        addHistoryRecord(`删除第 ${deleteIndex + 1} 页`);
-        hasUnsavedChanges = false;
-        saveBtn.textContent = '已保存';
-    } catch (err) {
-        console.error('❌ 删除同步失败:', err);
-        alert('删除失败：' + (err.message || '网络错误（请在讨论页/贴吧汇报给站长！你将会收获一份诚心诚意土下座大礼包以及修复方案）'));
-    }
+        // 4. 计算新的当前页码（如果删的是最后一页，就前移）
+        let nextIndex = deleteIndex;
+        if (nextIndex >= newPages.length) {
+            nextIndex = newPages.length - 1;
+        }
+
+        // 5. 应用到全局变量
+        pages = newPages;
+        currentPageIndex = nextIndex;
+
+        // 6. 加载新的当前页到编辑器
+        const nextContent = pages[currentPageIndex]?.content || { ops: [] };
+        quill.setContents(nextContent, 'silent'); // silent 加载
+        
+        // 恢复该页的历史（如果有）
+        quill.history.clear();
+if (pageHistories[currentPageIndex]) {
+  quill.history.stack = deserializeHistoryStack(pageHistories[currentPageIndex]);
+} else {
+  quill.history.stack = { undo: [], redo: [] };
 }
 
+
+        // 7. 更新 UI
+        renderPageList();
+        updatePageDisplay();
+
+        // 8. ✅【强制同步后端】
+        // 使用 pages 字段发送，确保后端同时更新
+        const res = await fetch(`${API_BASE_URL}/${currentWorkId}`, {
+  method: 'PATCH',
+  headers: authHeaders(true),
+  body: JSON.stringify({
+    title: editorTitle.textContent.replace('正在编辑：', ''),
+    pages: pages
+  })
+});
+if (!res.ok) throw new Error('同步删除失败');
+        
+        // 成功提示
+        hasUnsavedChanges = false;
+        saveBtn.textContent = '已保存';
+        addHistoryRecord(`删除第 ${deleteIndex + 1} 页`);
+
+    } catch (err) {
+        console.error('删除页面失败:', err);
+        alert('删除失败，请刷新页面重试。');
+    } finally {
+        // 9. 恢复自动保存
+        if (wasAutoSave) {
+            autoSaveEnabled = true;
+            startAutoSave(); // 重新启动计时器
+        }
+    }
+}
 
 
         /* ---------- 页码管理（统一使用 pages 与 currentPageIndex）---------- */
@@ -1204,28 +1281,70 @@ async function deleteCurrentPage() {
 deletePageBtn.addEventListener('click', deleteCurrentPage);
 
         addPageBtn.addEventListener('click', () => {
-            // 保存当前页
-            pages[currentPageIndex].content = quill.getContents();
-            // push 新页
-            pages.push({ content: {} });
-            currentPageIndex = pages.length - 1;
-            // 加载新页（为空）
-            try { quill.setContents(pages[currentPageIndex].content); } catch (e) { quill.setContents({ ops: [] }); }
-            updatePageDisplay();
-            renderPageList();
-        });
+  // 新建空页（标准 Delta）
+  pages.push({ content: { ops: [] } });
+  const newIndex = pages.length - 1;
 
-        function goToPage(index) {
-            if (index < 0 || index >= pages.length) return;
-            // 保存当前页
-            pages[currentPageIndex].content = quill.getContents();
-            currentPageIndex = index;
-            // 加载目标页
-            const content = pages[currentPageIndex] && pages[currentPageIndex].content ? pages[currentPageIndex].content : { ops: [] };
-            try { quill.setContents(content); } catch (e) { quill.setContents({ ops: [] }); }
-            updatePageDisplay();
-            renderPageList();
-        }
+  // 给新页准备空历史（序列化格式）
+  pageHistories[newIndex] = { undo: [], redo: [] };
+
+  // 统一走切页逻辑（保存旧页内容+旧页历史、silent 加载、新页历史恢复、自动保存暂停/恢复）
+  goToPage(newIndex);
+
+  renderPageList();
+  updatePageDisplay();
+});
+
+
+
+        /* ---------- 切换页码（带历史记录隔离）---------- */
+function goToPage(index) {
+    if (index < 0 || index >= pages.length || index === currentPageIndex) return;
+
+    // 1. 暂停自动保存，防止切页过程中的状态混乱
+    const wasAutoSave = autoSaveEnabled;
+    autoSaveEnabled = false;
+
+    // 2. 【保存旧页】：保存当前页内容
+    pages[currentPageIndex].content = quill.getContents();
+
+    // ✅【关键：保存旧页的历史记录】
+    // Quill 的 history 模块包含 stack（undo/redo 栈）
+    if (quill.history) {
+        // 深拷贝 stack 以防引用被修改
+        pageHistories[currentPageIndex] = serializeHistoryStack(quill.history.stack);
+    }
+
+    // 3. 【切换索引】
+    currentPageIndex = index;
+
+    // 4. 【加载新页内容】
+    const nextContent = pages[currentPageIndex]?.content || { ops: [] };
+    // 使用 'silent' 避免触发 user 来源的 change 事件
+    quill.setContents(nextContent, 'silent');
+
+    // 5. ✅【关键：恢复新页的历史记录】
+    if (quill.history) {
+        quill.history.clear();
+if (pageHistories[currentPageIndex]) {
+  quill.history.stack = deserializeHistoryStack(pageHistories[currentPageIndex]);
+} else {
+  quill.history.stack = { undo: [], redo: [] };
+}
+
+        // 如果没有存过（第一次点开这一页），history 就是空的，这是对的
+    }
+
+    // 6. 更新 UI
+    updatePageDisplay();
+    renderPageList();
+    pageDropdown.classList.add('hidden'); // 顺手关掉下拉菜单
+
+    // 7. 恢复自动保存
+    setTimeout(() => {
+        autoSaveEnabled = wasAutoSave;
+    }, 50);
+}
 
         /* ---------- 骰子（随机）---------- */
         // 2. 切换骰子记录的显示/隐藏状态 (使用现有下拉菜单的逻辑) 
