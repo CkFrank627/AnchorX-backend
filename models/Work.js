@@ -91,6 +91,11 @@ const workSchema = new mongoose.Schema({
         default: []
     },
     // ----------------------
+    // pages 存储模式：embedded(旧) / separate(新)
+pageStorage: { type: String, enum: ['embedded', 'separate'], default: 'embedded' },
+pageCount: { type: Number, default: 1 },
+pagesMigratedAt: { type: Date, default: null },
+
     
 isPublished: {
     type: Boolean,

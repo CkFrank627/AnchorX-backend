@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const Work = require('../models/Work');
 const jwt = require('jsonwebtoken');
+const WorkPage = require('../models/WorkPage');
 
 const multer = require('multer');
 const path = require('path');
@@ -97,6 +98,80 @@ const calculateWordCount = (pages) => {
     }, 0);
 };
 
+const calcPageWordCount = (content) => {
+  if (!content || typeof content !== 'object' || !Array.isArray(content.ops)) return 0;
+  const text = content.ops.map(op => (typeof op.insert === 'string' ? op.insert : '')).join('');
+  return text.replace(/[\n\r\t\s\u200B-\u200D\uFEFF]/g, '').length;
+};
+
+const normalizePageForResponse = (pageObj) => ({
+  content: pageObj.content || { ops: [] },
+  createdAt: pageObj.createdAt || new Date(),
+  updatedAt: pageObj.updatedAt || new Date(),
+});
+
+const rewriteUploadsInDelta = (deltaObj) => {
+  if (!deltaObj || typeof deltaObj !== 'object') return deltaObj;
+  try {
+    let s = JSON.stringify(deltaObj);
+    s = s.replace(/http:\/\/api\.anchorx\.ca\/uploads/g, 'https://api.anchorx.ca/uploads');
+    return JSON.parse(s);
+  } catch (e) {
+    return deltaObj;
+  }
+};
+
+
+// 懒迁移：把 work.content 拆到 WorkPage
+const ensureSeparated = async (work) => {
+  if (!work || work.pageStorage === 'separate') return;
+
+  const embeddedPages = Array.isArray(work.content) && work.content.length > 0
+    ? work.content
+    : [{ content: { ops: [] } }];
+
+  // bulk upsert
+  const ops = embeddedPages.map((p, i) => {
+    const content = p?.content || { ops: [] };
+    return {
+      updateOne: {
+        filter: { workId: work._id, index: i },
+        update: {
+          $set: {
+            workId: work._id,
+            index: i,
+            content,
+            wordCount: calcPageWordCount(content),
+            createdAt: p.createdAt || new Date(),
+            updatedAt: new Date(),
+          }
+        },
+        upsert: true
+      }
+    };
+  });
+
+  if (ops.length) await WorkPage.bulkWrite(ops, { ordered: false });
+
+  const totalWC = embeddedPages.reduce((sum, p) => sum + calcPageWordCount(p?.content), 0);
+
+  // 迁移后把 Work 主文档变轻（避免以后接近 Mongo 16MB 上限）
+  work.pageStorage = 'separate';
+  work.pageCount = embeddedPages.length;
+  work.pagesMigratedAt = new Date();
+  work.wordCount = totalWC;
+
+  // 可选：把 content 清成占位（强烈建议）
+  work.content = [{ content: { ops: [] } }];
+
+  await work.save();
+};
+
+const getSeparatedPages = async (workId) => {
+  const pageDocs = await WorkPage.find({ workId }).sort({ index: 1 }).lean();
+  return pageDocs.map(p => normalizePageForResponse(p));
+};
+
 // **接收 JSON 数据中的 coverImageUrl**
 router.patch('/:id/cover', auth, async (req, res) => {
     try {
@@ -137,6 +212,14 @@ router.patch('/:id/publish', auth, async (req, res) => {
     try {
         const workId = req.params.id;
         const { isPublished } = req.body; // 期望接收 true 或 false
+
+        // 🚫 禁止整包 pages/content（避免 413）
+// 页面内容请用 /:id/pages/:pageIndex
+if (req.body.pages !== undefined || req.body.content !== undefined) {
+  return res.status(400).json({
+    message: '不再支持 PATCH 整包 pages/content。请改用 /api/works/:id/pages/* 接口保存页面内容。'
+  });
+}
 
         // 验证 isPublished 字段
         if (typeof isPublished !== 'boolean') {
@@ -214,74 +297,241 @@ router.get('/', auth, async (req, res) => {
 });
 
 // **修改：创建新作品**
+// ✅ 创建新作品：默认 separate（页面独立存 WorkPage）
 router.post('/', auth, async (req, res) => {
-    try {
-        const { title, content } = req.body; // 新增：从请求体中获取 content
-        const newWork = new Work({ 
-            title, 
-            author: req.userId,
-            // 新增：根据请求中的内容计算初始字数
-            content: content || [{ content: {} }],
-            wordCount: calculateWordCount(content) 
-        });
-        await newWork.save();
-        res.status(201).json(newWork);
-    } catch (error) {
-        res.status(400).json({ message: '创建作品失败', error: error.message });
-    }
-});
+  try {
+    const { title, content } = req.body;
 
-// **修改：更新作品的路由**
-router.put('/:id', auth, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { content, pages, title } = req.body;
+    // 允许前端仍传 content（页面数组），但我们不再嵌入 Work.content
+    const pageArray = (Array.isArray(content) && content.length > 0)
+      ? content
+      : [{ content: { ops: [] } }];
 
-        // ✅ 兼容：优先 pages；否则回退到 content
-        const pageArray = Array.isArray(pages) ? pages : content;
+    const normalizedPages = pageArray.map((p) => ({
+      content: (p && typeof p.content === 'object') ? p.content : { ops: [] }
+    }));
 
-        if (!Array.isArray(pageArray)) {
-            return res.status(400).json({ message: '内容格式不正确，需要是一个页面数组' });
-        }
+    const newWordCount = calculateWordCount(normalizedPages);
 
-        const normalizedPages = pageArray.map(p => ({
-            ...p,
-            updatedAt: new Date()
-        }));
+    // 1) 先建 Work（主文档保持“轻”）
+    const newWork = new Work({
+      title,
+      author: req.userId,
 
-        const newWordCount = calculateWordCount(pageArray);
+      pageStorage: 'separate',
+      pageCount: normalizedPages.length,
+      wordCount: newWordCount,
+      updatedAt: new Date(),
 
-        const updateDoc = {
-            // 旧字段（兼容老前端/老数据）
-            content: normalizedPages,
+      // Work.content 只放占位，避免文档越来越大
+      content: [{ content: { ops: [] } }],
+    });
 
-            // ✅ 新字段（要真正落库：Work schema 里需要有 pages 字段）
-            pages: normalizedPages,
+    await newWork.save();
 
+    // 2) 再建 WorkPage（每页一条）
+    const ops = normalizedPages.map((p, i) => ({
+      updateOne: {
+        filter: { workId: newWork._id, index: i },
+        update: {
+          $set: {
+            workId: newWork._id,
+            index: i,
+            content: p.content,
+            wordCount: calcPageWordCount(p.content),
+            createdAt: new Date(),
             updatedAt: new Date(),
-            wordCount: newWordCount
-        };
+          }
+        },
+        upsert: true
+      }
+    }));
 
-        // ✅ PUT 也允许更新 title（不传就不动）
-        if (title !== undefined) {
-            updateDoc.title = title;
-        }
+    if (ops.length) await WorkPage.bulkWrite(ops, { ordered: false });
 
-        const updatedWork = await Work.findOneAndUpdate(
-            { _id: id, author: req.userId },
-            updateDoc,
-            { new: true, timestamps: true }
-        );
-
-        if (!updatedWork) {
-            return res.status(404).json({ message: '作品不存在或无权修改' });
-        }
-
-        res.json(updatedWork);
-    } catch (error) {
-        res.status(500).json({ message: '更新作品失败', error: error.message });
-    }
+    res.status(201).json(newWork);
+  } catch (error) {
+    res.status(400).json({ message: '创建作品失败', error: error.message });
+  }
 });
+
+// ✅ 更新作品（轻量）：不再允许 PUT 整本 pages/content（避免 413）
+// 只允许更新 title 等元信息；页面内容请用 /:id/pages/*
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, coverImage, isPublished } = req.body;
+
+    // 🚫 禁止整包 pages/content
+    if (req.body.pages !== undefined || req.body.content !== undefined) {
+      return res.status(400).json({
+        message: '不再支持 PUT 整包 pages/content。请改用 /api/works/:id/pages/* 接口保存页面内容。若出现此信息请立刻联系站长'
+      });
+    }
+
+    const updateDoc = { updatedAt: new Date() };
+    if (title !== undefined) updateDoc.title = title;
+    if (coverImage !== undefined) updateDoc.coverImage = coverImage;
+    if (isPublished !== undefined) updateDoc.isPublished = isPublished;
+
+    const updatedWork = await Work.findOneAndUpdate(
+      { _id: id, author: req.userId },
+      { $set: updateDoc },
+      { new: true, timestamps: true }
+    );
+
+    if (!updatedWork) {
+      return res.status(404).json({ message: '作品不存在或无权修改' });
+    }
+
+    res.json(updatedWork);
+  } catch (error) {
+    res.status(500).json({ message: '更新作品失败', error: error.message });
+  }
+});
+
+
+router.get('/:id/pages', auth, async (req, res) => {
+  try {
+    const work = await Work.findOne({ _id: req.params.id, author: req.userId });
+    if (!work) return res.status(404).json({ message: '作品不存在或无权查看' });
+
+    if (work.pageStorage !== 'separate') {
+      // 旧作品暂时直接返回嵌入 content（你说后面再考虑迁移）
+      if (work.pageStorage !== 'separate') {
+  const pages = (work.content || []).map(p => {
+    const obj = (p && typeof p.toObject === 'function') ? p.toObject() : p;
+    return {
+      ...obj,
+      content: rewriteUploadsInDelta(obj?.content),
+    };
+  });
+  return res.json({ pages });
+}
+
+      return res.json({ pages });
+    }
+
+    const docs = await WorkPage.find({ workId: work._id }).sort({ index: 1 }).lean();
+    const pages = docs.map(p => ({
+      content: rewriteUploadsInDelta(p.content || { ops: [] }),
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    }));
+
+    res.json({ pages });
+  } catch (e) {
+    res.status(500).json({ message: '获取 pages 失败', error: e.message });
+  }
+});
+
+router.patch('/:id/pages/:pageIndex', auth, async (req, res) => {
+  try {
+    const pageIndex = Number(req.params.pageIndex);
+    const { content, title } = req.body;
+
+    if (!Number.isInteger(pageIndex) || pageIndex < 0) {
+      return res.status(400).json({ message: 'pageIndex 不合法' });
+    }
+    if (!content || typeof content !== 'object') {
+      return res.status(400).json({ message: 'content 不合法' });
+    }
+
+    const work = await Work.findOne({ _id: req.params.id, author: req.userId });
+    if (!work) return res.status(404).json({ message: '作品不存在或无权修改' });
+
+    if (work.pageStorage !== 'separate') {
+      return res.status(400).json({ message: '该作品不是 separate 存储（暂不支持单页保存）' });
+    }
+
+    const page = await WorkPage.findOne({ workId: work._id, index: pageIndex });
+    if (!page) return res.status(404).json({ message: '页面不存在' });
+
+    const oldWC = page.wordCount || 0;
+    const newWC = calcPageWordCount(content);
+    const diff = newWC - oldWC;
+
+    page.content = content;
+    page.wordCount = newWC;
+    page.updatedAt = new Date();
+    await page.save();
+
+    work.wordCount = Math.max((work.wordCount || 0) + diff, 0);
+    work.updatedAt = new Date();
+    if (title !== undefined) work.title = title;
+    await work.save();
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ message: '更新单页失败', error: e.message });
+  }
+});
+
+router.post('/:id/pages', auth, async (req, res) => {
+  try {
+    const work = await Work.findOne({ _id: req.params.id, author: req.userId });
+    if (!work) return res.status(404).json({ message: '作品不存在或无权修改' });
+    if (work.pageStorage !== 'separate') {
+      return res.status(400).json({ message: '该作品不是 separate 存储（暂不支持新增页）' });
+    }
+
+    const newIndex = Number(work.pageCount || 0);
+
+    await WorkPage.create({
+      workId: work._id,
+      index: newIndex,
+      content: { ops: [] },
+      wordCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    work.pageCount = newIndex + 1;
+    work.updatedAt = new Date();
+    await work.save();
+
+    res.status(201).json({ index: newIndex });
+  } catch (e) {
+    res.status(500).json({ message: '新增页面失败', error: e.message });
+  }
+});
+
+router.delete('/:id/pages/:pageIndex', auth, async (req, res) => {
+  try {
+    const pageIndex = Number(req.params.pageIndex);
+    if (!Number.isInteger(pageIndex) || pageIndex < 0) {
+      return res.status(400).json({ message: 'pageIndex 不合法' });
+    }
+
+    const work = await Work.findOne({ _id: req.params.id, author: req.userId });
+    if (!work) return res.status(404).json({ message: '作品不存在或无权修改' });
+    if (work.pageStorage !== 'separate') {
+      return res.status(400).json({ message: '该作品不是 separate 存储（暂不支持删页）' });
+    }
+
+    if ((work.pageCount || 0) <= 1) {
+      return res.status(400).json({ message: '至少保留一页' });
+    }
+
+    const deleted = await WorkPage.findOneAndDelete({ workId: work._id, index: pageIndex });
+    if (!deleted) return res.status(404).json({ message: '页面不存在' });
+
+    await WorkPage.updateMany(
+      { workId: work._id, index: { $gt: pageIndex } },
+      { $inc: { index: -1 } }
+    );
+
+    work.pageCount = Math.max((work.pageCount || 1) - 1, 1);
+    work.wordCount = Math.max((work.wordCount || 0) - (deleted.wordCount || 0), 0);
+    work.updatedAt = new Date();
+    await work.save();
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ message: '删除页面失败', error: e.message });
+  }
+});
+
 
 
 // **新增：支持页面(pages)删除/更新的 PATCH 路由**
@@ -326,28 +576,8 @@ router.patch('/:id', auth, async (req, res) => {
         // otherFields 里会包含：effectsDraft / effectsPublished 等
         const updateFields = { ...otherFields };
 
-        // ========= 1）如果有 pages，则更新 content + 字数 =========
-        if (pages !== undefined) {
-            if (!Array.isArray(pages)) {
-                return res
-                    .status(400)
-                    .json({ message: 'pages 格式不正确，需要是一个页面数组' });
-            }
-
-            updateFields.content = pages.map((p) => ({
-                ...p,
-                updatedAt: new Date(),
-            }));
-
-            // ✅ 同步写入 pages 字段（真正落库）
-updateFields.pages = pages.map((p) => ({
-    ...p,
-    updatedAt: new Date(),
-}));
-
-            updateFields.wordCount = calculateWordCount(pages);
-            updateFields.updatedAt = new Date(); // 记录作品更新时间
-        }
+        // ========= 1）如果有 pages，则更新 content + 字数（考虑到作品大小上限，已禁用） =========
+        
 
         // ========= 2）允许同时更新 title =========
         if (title !== undefined) {
@@ -414,107 +644,104 @@ updateFields.pages = pages.map((p) => ({
 
 // 删除作品
 router.delete('/:id', auth, async (req, res) => {
-    try {
-        const work = await Work.findOneAndDelete({ _id: req.params.id, author: req.userId });
-        if (!work) {
-            return res.status(404).json({ message: '作品不存在或无权删除' });
-        }
-        res.json({ message: '作品删除成功' });
-    } catch (error) {
-        res.status(500).json({ message: '删除失败', error: error.message });
-    }
+  try {
+    const work = await Work.findOneAndDelete({ _id: req.params.id, author: req.userId });
+    if (!work) {
+      return res.status(404).json({ message: '作品不存在或无权删除' });
+    }
+
+    // ✅ 同时清理分页数据
+    await WorkPage.deleteMany({ workId: work._id });
+
+    res.json({ message: '作品删除成功' });
+  } catch (error) {
+    res.status(500).json({ message: '删除失败', error: error.message });
+  }
 });
 
+
 // 修改：获取单个作品的路由（用于阅读页面），并增加浏览量
+// ✅ 修复版：获取单个作品（阅读页）+ 增加浏览量
 router.get('/:id', optionalAuth, async (req, res) => {
-    const handlerStart = Date.now();          // 整个接口开始时间
-    console.log(`📥 [WORK GET] start, id = ${req.params.id}`);
+  const handlerStart = Date.now();
+  console.log(`📥 [WORK GET] start, id = ${req.params.id}`);
 
-    try {
-        const workId = req.params.id;
+  try {
+    const workId = req.params.id;
 
-        // ---------- 1）计时：数据库查询 ----------
-        const dbStart = Date.now();
-        const work = await Work.findByIdAndUpdate(
-            workId,
-            { $inc: { views: 1 } },
-            { new: true, timestamps: false }
-        ).populate('author', 'username');
-        const dbEnd = Date.now();
+    const dbStart = Date.now();
+    const work = await Work.findByIdAndUpdate(
+      workId,
+      { $inc: { views: 1 } },
+      { new: true, timestamps: false }
+    ).populate('author', 'username');
+    const dbEnd = Date.now();
 
-        if (!work) {
-            console.log(`❗ [WORK GET] not found, DB time = ${dbEnd - dbStart} ms`);
-            return res.status(404).json({ message: '作品不存在' });
-        }
-
-        // ---------- 2）计时：内容处理（字符串替换 + toObject） ----------
-        const processStart = Date.now();
-
-        const isLikedByCurrentUser = req.userId ? work.likedBy.includes(req.userId) : false;
-
-        const responseWork = {
-            _id: work._id,
-            title: work.title,
-            author: work.author,
-            views: work.views,
-            likesCount: work.likesCount,
-            isLikedByCurrentUser: isLikedByCurrentUser,
-            updatedAt: work.updatedAt,
-            createdAt: work.createdAt,
-
-            // 文字特效
-            effectsDraft: work.effectsDraft || [],
-            effectsPublished: work.effectsPublished || [],
-
-            // ⭐ 新增：背景配置（草稿 + 已发布）
-            backgroundDraft: work.backgroundDraft || {
-                images: [],
-                bindings: [],
-                transitions: [],
-            },
-            backgroundPublished: work.backgroundPublished || {
-                images: [],
-                bindings: [],
-                transitions: [],
-            },
-
-            // 作品内容
-            content: work.content.map(page => {
-                if (page.content && typeof page.content === 'object') {
-                    let contentString = JSON.stringify(page.content);
-                    contentString = contentString.replace(
-                        /http:\/\/api\.anchorx\.ca\/uploads/g,
-                        'https://api.anchorx.ca/uploads'
-                    );
-                    try {
-                        return { ...page.toObject(), content: JSON.parse(contentString) };
-                    } catch (e) {
-                        console.error("Content replacement error:", e);
-                        return page;
-                    }
-                }
-                return page;
-            })
-        };
-
-        const processEnd = Date.now();
-
-        // ---------- 3）整条链路耗时 ----------
-        const handlerEnd = Date.now();
-        console.log(
-          `✅ [WORK GET] id=${workId}
-             DB time       : ${dbEnd - dbStart} ms
-             Process time  : ${processEnd - processStart} ms
-             Handler total : ${handlerEnd - handlerStart} ms`
-        );
-
-        res.json(responseWork);
-    } catch (error) {
-        const handlerEnd = Date.now();
-        console.error('获取作品失败:', error);
-        console.log(`❌ [WORK GET] error, total = ${handlerEnd - handlerStart} ms`);
-        res.status(500).json({ message: '获取作品失败', error: error.message });
+    if (!work) {
+      console.log(`❗ [WORK GET] not found, DB time = ${dbEnd - dbStart} ms`);
+      return res.status(404).json({ message: '作品不存在' });
     }
+
+    const processStart = Date.now();
+    const isLikedByCurrentUser = req.userId
+  ? Array.isArray(work.likedBy) && work.likedBy.some(x => String(x) === String(req.userId))
+  : false;
+
+
+    // ✅ 先算 pages（可 await）
+    let pages = [];
+    if (work.pageStorage === 'separate') {
+      const docs = await WorkPage.find({ workId: work._id }).sort({ index: 1 }).lean();
+      pages = docs.map(p => ({
+        content: rewriteUploadsInDelta(p.content || { ops: [] }),
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      }));
+    } else {
+      pages = (work.content || []).map(page => {
+        const obj = page.toObject ? page.toObject() : page;
+        return { ...obj, content: rewriteUploadsInDelta(obj.content) };
+      });
+    }
+
+    // ✅ 再组 responseWork（纯对象）
+    const responseWork = {
+      _id: work._id,
+      title: work.title,
+      author: work.author,
+      views: work.views,
+      likesCount: work.likesCount,
+      isLikedByCurrentUser,
+      updatedAt: work.updatedAt,
+      createdAt: work.createdAt,
+
+      effectsDraft: work.effectsDraft || [],
+      effectsPublished: work.effectsPublished || [],
+
+      backgroundDraft: work.backgroundDraft || { images: [], bindings: [], transitions: [] },
+      backgroundPublished: work.backgroundPublished || { images: [], bindings: [], transitions: [] },
+
+      // ✅ 同时返回 content/pages 兼容老前端
+      content: pages,
+      pages: pages,
+    };
+
+    const processEnd = Date.now();
+    const handlerEnd = Date.now();
+    console.log(
+      `✅ [WORK GET] id=${workId}
+         DB time       : ${dbEnd - dbStart} ms
+         Process time  : ${processEnd - processStart} ms
+         Handler total : ${handlerEnd - handlerStart} ms`
+    );
+
+    return res.json(responseWork);
+  } catch (error) {
+    const handlerEnd = Date.now();
+    console.error('获取作品失败:', error);
+    console.log(`❌ [WORK GET] error, total = ${handlerEnd - handlerStart} ms`);
+    return res.status(500).json({ message: '获取作品失败', error: error.message });
+  }
 });
 
 
@@ -526,18 +753,20 @@ router.post('/:id/like', auth, async (req, res) => {
             return res.status(404).json({ message: '作品未找到' });
         }
 
-        const userId = req.userId;
-        const index = work.likedBy.indexOf(userId);
+        const userId = String(req.userId);
+const index = Array.isArray(work.likedBy)
+  ? work.likedBy.findIndex(x => String(x) === userId)
+  : -1;
+
         
         if (index > -1) {
-            // 用户已经点赞，执行取消点赞
-            work.likedBy.splice(index, 1);
-            work.likesCount -= 1;
-        } else {
-            // 用户尚未点赞，执行点赞
-            work.likedBy.push(userId);
-            work.likesCount += 1;
-        }
+  work.likedBy.splice(index, 1);
+  work.likesCount = Math.max((work.likesCount || 0) - 1, 0);
+} else {
+  work.likedBy.push(req.userId);
+  work.likesCount = (work.likesCount || 0) + 1;
+}
+
 
         await work.save();
 

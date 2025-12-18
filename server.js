@@ -74,7 +74,22 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+
+// ✅ 让“保存作品(大量 pages/content)”不再 413
+const BODY_LIMIT = process.env.BODY_LIMIT || '50mb';
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
+
+// ✅ 可选：把 413 变成 JSON，前端更好提示
+app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({
+      message: `内容过大（当前限制：${BODY_LIMIT}）。请先保存到本地以防丢失数据！！！减少单次保存体积或联系站长提高上限。`,
+    });
+  }
+  next(err);
+});
+
 
 // ================== 全局请求计时中间件 ==================
 app.use((req, res, next) => {
