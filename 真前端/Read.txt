@@ -2216,113 +2216,182 @@ function renderFloorsRange(startIndex, endIndex) {
     }
 }
 
-      // ====== 背景透视（Shift） ======
+     // ====== 背景透视（Shift / 按钮） ======
 const bgPeekBtn = document.getElementById('bg-peek-btn');
 let isBgPeekMode = false;
 
-// 桌面端判断：和你现有的 1050px 断点保持一致（见你的移动端媒体查询 :contentReference[oaicite:4]{index=4}）
-function isDesktop() {
-  return !window.matchMedia('(max-width: 1050px)').matches;
-}
-
-function setBgPeekMode(on) {
-  isBgPeekMode = !!on;
-  document.body.classList.toggle('bg-peek-mode', isBgPeekMode);
-  if (bgPeekBtn) bgPeekBtn.classList.toggle('active', isBgPeekMode);
-}
-
-
-function isMobile() {
+// 与 CSS 断点保持一致（max-width: 1050px）
+function bgPeekIsMobile() {
   return window.matchMedia('(max-width: 1050px)').matches;
 }
+function bgPeekIsDesktop() {
+  return !bgPeekIsMobile();
+}
+
+// 统一应用：桌面用 bg-peek-mode，移动端用 bg-peek-mobile-mode
+function applyBgPeekState() {
+  document.body.classList.remove('bg-peek-mode');
+  document.body.classList.remove('bg-peek-mobile-mode');
+
+  if (bgPeekBtn) {
+    bgPeekBtn.classList.remove('active');
+  }
+  if (typeof bgPeekMobile !== 'undefined') {
+    if (bgPeekMobile) {
+      bgPeekMobile.classList.remove('active');
+    }
+  }
+
+  if (!isBgPeekMode) return;
+
+  if (bgPeekIsMobile()) {
+    document.body.classList.add('bg-peek-mobile-mode');
+    if (typeof bgPeekMobile !== 'undefined') {
+      if (bgPeekMobile) {
+        bgPeekMobile.classList.add('active');
+      }
+    }
+  } else {
+    document.body.classList.add('bg-peek-mode');
+    if (bgPeekBtn) {
+      bgPeekBtn.classList.add('active');
+    }
+  }
+}
 
 function setBgPeekMode(on) {
   isBgPeekMode = !!on;
-
-  // 只做移动端这个模式（PC 的 Shift 模式你之前那套可以继续用）
-  document.body.classList.toggle('bg-peek-mobile-mode', isBgPeekMode && isMobile());
-
-  if (bgPeekMobile) bgPeekMobile.classList.toggle('active', isBgPeekMode && isMobile());
+  applyBgPeekState();
 }
 
 function toggleBgPeekMode() {
   setBgPeekMode(!isBgPeekMode);
 }
 
-if (bgPeekMobileBtn) {
-  bgPeekMobileBtn.addEventListener('click', (e) => {
-    e.preventDefault();
+// —— 小贴士弹窗（只在 PC 手动点击按钮时弹）
+function showBgPeekShiftTip() {
+  if (!bgPeekIsDesktop()) return;
+
+  var id = 'bg-peek-shift-tip';
+  var tip = document.getElementById(id);
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = id;
+    tip.setAttribute('role', 'status');
+    tip.setAttribute('aria-live', 'polite');
+    tip.style.position = 'fixed';
+    tip.style.left = '14px';
+    tip.style.bottom = '14px';
+    tip.style.zIndex = '3000';
+    tip.style.maxWidth = '320px';
+    tip.style.background = 'rgba(20, 20, 20, 0.85)';
+    tip.style.color = '#fff';
+    tip.style.padding = '10px 12px';
+    tip.style.borderRadius = '12px';
+    tip.style.fontSize = '14px';
+    tip.style.lineHeight = '1.4';
+    tip.style.boxShadow = '0 6px 18px rgba(0,0,0,0.25)';
+    tip.style.opacity = '0';
+    tip.style.transform = 'translateY(8px)';
+    tip.style.transition = 'opacity 160ms ease, transform 160ms ease';
+    document.body.appendChild(tip);
+  }
+
+  tip.textContent = '小贴士：按 Shift 也可以切换背景透视模式';
+
+  requestAnimationFrame(function () {
+    tip.style.opacity = '1';
+    tip.style.transform = 'translateY(0)';
+  });
+
+  if (tip.__hideTimer) {
+    clearTimeout(tip.__hideTimer);
+  }
+  tip.__hideTimer = setTimeout(function () {
+    tip.style.opacity = '0';
+    tip.style.transform = 'translateY(8px)';
+  }, 2000);
+}
+
+// 手动按钮：点击切换（PC 按钮）
+if (bgPeekBtn) {
+  bgPeekBtn.addEventListener('click', function (e) {
+    if (e) e.preventDefault();
     toggleBgPeekMode();
+    showBgPeekShiftTip();
   });
 }
 
-// 屏幕尺寸切换时：如果处在开启状态，自动把 class 挂到正确端
-window.addEventListener('resize', () => {
+// 移动端按钮：点击切换
+if (typeof bgPeekMobileBtn !== 'undefined') {
+  if (bgPeekMobileBtn) {
+    bgPeekMobileBtn.addEventListener('click', function (e) {
+      if (e) e.preventDefault();
+      toggleBgPeekMode();
+    });
+  }
+}
+
+// 屏幕尺寸切换时：如果处在开启状态，把 class 挂到正确端
+window.addEventListener('resize', function () {
   if (!isBgPeekMode) return;
-  // 先清干净再按当前端重新加
-  document.body.classList.remove('bg-peek-mobile-mode');
-  setBgPeekMode(true);
+  applyBgPeekState();
 });
-
-      
-function toggleBgPeekMode() {
-  setBgPeekMode(!isBgPeekMode);
-}
-
-// 手动按钮：点击切换
-if (bgPeekBtn) {
-  bgPeekBtn.addEventListener('click', () => toggleBgPeekMode());
-}
 
 /**
  * ✅ 关键点：只在“单独按一下 Shift（没有搭配其它按键/鼠标动作）”时触发
- * 这样 Shift+方向键、Shift+字母（打大写）、Shift+点击选区 都不会误触发
  */
 let shiftDown = false;
 let shiftUsedWithOther = false;
 
 function shouldIgnoreKeyTarget(target) {
   if (!target) return false;
-  const tag = (target.tagName || '').toUpperCase();
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
   if (target.isContentEditable) return true;
+
+  var tag = (target.tagName || '').toLowerCase();
+  if (tag === 'input') return true;
+  if (tag === 'textarea') return true;
+  if (tag === 'select') return true;
   return false;
 }
 
-document.addEventListener('keydown', (e) => {
-  if (!isDesktop()) return;
+document.addEventListener('keydown', function (e) {
+  if (!bgPeekIsDesktop()) return;
 
   if (e.key === 'Shift') {
-    if (shiftDown) return; // 已经按住了，忽略重复
+    if (shiftDown) return;
     if (shouldIgnoreKeyTarget(e.target)) return;
-
     shiftDown = true;
     shiftUsedWithOther = false;
     return;
   }
 
-  // Shift 按住期间按了其它键：标记为“组合键”，不触发切换
-  if (shiftDown) shiftUsedWithOther = true;
+  if (shiftDown) {
+    shiftUsedWithOther = true;
+  }
 });
 
-document.addEventListener('mousedown', () => {
-  // Shift+鼠标点击（常用于选区）：也视为组合操作，不触发
+// 只要 Shift 按着时发生鼠标动作，就视为“搭配其它动作”
+document.addEventListener('mousedown', function () {
   if (shiftDown) shiftUsedWithOther = true;
 }, true);
 
-document.addEventListener('keyup', (e) => {
-  if (!isDesktop()) return;
+document.addEventListener('keyup', function (e) {
+  if (!bgPeekIsDesktop()) return;
   if (e.key !== 'Shift') return;
 
   if (!shouldIgnoreKeyTarget(e.target)) {
-    if (shiftDown && !shiftUsedWithOther) {
-      toggleBgPeekMode();
+    if (shiftDown) {
+      if (!shiftUsedWithOther) {
+        toggleBgPeekMode();
+      }
     }
   }
 
   shiftDown = false;
   shiftUsedWithOther = false;
 });
+
 
 
 // 初始化 / 重新渲染楼层模式
@@ -2464,6 +2533,7 @@ function renderPageMode() {
     bookContent.innerHTML = '';
     const pageDiv = document.createElement('div');
     pageDiv.className = 'page-view';
+  pageDiv.id = 'page-view'; // ✅ 新增：让背景系统能准确拿到容器
     // container for Quill
     const quillContainer = document.createElement('div');
     quillContainer.id = 'quill-page-view';
@@ -2579,7 +2649,7 @@ function loadPageIntoPageQuill(pageIndex) {
     // 5. 标记内容并绑定事件 (绑定句末评论标识和句子点击事件)
 const pageCommentBtn = document.getElementById('page-view-comment-btn');
 if (pageCommentBtn) {
-    const commentCount = getCommentsCountForPage(pageIndex);
+    const commentCount = getCommentsCountForPage(currentPageIndex);
     pageCommentBtn.textContent = `查看评论 (${commentCount})`;
 }
   processContentForSentenceIds(pageQuill.root);

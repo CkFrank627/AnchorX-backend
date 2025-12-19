@@ -2097,7 +2097,8 @@ hiddenTextSecretOption.addEventListener('click', () => {
 
 
         /* ---------- 全局状态 ---------- */
-        let pages = [{ content: {} }]; // 始终和后端 schema 对齐：数组，每项至少有 content 字段
+        let pages = [{ content: { ops: [] } }];
+ // 始终和后端 schema 对齐：数组，每项至少有 content 字段
         let currentPageIndex = 0;       // 使用索引管理页码（避免自造 id）
         let currentWorkId = null;       // 编辑时的 work._id
         let roles = [];                 // 当前作品的角色数组（来自后端）
@@ -2332,7 +2333,7 @@ uploadImageInput.addEventListener('change', async () => {
 
         async function createWork(title) {
             try {
-                const body = { title: title, content: [{ content: {} }] };
+                const body = { title: title, content: [{ content: { ops: [] } }] };
                 const res = await fetch(API_BASE_URL, {
                     method: 'POST',
                     headers: authHeaders(true),
@@ -2383,6 +2384,53 @@ uploadImageInput.addEventListener('change', async () => {
                 return null;
             }
         }
+
+      // 编辑器加载页：走 /:id/pages（带 auth，不走 /:id 增加 views）
+async function fetchWorkPagesForEditor(workId) {
+  const res = await fetch(`${API_BASE_URL}/${workId}/pages`, {
+    method: 'GET',
+    headers: authHeaders(false),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.message || `获取 pages 失败 (${res.status})`);
+  const pages = Array.isArray(j.pages) && j.pages.length ? j.pages : [{ content: { ops: [] } }];
+  return pages;
+}
+
+// 保存单页：PATCH /:id/pages/:pageIndex
+async function saveOnePage(workId, pageIndex, content, title) {
+  const res = await fetch(`${API_BASE_URL}/${workId}/pages/${pageIndex}`, {
+    method: 'PATCH',
+    headers: authHeaders(true),
+    body: JSON.stringify({ content, title }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.message || `保存单页失败 (${res.status})`);
+  return true;
+}
+
+// 新增页：POST /:id/pages
+async function createPage(workId) {
+  const res = await fetch(`${API_BASE_URL}/${workId}/pages`, {
+    method: 'POST',
+    headers: authHeaders(true),
+    body: JSON.stringify({}),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.message || `新增页失败 (${res.status})`);
+  return j.index; // 后端返回 { index }
+}
+
+// 删除页：DELETE /:id/pages/:pageIndex
+async function deletePage(workId, pageIndex) {
+  const res = await fetch(`${API_BASE_URL}/${workId}/pages/${pageIndex}`, {
+    method: 'DELETE',
+    headers: authHeaders(false),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.message || `删除页失败 (${res.status})`);
+  return true;
+}
 
       // ... 位于 fetchWorkById 之后或附近
 
@@ -2596,58 +2644,51 @@ function renderDiceHistory(history) {
 
 
 /* ---------- 载入单个作品（并初始化 pages）---------- */
+/* ---------- 载入单个作品（并初始化 pages）---------- */
 async function loadWorkById(id) {
-    const work = await fetchWorkById(id);
-    if (!work) return;
+  const work = await fetchWorkById(id);
+  if (!work) return;
 
-    // ✅【改动 1：后端字段兼容读取】
-    // 优先读 work.pages，如果为空或不存在，再尝试读 work.content
-    let loadedPages = [];
-    if (Array.isArray(work.pages) && work.pages.length > 0) {
-        loadedPages = work.pages;
-    } else if (Array.isArray(work.content) && work.content.length > 0) {
-        loadedPages = work.content;
-    } else {
-        loadedPages = [{ content: { ops: [] } }];
-    }
-    
-    // 赋值给全局变量
-    pages = loadedPages;
-    currentPageIndex = 0;
+  let loadedPages = [{ content: { ops: [] } }];
+  try {
+    // ✅ 编辑器统一从 /:id/pages 获取（和后端 separate 版本一致）
+    loadedPages = await fetchWorkPagesForEditor(id);
+  } catch (e) {
+    console.warn('fetchWorkPagesForEditor failed, fallback to work.pages/content', e);
+    // fallback（尽量别炸）
+    if (Array.isArray(work.pages) && work.pages.length) loadedPages = work.pages;
+    else if (Array.isArray(work.content) && work.content.length) loadedPages = work.content;
+  }
 
-    // ✅【改动 2：重置历史记录栈】
-    pageHistories = {}; // 换作品了，清空所有页的历史
-    if (quill.history) quill.history.clear(); // 清空当前编辑器历史
+  pages = loadedPages;
+  currentPageIndex = 0;
 
-    await switchToEditor(work);
-    
-    // 暂时关闭自动保存，防止加载过程触发保存
-    const wasAutoSave = autoSaveEnabled;
-    autoSaveEnabled = false; 
+  pageHistories = {};
+  if (quill.history) quill.history.clear();
 
-    // 加载骰子历史
-    const diceHistory = await fetchDiceHistory(id); 
-    renderDiceHistory(diceHistory);
+  await switchToEditor(work);
 
-    // ✅【改动 3：加载第一页内容】
-    try {
-        const firstPageContent = pages[0]?.content || { ops: [] };
-        // 使用 'silent' 模式设置内容，不触发 text-change 事件，也不计入 history
-        quill.setContents(firstPageContent, 'silent');
-    } catch (err) {
-        console.warn('quill.setContents failed', err);
-        quill.setContents({ ops: [] }, 'silent');
-    }
+  const wasAutoSave = autoSaveEnabled;
+  autoSaveEnabled = false;
 
-    updatePageDisplay();
-    renderPageList();
-    
-    // 恢复自动保存状态（如果是开启的）
-    // 延迟一点点确保 Quill 稳定
-    setTimeout(() => {
-        autoSaveEnabled = wasAutoSave;
-        startAutoSave();
-    }, 100);
+  const diceHistory = await fetchDiceHistory(id);
+  renderDiceHistory(diceHistory);
+
+  try {
+    const firstPageContent = pages[0]?.content || { ops: [] };
+    quill.setContents(firstPageContent, 'silent');
+  } catch (err) {
+    console.warn('quill.setContents failed', err);
+    quill.setContents({ ops: [] }, 'silent');
+  }
+
+  updatePageDisplay();
+  renderPageList();
+
+  setTimeout(() => {
+    autoSaveEnabled = wasAutoSave;
+    startAutoSave();
+  }, 100);
 }
 
       /* ---------- 保存作品的核心逻辑 (返回是否成功) ---------- */
@@ -2655,7 +2696,7 @@ async function loadWorkById(id) {
 async function performSave() {
   if (!currentWorkId) return false;
 
-  // 同步当前页内容到 pages
+  // 1) 同步当前页内容到 pages[currentPageIndex]
   if (isQuillActive) {
     pages[currentPageIndex].content = quill.getContents();
   } else {
@@ -2663,36 +2704,37 @@ async function performSave() {
     pages[currentPageIndex].content = { ops: lines.map(line => ({ insert: line + '\n' })) };
   }
 
-  // ✅ 只发 pages（别再 pages+content 双份发了）
-  const data = {
-    title: editorTitle.textContent.replace('正在编辑：', ''),
-    pages: pages
-  };
-
-  // （可选）打点看看你到底多大
-  // console.log('save payload bytes =', new Blob([JSON.stringify(data)]).size);
+  const title = editorTitle.textContent.replace('正在编辑：', '');
+  const currentContent = pages[currentPageIndex]?.content || { ops: [] };
 
   try {
     isSaving = true;
-    const res = await fetch(`${API_BASE_URL}/${currentWorkId}`, {
-      method: 'PUT',
-      headers: authHeaders(true),
-      body: JSON.stringify(data)
-    });
 
-    const text = await res.text(); // ✅ 先拿纯文本，避免 413 HTML 直接把 res.json() 炸掉
-    let j = null;
-    try { j = JSON.parse(text); } catch (_) {}
+    // ✅ 2) 只保存“当前页”
+    await saveOnePage(currentWorkId, currentPageIndex, currentContent, title);
 
-    if (!res.ok) {
-      throw new Error(j?.message || `HTTP ${res.status}: ${text.slice(0, 200)}`);
+    // ✅ 3) 如果你希望“保存按钮也顺便保存特效/背景”，就 PATCH /:id（绝对不能带 pages/content）
+    // 如果你没有这些变量，就删掉这个块。
+    const meta = {};
+    if (typeof effectsDraft !== 'undefined') meta.effectsDraft = effectsDraft;
+    if (typeof effectsPublished !== 'undefined') meta.effectsPublished = effectsPublished;
+    if (typeof backgroundDraft !== 'undefined') meta.backgroundDraft = backgroundDraft;
+    if (typeof backgroundPublished !== 'undefined') meta.backgroundPublished = backgroundPublished;
+
+    if (Object.keys(meta).length) {
+      const res2 = await fetch(`${API_BASE_URL}/${currentWorkId}`, {
+        method: 'PATCH',
+        headers: authHeaders(true),
+        body: JSON.stringify(meta),
+      });
+      const j2 = await res2.json().catch(() => ({}));
+      if (!res2.ok) throw new Error(j2.message || `保存特效/背景失败 (${res2.status})`);
     }
 
-    currentWorkId = j?._id || currentWorkId;
     return true;
   } catch (err) {
-    console.error('保存失败', err);
-    alert('保存失败：' + err.message);
+    console.error('保存失败:', err);
+    alert('保存失败：' + (err.message || '网络错误'));
     return false;
   } finally {
     isSaving = false;
@@ -2905,11 +2947,11 @@ publishBtn.addEventListener('click', async () => {
         
         // 3. 【新增：调用 PATCH API 将后端发布状态变为 true】
         try {
-            const res = await fetch(`${API_BASE_URL}/${currentWorkId}`, {
-                method: 'PATCH',
-                headers: authHeaders(true),
-                body: JSON.stringify({ isPublished: true }) // 关键：设置发布状态
-            });
+            const res = await fetch(`${API_BASE_URL}/${currentWorkId}/publish`, {
+  method: 'PATCH',
+  headers: authHeaders(true),
+  body: JSON.stringify({ isPublished: true })
+});
             
             if (!res.ok) {
                 const j = await res.json();
@@ -2947,103 +2989,87 @@ publishBtn.addEventListener('click', async () => {
     }
 });
 
-/* ------------------- 最终稳定版：删除当前页面 ------------------- */
 async function deleteCurrentPage() {
-    if (!currentWorkId || !Array.isArray(pages) || pages.length === 0) {
-        alert('数据异常，无法删除。');
-        return;
+  if (!currentWorkId || !Array.isArray(pages) || pages.length === 0) {
+    alert('数据异常，无法删除。');
+    return;
+  }
+  if (pages.length === 1) {
+    alert('至少保留一页。');
+    return;
+  }
+
+  const deleteIndex = currentPageIndex;
+  if (!confirm(`确定要删除第 ${deleteIndex + 1} 页吗？此操作不可恢复。`)) return;
+
+  const wasAutoSave = autoSaveEnabled;
+  autoSaveEnabled = false;
+  if (autoSaveTimer) clearInterval(autoSaveTimer);
+
+  try {
+    // ✅ 1) 先删后端（后端会 reindex）
+    await deletePage(currentWorkId, deleteIndex);
+
+    // ✅ 2) 更新本地 pages
+    const newPages = pages.filter((_, idx) => idx !== deleteIndex);
+
+    // ✅ 3) 重构 history（索引整体左移）
+    const newHistories = {};
+    Object.keys(pageHistories).forEach(key => {
+      const idx = parseInt(key, 10);
+      if (idx < deleteIndex) newHistories[idx] = pageHistories[idx];
+      else if (idx > deleteIndex) newHistories[idx - 1] = pageHistories[idx];
+    });
+    pageHistories = newHistories;
+
+    // ✅ 4) 新 currentPageIndex（删最后一页就前移）
+    let nextIndex = deleteIndex;
+    if (nextIndex >= newPages.length) nextIndex = newPages.length - 1;
+
+    // ✅ 5) 应用
+    pages = newPages;
+    currentPageIndex = nextIndex;
+
+    // ✅ 6) 加载新页
+    const nextContent = pages[currentPageIndex]?.content || { ops: [] };
+    quill.setContents(nextContent, 'silent');
+
+    // ✅ 6.1) 恢复该页的历史
+    quill.history.clear();
+    if (pageHistories[currentPageIndex]) {
+      quill.history.stack = deserializeHistoryStack(pageHistories[currentPageIndex]);
+    } else {
+      quill.history.stack = { undo: [], redo: [] };
     }
-    if (pages.length === 1) {
-        alert('至少保留一页。');
-        return;
+
+    // ✅ 7) 更新 UI
+    renderPageList();
+    updatePageDisplay();
+
+    // ✅ 8) 可选：轻量同步标题（不带 pages/content）
+    const metaRes = await fetch(`${API_BASE_URL}/${currentWorkId}`, {
+      method: 'PATCH',
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        title: editorTitle.textContent.replace('正在编辑：', '')
+      })
+    });
+    const metaJ = await metaRes.json().catch(() => ({}));
+    if (!metaRes.ok) throw new Error(metaJ.message || '同步元信息失败');
+
+    hasUnsavedChanges = false;
+    saveBtn.textContent = '已保存';
+    addHistoryRecord(`删除第 ${deleteIndex + 1} 页`);
+  } catch (err) {
+    console.error('删除页面失败:', err);
+    alert('删除失败：' + (err.message || '请刷新页面重试。'));
+  } finally {
+    if (wasAutoSave) {
+      autoSaveEnabled = true;
+      startAutoSave();
     }
-
-    const deleteIndex = currentPageIndex;
-    if (!confirm(`确定要删除第 ${deleteIndex + 1} 页吗？此操作不可恢复。`)) return;
-
-    // 1. 🛑 彻底暂停自动保存，防止“抢跑”保存了还未处理完的脏数据
-    const wasAutoSave = autoSaveEnabled;
-    autoSaveEnabled = false;
-    if (autoSaveTimer) clearInterval(autoSaveTimer); // 强制清除计时器
-
-    try {
-        // 2. ✅【更新 Pages 数组】
-        // 注意：这里不需要保存当前 quill 内容，因为我们要删掉它
-        const newPages = pages.filter((_, idx) => idx !== deleteIndex);
-        
-        // 3. ✅【重构 History 对象】
-        // 因为数组索引变了（比如删了第2页，原来的第3页变成了第2页）
-        // 所以 history 的 key 也必须跟着移位，否则撤销记录会串台
-        const newHistories = {};
-        Object.keys(pageHistories).forEach(key => {
-            const idx = parseInt(key);
-            if (idx < deleteIndex) {
-                // 删页之前的页码不变
-                newHistories[idx] = pageHistories[idx];
-            } else if (idx > deleteIndex) {
-                // 删页之后的页码 -1
-                newHistories[idx - 1] = pageHistories[idx];
-            }
-            // 等于 deleteIndex 的直接丢弃
-        });
-        pageHistories = newHistories; // 应用新的历史记录表
-
-        // 4. 计算新的当前页码（如果删的是最后一页，就前移）
-        let nextIndex = deleteIndex;
-        if (nextIndex >= newPages.length) {
-            nextIndex = newPages.length - 1;
-        }
-
-        // 5. 应用到全局变量
-        pages = newPages;
-        currentPageIndex = nextIndex;
-
-        // 6. 加载新的当前页到编辑器
-        const nextContent = pages[currentPageIndex]?.content || { ops: [] };
-        quill.setContents(nextContent, 'silent'); // silent 加载
-        
-        // 恢复该页的历史（如果有）
-        quill.history.clear();
-if (pageHistories[currentPageIndex]) {
-  quill.history.stack = deserializeHistoryStack(pageHistories[currentPageIndex]);
-} else {
-  quill.history.stack = { undo: [], redo: [] };
+  }
 }
-
-
-        // 7. 更新 UI
-        renderPageList();
-        updatePageDisplay();
-
-        // 8. ✅【强制同步后端】
-        // 使用 pages 字段发送，确保后端同时更新
-        const res = await fetch(`${API_BASE_URL}/${currentWorkId}`, {
-  method: 'PATCH',
-  headers: authHeaders(true),
-  body: JSON.stringify({
-    title: editorTitle.textContent.replace('正在编辑：', ''),
-    pages: pages
-  })
-});
-if (!res.ok) throw new Error('同步删除失败');
-        
-        // 成功提示
-        hasUnsavedChanges = false;
-        saveBtn.textContent = '已保存';
-        addHistoryRecord(`删除第 ${deleteIndex + 1} 页`);
-
-    } catch (err) {
-        console.error('删除页面失败:', err);
-        alert('删除失败，请刷新页面重试。');
-    } finally {
-        // 9. 恢复自动保存
-        if (wasAutoSave) {
-            autoSaveEnabled = true;
-            startAutoSave(); // 重新启动计时器
-        }
-    }
-}
-
 
         /* ---------- 页码管理（统一使用 pages 与 currentPageIndex）---------- */
         function updatePageDisplay() {
@@ -3075,21 +3101,27 @@ if (!res.ok) throw new Error('同步删除失败');
 
 deletePageBtn.addEventListener('click', deleteCurrentPage);
 
-        addPageBtn.addEventListener('click', () => {
-  // 新建空页（标准 Delta）
-  pages.push({ content: { ops: [] } });
-  const newIndex = pages.length - 1;
+  addPageBtn.addEventListener('click', async () => {
+  if (!currentWorkId) return;
 
-  // 给新页准备空历史（序列化格式）
-  pageHistories[newIndex] = { undo: [], redo: [] };
+  try {
+    // 先把当前页内容同步到 pages，避免丢字
+    pages[currentPageIndex].content = quill.getContents();
 
-  // 统一走切页逻辑（保存旧页内容+旧页历史、silent 加载、新页历史恢复、自动保存暂停/恢复）
-  goToPage(newIndex);
+    const newIndex = await createPage(currentWorkId);
 
-  renderPageList();
-  updatePageDisplay();
+    // 本地补一页（后端也是在末尾新增）
+    pages.splice(newIndex, 0, { content: { ops: [] } });
+    pageHistories[newIndex] = { undo: [], redo: [] };
+
+    goToPage(newIndex);
+    renderPageList();
+    updatePageDisplay();
+  } catch (e) {
+    console.error('新增页失败', e);
+    alert('新增页失败：' + (e.message || '网络错误'));
+  }
 });
-
 
 
         /* ---------- 切换页码（带历史记录隔离）---------- */
@@ -3180,18 +3212,19 @@ async function rollDiceLogic() {
     // 3. 调用后端 API 记录
     if (currentWorkId) {
         try {
-            await fetch(`/api/work/${currentWorkId}/dice-log`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    rollType: diceType,
-                    result: result,
-                    rollText: rollResultText
-                })
-            });
+            const data = {
+  rollType: diceType,
+  result: result,
+  rollText: rollResultText
+};
+
+await fetch(`${API_BASE_URL}/${currentWorkId}/dice-log`, {
+  method: 'POST',
+  headers: authHeaders(true),
+  body: JSON.stringify(data)
+});
+
+
         } catch (error) {
             console.error('记录骰子结果到后端失败:', error);
         }
