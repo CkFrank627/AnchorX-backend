@@ -1,182 +1,206 @@
+#!/usr/bin/env node
 /**
- * scripts/migrate-works-to-separate.js
+ * 迁移 Work(content/pages embedded) => WorkPage(workId+index separate)
+ *
+ * 默认行为：
+ * - 迁移所有 pageStorage != 'separate' 的作品（包含字段不存在的旧作品）
+ * - 写入 WorkPages（upsert）
+ * - 更新 Work.pageStorage='separate', pageCount, pagesMigratedAt, wordCount
+ * - 默认“保留旧 content 字段”（方案1：兼容回滚/读取旧数据）
+ * - “半迁移”作品（pageStorage='separate'）默认跳过，除非 --repair
  *
  * 用法：
- * 1) 先 dry-run 看看会迁移哪些：
- *    node scripts/migrate-works-to-separate.js
- *
- * 2) 真正执行：
- *    node scripts/migrate-works-to-separate.js --apply
- *
- * 可选：
- *    --limit=50
- *    --workId=<某个作品id>   (只迁移一个作品便于测试)
- *    --keepEmbedded         (不清掉 Work 里的 pages/content，仅标记为 separate；一般不推荐)
+ *  - dry-run：node scripts/migrate-works-to-separate.js
+ *  - 真执行： node scripts/migrate-works-to-separate.js --apply
+ *  - 单作品： node scripts/migrate-works-to-separate.js --workId=<id> --apply
+ *  - 修复半迁移：node scripts/migrate-works-to-separate.js --repair --apply
+ *  - 不保留旧 content：node scripts/migrate-works-to-separate.js --apply --dropEmbedded
  */
 
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
-function hasFlag(name) {
-  return process.argv.includes(name);
-}
-function getArg(prefix, def = null) {
-  const found = process.argv.find(a => a.startsWith(prefix));
-  if (!found) return def;
-  const [, v] = found.split("=");
-  return v ?? def;
-}
+try { require('dotenv').config(); } catch (e) { /* ignore */ }
 
-const APPLY = hasFlag("--apply");
-const KEEP_EMBEDDED = hasFlag("--keepEmbedded");
-const LIMIT = parseInt(getArg("--limit=", "0"), 10) || 0;
-const ONLY_WORK_ID = getArg("--workId=", null);
+const Work = require('../models/Work');
+const WorkPage = require('../models/WorkPage');
 
-// ====== 你只需要确保这里能连上你的数据库 ======
-const MONGODB_URI = process.env.MONGODB_URI; // 建议放环境变量
-if (!MONGODB_URI) {
-  console.error("❌ 缺少环境变量 MONGODB_URI");
-  process.exit(1);
+function parseArgs(argv) {
+  const out = {};
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a.startsWith('--')) continue;
+    const [k, v] = a.split('=');
+    const key = k.replace(/^--/, '');
+    if (v === undefined) out[key] = true;
+    else out[key] = v;
+  }
+  return out;
 }
 
-// ====== 最小模型定义（不依赖你项目里的 model 文件，方便直接跑） ======
-const WorkSchema = new mongoose.Schema(
-  {
-    title: String,
-    pageStorage: String, // 'embedded' / 'separate'
-    pages: Array,        // 旧结构（可能存在）
-    content: Array,      // 旧结构（可能存在）
-    migratedAt: Date,
-    pageCount: Number,
-  },
-  { collection: "works", timestamps: true }
-);
+// —— 尽量对齐你后端 calcPageWordCount 的“可接受近似”版本 ——
+// 建议：你也可以直接把后端 calcPageWordCount 函数抽出来 require 过来替换这里
+function calcPageWordCount(delta) {
+  if (!delta || typeof delta !== 'object') return 0;
+  const ops = Array.isArray(delta.ops) ? delta.ops : [];
 
-const WorkPageSchema = new mongoose.Schema(
-  {
-    workId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
-    index: { type: Number, required: true },
-    content: { type: Object, default: { ops: [] } },
-  },
-  { collection: "workpages", timestamps: true }
-);
-
-// ✅ 推荐唯一索引：防止重复页
-WorkPageSchema.index({ workId: 1, index: 1 }, { unique: true });
-
-const Work = mongoose.model("Work", WorkSchema);
-const WorkPage = mongoose.model("WorkPage", WorkPageSchema);
-
-// ====== 帮助函数：把各种可能的 page 形态统一成 { ops: [] } ======
-function normalizeToDeltaContent(pageLike) {
-  // 形态 1：{ content: { ops: [...] } }
-  if (pageLike && pageLike.content && Array.isArray(pageLike.content.ops)) {
-    return pageLike.content;
+  let text = '';
+  for (const op of ops) {
+    const ins = op && op.insert;
+    if (typeof ins === 'string') text += ins;
+    // embed（image等）不计入字数
   }
-  // 形态 2：直接就是 { ops: [...] }
-  if (pageLike && Array.isArray(pageLike.ops)) {
-    return pageLike;
-  }
-  // 形态 3：字符串（极少数），转成简单 delta
-  if (typeof pageLike === "string") {
-    return { ops: [{ insert: pageLike.endsWith("\n") ? pageLike : pageLike + "\n" }] };
-  }
-  // 兜底：空页
-  return { ops: [] };
+
+  // 去掉常见的零宽字符
+  text = text.replace(/\u200B/g, '');
+
+  // 统计：CJK 字符按“字”计；英文按“词”计；数字按段计
+  const cjk = text.match(/[\u4E00-\u9FFF]/g)?.length || 0;
+  const words = text
+    .replace(/[\u4E00-\u9FFF]/g, ' ')     // 先把中文换空格，避免影响英文分词
+    .match(/[A-Za-z]+(?:'[A-Za-z]+)?|\d+/g)?.length || 0;
+
+  return cjk + words;
 }
 
-function getEmbeddedPages(workDoc) {
-  // 优先 pages，其次 content
-  const arr =
-    (Array.isArray(workDoc.pages) && workDoc.pages.length && workDoc.pages) ||
-    (Array.isArray(workDoc.content) && workDoc.content.length && workDoc.content) ||
-    null;
-
-  if (!arr) return [{ content: { ops: [] } }];
-
-  // 统一成 “每项至少有 content”
-  return arr.map(p => ({ content: normalizeToDeltaContent(p) }));
-}
-
-async function migrateOneWork(workDoc) {
-  const embeddedPages = getEmbeddedPages(workDoc);
-  const pageCount = embeddedPages.length;
-
-  // 准备写入 WorkPage（upsert，幂等可重复跑）
-  const bulk = embeddedPages.map((p, i) => ({
-    updateOne: {
-      filter: { workId: workDoc._id, index: i }, // 如果你后端字段叫 work 而不是 workId，就改成 { work: workDoc._id, index:i }
-      update: { $set: { content: p.content } },
-      upsert: true,
-    },
-  }));
-
-  if (!APPLY) {
-    console.log(`🟡 [DRY] 将迁移：${workDoc._id} "${workDoc.title || ""}" pages=${pageCount}`);
-    return { migrated: false, pageCount };
+function normalizePagesFromWork(work) {
+  // 你的旧数据主要在 work.content: Array(pageSchema)
+  if (Array.isArray(work.content) && work.content.length) {
+    return work.content.map(p => ({
+      content: (p && p.content && typeof p.content === 'object') ? p.content : (p && typeof p === 'object' ? p : { ops: [] }),
+      createdAt: p?.createdAt,
+      updatedAt: p?.updatedAt,
+    }));
   }
 
-  // 1) 写 pages
-  if (bulk.length) {
-    await WorkPage.bulkWrite(bulk, { ordered: false });
+  // 兼容：如果某些时期你用过 work.pages
+  if (Array.isArray(work.pages) && work.pages.length) {
+    return work.pages.map(p => ({
+      content: (p && p.content && typeof p.content === 'object') ? p.content : (p && typeof p === 'object' ? p : { ops: [] }),
+      createdAt: p?.createdAt,
+      updatedAt: p?.updatedAt,
+    }));
   }
 
-  // 2) 更新 work 本体标记为 separate
-  const set = {
-    pageStorage: "separate",
-    migratedAt: new Date(),
-    pageCount,
-  };
-
-  const unset = {};
-  if (!KEEP_EMBEDDED) {
-    // 清掉旧大字段，避免以后误用 + 避免文档过大
-    unset.pages = "";
-    unset.content = "";
-    // 你如果 Work schema 里还有别的旧字段（比如 contentText），也可以在这一起 unset
-  }
-
-  const update = Object.keys(unset).length
-    ? { $set: set, $unset: unset }
-    : { $set: set };
-
-  await Work.updateOne({ _id: workDoc._id }, update);
-
-  console.log(`✅ 已迁移：${workDoc._id} pages=${pageCount} ${KEEP_EMBEDDED ? "(保留内嵌内容)" : "(已清空内嵌内容)"}`);
-  return { migrated: true, pageCount };
+  return [{ content: { ops: [] } }];
 }
 
 async function main() {
-  await mongoose.connect(MONGODB_URI);
+  const args = parseArgs(process.argv);
 
-  const q = {
-    $or: [{ pageStorage: { $ne: "separate" } }, { pageStorage: { $exists: false } }],
-  };
-  if (ONLY_WORK_ID) q._id = new mongoose.Types.ObjectId(ONLY_WORK_ID);
+  const APPLY = !!args.apply;
+  const REPAIR = !!args.repair;
+  const DROP_EMBEDDED = !!args.dropEmbedded;
+  const workId = args.workId;
 
-  let cursor = Work.find(q).sort({ updatedAt: -1 });
-  if (LIMIT > 0) cursor = cursor.limit(LIMIT);
-
-  const works = await cursor.lean(); // 用 lean 更快
-  console.log(`共找到待迁移作品：${works.length}（APPLY=${APPLY}）`);
-
-  let totalPages = 0;
-  let migratedCount = 0;
-
-  for (const w of works) {
-    try {
-      const r = await migrateOneWork(w);
-      totalPages += r.pageCount || 0;
-      if (r.migrated) migratedCount++;
-    } catch (e) {
-      console.error(`❌ 迁移失败：${w._id}`, e && e.message ? e.message : e);
-    }
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    console.error('❌ 缺少环境变量 MONGODB_URI');
+    process.exit(1);
   }
 
-  console.log(`\n完成：迁移作品=${migratedCount}/${works.length}，写入总页数=${totalPages}`);
+  await mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 15000,
+  });
+
+  const now = new Date();
+
+  // ✅ 默认：迁移所有 “不是 separate” 的作品（包括字段不存在）
+  // ✅ repair：连 pageStorage=separate 的也扫描（用来修复 WorkPages 缺失）
+  const baseQuery = workId
+    ? { _id: new mongoose.Types.ObjectId(workId) }
+    : {};
+
+  const query = REPAIR
+    ? baseQuery
+    : { ...baseQuery, pageStorage: { $ne: 'separate' } };
+
+  const works = await Work.find(query).select('_id title author pageStorage content pages wordCount createdAt updatedAt').lean();
+
+  console.log(`共找到待迁移作品：${works.length}（APPLY=${APPLY} REPAIR=${REPAIR} DROP_EMBEDDED=${DROP_EMBEDDED}）`);
+
+  let migrated = 0;
+  let totalPagesWritten = 0;
+  let skippedHalfMigrated = 0;
+
+  for (const w of works) {
+    const id = w._id;
+
+    // 半迁移跳过（你要求默认跳过）
+    if (!REPAIR && w.pageStorage === 'separate') {
+      skippedHalfMigrated++;
+      continue;
+    }
+
+    const pages = normalizePagesFromWork(w);
+    const pageCount = pages.length;
+
+    // repair 模式下：如果已 separate 但 WorkPages 一页都没有，则重建
+    if (REPAIR && w.pageStorage === 'separate') {
+      const existingCount = await WorkPage.countDocuments({ workId: id });
+      if (existingCount >= pageCount && existingCount > 0) {
+        // 已经有足够 pages，跳过
+        continue;
+      }
+    }
+
+    let sumWC = 0;
+
+    // upsert 写 WorkPages
+    for (let i = 0; i < pageCount; i++) {
+      const content = pages[i]?.content || { ops: [] };
+      const wc = calcPageWordCount(content);
+      sumWC += wc;
+
+      if (APPLY) {
+        await WorkPage.updateOne(
+          { workId: id, index: i },
+          {
+            $set: {
+              content,
+              wordCount: wc,
+              updatedAt: now,
+            },
+            $setOnInsert: {
+              workId: id,
+              index: i,
+              createdAt: pages[i]?.createdAt || now,
+            }
+          },
+          { upsert: true }
+        );
+      }
+
+      totalPagesWritten++;
+    }
+
+    // 更新 Work 元数据
+    const update = {
+      pageStorage: 'separate',
+      pageCount: pageCount,
+      pagesMigratedAt: now,
+      wordCount: sumWC,
+      updatedAt: now,
+    };
+
+    // 方案1默认保留旧 content；若你想彻底去重，用 --dropEmbedded
+    if (DROP_EMBEDDED) {
+      update.content = [{ content: { ops: [] }, createdAt: now, updatedAt: now }];
+    }
+
+    if (APPLY) {
+      await Work.updateOne({ _id: id }, { $set: update });
+    }
+
+    migrated++;
+    console.log(`✅ ${APPLY ? '已迁移' : '将迁移'}: ${id} | pages=${pageCount} | wc=${sumWC} | title=${w.title}`);
+  }
+
+  console.log(`\n完成：迁移作品=${migrated}/${works.length}，写入总页数=${totalPagesWritten}，跳过半迁移=${skippedHalfMigrated}`);
   await mongoose.disconnect();
 }
 
-main().catch(err => {
-  console.error("脚本崩溃：", err);
+main().catch(async (e) => {
+  console.error('❌ 脚本异常：', e);
+  try { await mongoose.disconnect(); } catch {}
   process.exit(1);
 });
