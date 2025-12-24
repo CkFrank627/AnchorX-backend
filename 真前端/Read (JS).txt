@@ -1,4 +1,4 @@
-<script>
+    <script>
   /* ---------- 1. 注册自定义 Blot（插件） - 确保阅读端能解析 HiddenTextBlot ---------- */
     // 导入 Quill 核心 Blot 类
     const Inline = Quill.import('blots/inline');
@@ -271,6 +271,69 @@ function registerEffectTrigger(targetEl, cb) {
     effectObserver.observe(targetEl);
 }
 
+      function sanitizeEffectCode(raw) {
+  if (raw == null) return '';
+  var s = String(raw);
+
+  // 统一换行
+  s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // 去 BOM / 零宽字符 / 软连字符
+  if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
+  s = s.replace(/[\u200B-\u200D\u2060\u00AD]/g, '');
+
+  // 某些环境会把 U+2028/U+2029 当“非法换行”
+  s = s.replace(/\u2028/g, '\n').replace(/\u2029/g, '\n');
+
+  // 智能引号 → 普通引号（特别常见：从富文本/文档里复制代码）
+  s = s.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+
+  // 常见全角标点（可选但建议）
+  s = s.replace(/；/g, ';').replace(/，/g, ',').replace(/（/g, '(').replace(/）/g, ')');
+
+  // 如果明显像被 HTML/富文本包过，尝试“还原成纯文本”
+  var looksHtml = false;
+  if (s.indexOf('&lt;') !== -1) looksHtml = true;
+  if (s.indexOf('&gt;') !== -1) looksHtml = true;
+  if (s.indexOf('&nbsp;') !== -1) looksHtml = true;
+  if (s.indexOf('<br') !== -1) looksHtml = true;
+  if (s.indexOf('<div') !== -1) looksHtml = true;
+  if (looksHtml) {
+    var div = document.createElement('div');
+    div.innerHTML = s;
+    // innerText 比 textContent 更像“复制出来的代码”，会保留换行
+    s = div.innerText || div.textContent || s;
+  }
+
+  return s;
+}
+
+function findFirstSuspiciousChar(raw) {
+  if (raw == null) return null;
+  var s = String(raw);
+  for (var i = 0; i < s.length; i++) {
+    var code = s.charCodeAt(i);
+
+    // 控制字符：除 tab / \n / \r 外都可疑
+    if (code < 32) {
+      if (code !== 9) {
+  if (code !== 10) {
+    if (code !== 13) {
+      return { index: i, code: code };
+    }
+  }
+}
+
+    }
+
+    // BOM / 行分隔符 / 零宽
+    if (code === 0xFEFF || code === 0x2028 || code === 0x2029) return { index: i, code: code };
+    if (code >= 0x200B && code <= 0x200D) return { index: i, code: code };
+    if (code === 0x2060 || code === 0x00AD) return { index: i, code: code };
+  }
+  return null;
+}
+
 
 // 只在第一次需要时，从后端加载自定义特效列表
 async function ensureCustomEffectsLoaded() {
@@ -283,22 +346,56 @@ async function ensureCustomEffectsLoaded() {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.data || []);
 
-        customEffectFnMap = {};
-        list.forEach(item => {
-            if (!item || !item.key || !item.code) return;
-            try {
-                // 约定：代码中定义 function applyEffect(targetEl) { ... }
-                customEffectFnMap[item.key] = new Function('targetEl', `
-                    "use strict";
-                    ${item.code}
-                    if (typeof applyEffect === 'function') {
-                        return applyEffect(targetEl);
-                    }
-                `);
-            } catch (err) {
-                console.error('编译自定义特效失败：', item.key, err);
-            }
-        });
+        customEffectFnMap = Object.create(null);
+
+list.forEach(function (item) {
+  if (!item) return;
+
+  var key = '';
+  if (item.key != null) key = String(item.key).trim();
+  if (!key) return;
+
+  var rawCode = '';
+  if (item.code != null) rawCode = String(item.code);
+  if (!rawCode) return;
+
+  var code = sanitizeEffectCode(rawCode);
+  var srcURL = '\n//# sourceURL=anchorx-custom-effect/' + encodeURIComponent(key) + '.js\n';
+  var keyLiteral = JSON.stringify(key); // 安全嵌入到动态代码里
+
+  // 先 strict 模式尝试（更容易暴露问题）
+  try {
+    var bodyStrict =
+      '"use strict";\n' +
+      code + '\n' +
+      'if (typeof applyEffect === "function") { return applyEffect(targetEl); }\n' +
+      'throw new Error("Custom effect " + ' + keyLiteral + ' + " must define applyEffect(targetEl)");\n' +
+      srcURL;
+
+    customEffectFnMap[key] = new Function('targetEl', bodyStrict);
+    return;
+  } catch (err1) {
+    // fallback：非 strict 再试一次（有些人会写 with / 一些严格模式不允许的东西）
+    try {
+      var bodyLoose =
+        code + '\n' +
+        'if (typeof applyEffect === "function") { return applyEffect(targetEl); }\n' +
+        'throw new Error("Custom effect " + ' + keyLiteral + ' + " must define applyEffect(targetEl)");\n' +
+        srcURL;
+
+      customEffectFnMap[key] = new Function('targetEl', bodyLoose);
+      console.warn('⚠️ [effects] 特效在非 strict 模式下才编译通过:', key);
+      return;
+    } catch (err2) {
+      var bad = findFirstSuspiciousChar(rawCode);
+      console.error('编译自定义特效失败：', key, err2, {
+        badChar: bad,
+        preview: rawCode.slice(0, 200)
+      });
+    }
+  }
+});
+
 
         customEffectsLoaded = true;
     } catch (err) {
@@ -321,6 +418,32 @@ async function ensureCustomEffectsLoaded() {
         const likeCounter = likeWorkBtn.querySelector('.like-counter');
         const likeIcon = likeWorkBtn.querySelector('.like-icon');
         const sidebar = document.getElementById('sidebar');
+
+      const lazyToast = document.getElementById('lazy-load-toast');
+const lazyToastText = document.getElementById('lazy-load-toast-text');
+const lazyToastNavBtn = document.getElementById('lazy-load-toast-nav-btn');
+
+function showLazyToast(text, { weak=false, showNav=false } = {}) {
+  if (!lazyToast) return;
+  lazyToastText && (lazyToastText.textContent = text || '');
+  lazyToast.classList.toggle('weak', !!weak);
+  lazyToast.classList.add('show');
+
+  if (lazyToastNavBtn) {
+    lazyToastNavBtn.style.display = showNav ? 'inline-flex' : 'none';
+  }
+}
+function hideLazyToast() {
+  if (!lazyToast) return;
+  lazyToast.classList.remove('show');
+}
+if (lazyToastNavBtn) {
+  lazyToastNavBtn.addEventListener('click', () => {
+    const navBtn = document.getElementById('nav-toggle-btn');
+    navBtn && navBtn.click();
+  });
+}
+
 
         // 【新增】回到顶部按钮（PC + Mobile）
         const backToTopBtn = document.getElementById('back-to-top-btn');
@@ -350,6 +473,23 @@ const bgPeekMobileBtn = document.getElementById('bg-peek-mobile-btn');
         const FLOOR_BATCH_SIZE = 5;          // 一次渲染 5 楼
         let renderedFloorCount = 0;          // 当前已经渲染到第几楼（数量）
         let floorLazyScrollHandler = null;   // 楼层模式滚动监听器
+
+      // ===== 懒懒加载（加强版懒加载；内容准备也分批） =====
+const LAZY_SLOW_THRESHOLD_MS = 60 * 1000;
+const WEAK_INITIAL_PAGES = 2;
+
+let isWeakLazyMode = false;
+let lazySlowTimer = null;
+let isLoadingMoreFloors = false;
+
+// 顺序“内容准备”游标：保证 sentenceStartIndex / segmentedHtml 全局编号一致
+let pagePrepareCursor = 0;
+let pageSentenceCounter = 0;
+let pagePrepareToken = 0;
+let pagePrepareRunning = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
 
         let contentIndexCounter = 0; // 全局计数器，用于生成唯一ID
 
@@ -750,41 +890,7 @@ console.log("🎨 已加载特效：", effectsPublished);
             ? `更新时间：${new Date(work.updatedAt).toLocaleString()}`
             : `更新时间：未知`;
 
-  // -------------------------
-// 处理每页内容（保留原有字体、颜色等样式）
-// -------------------------
-let sentenceIndex = 0;
-activePages.forEach(page => {
-    if (!page.content) {
-        page.content = { ops: [] };
-    }
-
-   if (typeof page.content === 'object') {
-    if (page.content.ops) {
-        rendererQuill.setContents(page.content);
-        const rawHtml = rendererQuill.root.innerHTML;
-
-        const effectRoot = document.createElement('div');
-        effectRoot.innerHTML = rawHtml;
-
-        // ⭐ 本页的“全文起始行号”
-        const pageStartIndex = sentenceIndex;
-
-        const { element: tempDiv, nextIndex } = segmentContentAndAddIds(
-            effectRoot.innerHTML,
-            work._id,
-            sentenceIndex
-        );
-
-        // 可选：如果之后翻页要用，可以缓存
-        page.sentenceStartIndex = pageStartIndex;
-
-        sentenceIndex = nextIndex;
-        page.segmentedHtml = tempDiv.innerHTML;
-    }
-}
-
-});
+ resetLazyPrepareState();   // ✅ 关键：不再预处理全书，只重置懒懒加载状态
 
         renderCurrentMode();
       initReadingBackgroundSystem();
@@ -802,6 +908,20 @@ activePages.forEach(page => {
     }
 }
 
+
+      function resetLazyPrepareState() {
+  pagePrepareCursor = 0;
+  pageSentenceCounter = 0;
+  pagePrepareToken++;
+
+  if (Array.isArray(activePages)) {
+    activePages.forEach(p => {
+      if (!p.content) p.content = { ops: [] };
+      delete p.segmentedHtml;
+      delete p.sentenceStartIndex;
+    });
+  }
+}
 
 // ⭐ 工具函数：为内容按“有效句子”编号并写入 data-sentence-id / data-sentence-index
 function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
@@ -852,6 +972,141 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
   return { element: tempDiv, nextIndex: counter };
 }
 
+      async function ensurePagesPreparedUpTo(targetCount, { userInitiated=false } = {}) {
+  if (!activeWork || !activeWork._id) return;
+  if (!Array.isArray(activePages) || activePages.length === 0) return;
+
+  const hardTarget = Math.min(targetCount, activePages.length);
+  const myToken = pagePrepareToken;
+
+  // 等待别的 prepare 结束
+  while (pagePrepareRunning && myToken === pagePrepareToken) {
+    await sleep(40);
+  }
+  if (myToken !== pagePrepareToken) return;
+  if (pagePrepareCursor >= hardTarget) return;
+
+  pagePrepareRunning = true;
+  const start = Date.now();
+
+  try {
+    while (pagePrepareCursor < hardTarget) {
+      if (myToken !== pagePrepareToken) return;
+
+      // 弱网模式：如果不是用户触发的加载，只准备前两页就停
+      if (isWeakLazyMode) {
+  if (!userInitiated) {
+    if (pagePrepareCursor >= WEAK_INITIAL_PAGES) {
+      return;
+    }
+  }
+}
+
+
+      const page = activePages[pagePrepareCursor];
+      if (!page) { pagePrepareCursor++; continue; }
+
+      if (typeof page.sentenceStartIndex !== 'number' || typeof page.segmentedHtml !== 'string') {
+        const startIndex = pageSentenceCounter;
+        page.sentenceStartIndex = startIndex;
+
+        const rawHtml = deltaToHtml(page.content);                 // 你已有（:contentReference[oaicite:8]{index=8}）
+        const segmented = segmentContentAndAddIds(rawHtml, activeWork._id, startIndex);
+        pageSentenceCounter = segmented.nextIndex;
+        page.segmentedHtml = segmented.element.innerHTML;
+      }
+
+      pagePrepareCursor++;
+
+      // 让出主线程，避免长循环卡死
+      if (Date.now() - start > 12) {
+        await sleep(0);
+      }
+    }
+  } finally {
+    pagePrepareRunning = false;
+  }
+}
+
+function floorPlaceholderHtml() {
+  return `<div class="lazy-floor-placeholder"><span class="spinner"></span><span>正在加载…</span></div>`;
+}
+
+function hydrateRenderedFloorsRange(startIndex, endIndex) {
+  for (let i = startIndex; i < endIndex; i++) {
+    const page = activePages[i];
+    const floorBody = document.querySelector(`.floor[data-page-index="${i}"] .floor-body`);
+    if (!floorBody) continue;
+    if (!page || !page.segmentedHtml) continue;
+
+    floorBody.innerHTML = page.segmentedHtml;
+    floorBody.dataset.hydrated = '1';
+    processContentForSentenceIds(floorBody);
+  }
+
+  // 背景系统位置重算（你原来 renderFloorsRange 末尾就有类似逻辑 :contentReference[oaicite:9]{index=9}）
+  if (typeof recalcBgSegmentPositions === 'function') {
+  if (typeof updateReadingBackgroundByScroll === 'function') {
+    recalcBgSegmentPositions();
+    updateReadingBackgroundByScroll(false);
+  }
+}
+
+}
+
+function startLazySlowWatchdog() {
+  clearTimeout(lazySlowTimer);
+  lazySlowTimer = setTimeout(() => {
+    if (currentMode !== 'scroll') return;
+    if (isWeakLazyMode) return;
+
+    // 如果 60s 后，当前已渲染楼层还没准备好对应内容 → 切弱网模式
+    const need = Math.min(renderedFloorCount, activePages.length);
+    if (pagePrepareCursor < need) {
+      switchToWeakLazyMode();
+    }
+  }, LAZY_SLOW_THRESHOLD_MS);
+}
+
+function switchToWeakLazyMode() {
+  if (isWeakLazyMode) return;
+  isWeakLazyMode = true;
+  pagePrepareToken++; // 取消正在进行的 prepare
+
+  showLazyToast(
+    '检测到弱 wifi 环境/与服务器的连接不稳定，正在切换加载样式…请点击“导航”以跳转阅读位置',
+    { weak:true, showNav:true }
+  );
+
+if (currentMode === 'scroll') {
+  if (bookContent) {
+    if (Array.isArray(activePages)) {
+      bookContent.innerHTML = '';
+      renderedFloorCount = 0;
+
+      const total = activePages.length;
+      const initialEnd = Math.min(total, WEAK_INITIAL_PAGES);
+
+      renderFloorsRange(0, initialEnd);
+      renderedFloorCount = initialEnd;
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // 只确保前两页准备好
+      ensurePagesPreparedUpTo(initialEnd, { userInitiated: true })
+        .then(() => {
+          hydrateRenderedFloorsRange(0, initialEnd);
+        })
+        .finally(() => {
+          // 弱网提示默认不自动隐藏（你要隐藏就手动 hideLazyToast()）
+        });
+    }
+  }
+}
+
+}
+
+
       // 【新增函数】：获取作品所有评论，并更新全局状态
 async function fetchAllWorkComments(workId) {
   try {
@@ -882,171 +1137,232 @@ async function fetchAllWorkComments(workId) {
             return String(text || '').replace(/[&<>"']/g, m => map[m]);
         }
 
-// 渲染 [startIndex, endIndex) 这一段楼层
 function renderFloorsRange(startIndex, endIndex) {
-    if (!activePages || activePages.length === 0) return;
-    if (!bookContent) return;
+  if (!activePages || activePages.length === 0) return;
+  if (!bookContent) return;
 
-    for (let pageIndex = startIndex; pageIndex < endIndex; pageIndex++) {
-        if (pageIndex >= activePages.length) {
-            break;
-        }
+  for (let pageIndex = startIndex; pageIndex < endIndex; pageIndex++) {
+    if (pageIndex >= activePages.length) break;
 
-        const page = activePages[pageIndex];
+    const page = activePages[pageIndex];
 
-        const floorDiv = document.createElement('div');
-        floorDiv.className = 'floor';
-        floorDiv.dataset.pageIndex = String(pageIndex);
-        floorDiv.innerHTML = `
-            <div class="floor-header">
-                <span>${pageIndex + 1} 楼</span>
-                <button class="comment-view-btn" data-page-index="${pageIndex}">
-                    查看本楼评论（${getCommentsCountForPage(pageIndex)}）
-                </button>
-            </div>
-            <div class="floor-body ql-editor">
-                ${page.segmentedHtml || ''}
-            </div>
-        `;
-        bookContent.appendChild(floorDiv);
+    const floorDiv = document.createElement('div');
+    floorDiv.className = 'floor';
+    floorDiv.dataset.pageIndex = String(pageIndex);
 
-        const floorBody = floorDiv.querySelector('.floor-body');
-        if (!floorBody) {
-            continue;
-        }
+    const countText = getCommentsCountForPage(pageIndex);
 
-        // ❌ 把这一块删掉（不要在这里再 applyEffectsToBlocks 了）
-        /*
-        applyEffectsToBlocks(
-            floorBody,
-            activeWork ? activeWork.effectsPublished : undefined,
-            page.startIndex ? page.startIndex : 0
-        );
-        */
+    floorDiv.innerHTML = `
+      <div class="floor-header">
+        <span>${pageIndex + 1} 楼</span>
+        <button class="comment-view-btn" data-page-index="${pageIndex}">
+          查看本楼评论（${countText}）
+        </button>
+      </div>
+      <div class="floor-body ql-editor" data-hydrated="0">
+        ${page && page.segmentedHtml ? page.segmentedHtml : floorPlaceholderHtml()}
+      </div>
+    `;
 
-        // 评论按钮
-        const commentBtn = floorDiv.querySelector('.comment-view-btn');
-        if (commentBtn) {
-            commentBtn.addEventListener('click', () => {
-                openCommentPanelForPage(pageIndex);
-            });
-        }
+    bookContent.appendChild(floorDiv);
 
-        // 给新渲染的楼层绑定评论句子点击
-        processContentForSentenceIds(floorBody);
+    const floorBody = floorDiv.querySelector('.floor-body');
+    if (!floorBody) continue;
+
+    const commentBtn = floorDiv.querySelector('.comment-view-btn');
+    if (commentBtn) {
+      commentBtn.addEventListener('click', () => {
+        openCommentPanelForPage(pageIndex); // openCommentPanelForPage 下面也要改成 async
+      });
     }
-  // ⭐ 新增：每次渲染完一批楼层后，重建背景区间
-    if (typeof initReadingBackgroundSystem === 'function') {
-        initReadingBackgroundSystem();
-    } else if (typeof recalcBgSegmentPositions === 'function' &&
-               typeof updateReadingBackgroundByScroll === 'function') {
-        // 极端情况下 init 没定义，就至少重算一下位置
-        recalcBgSegmentPositions();
-        updateReadingBackgroundByScroll(false);
+
+    // 只有真正有内容时才绑定句子点击
+    if (page && page.segmentedHtml) {
+      floorBody.dataset.hydrated = '1';
+      processContentForSentenceIds(floorBody);
     }
+  }
+
+  // 末尾：背景系统重算（保留你原来的逻辑 :contentReference[oaicite:12]{index=12}）
+  if (typeof initReadingBackgroundSystem === 'function') {
+    initReadingBackgroundSystem();
+  } else if (typeof recalcBgSegmentPositions === 'function' &&
+             typeof updateReadingBackgroundByScroll === 'function') {
+    recalcBgSegmentPositions();
+    updateReadingBackgroundByScroll(false);
+  }
 }
 
-      // ====== 背景透视（Shift） ======
+
+     // ====== 背景透视（Shift / 按钮） ======
 const bgPeekBtn = document.getElementById('bg-peek-btn');
 let isBgPeekMode = false;
 
-// 桌面端判断：和你现有的 1050px 断点保持一致（见你的移动端媒体查询 :contentReference[oaicite:4]{index=4}）
-function isDesktop() {
-  return !window.matchMedia('(max-width: 1050px)').matches;
-}
-
-function setBgPeekMode(on) {
-  isBgPeekMode = !!on;
-  document.body.classList.toggle('bg-peek-mode', isBgPeekMode);
-  if (bgPeekBtn) bgPeekBtn.classList.toggle('active', isBgPeekMode);
-}
-
-
-function isMobile() {
+// 与 CSS 断点保持一致（max-width: 1050px）
+function bgPeekIsMobile() {
   return window.matchMedia('(max-width: 1050px)').matches;
 }
+function bgPeekIsDesktop() {
+  return !bgPeekIsMobile();
+}
+
+// 统一应用：桌面用 bg-peek-mode，移动端用 bg-peek-mobile-mode
+function applyBgPeekState() {
+  document.body.classList.remove('bg-peek-mode');
+  document.body.classList.remove('bg-peek-mobile-mode');
+
+  if (bgPeekBtn) {
+    bgPeekBtn.classList.remove('active');
+  }
+  if (typeof bgPeekMobile !== 'undefined') {
+    if (bgPeekMobile) {
+      bgPeekMobile.classList.remove('active');
+    }
+  }
+
+  if (!isBgPeekMode) return;
+
+  if (bgPeekIsMobile()) {
+    document.body.classList.add('bg-peek-mobile-mode');
+    if (typeof bgPeekMobile !== 'undefined') {
+      if (bgPeekMobile) {
+        bgPeekMobile.classList.add('active');
+      }
+    }
+  } else {
+    document.body.classList.add('bg-peek-mode');
+    if (bgPeekBtn) {
+      bgPeekBtn.classList.add('active');
+    }
+  }
+}
 
 function setBgPeekMode(on) {
   isBgPeekMode = !!on;
-
-  // 只做移动端这个模式（PC 的 Shift 模式你之前那套可以继续用）
-  document.body.classList.toggle('bg-peek-mobile-mode', isBgPeekMode && isMobile());
-
-  if (bgPeekMobile) bgPeekMobile.classList.toggle('active', isBgPeekMode && isMobile());
+  applyBgPeekState();
 }
 
 function toggleBgPeekMode() {
   setBgPeekMode(!isBgPeekMode);
 }
 
-if (bgPeekMobileBtn) {
-  bgPeekMobileBtn.addEventListener('click', (e) => {
-    e.preventDefault();
+// —— 小贴士弹窗（只在 PC 手动点击按钮时弹）
+function showBgPeekShiftTip() {
+  if (!bgPeekIsDesktop()) return;
+
+  var id = 'bg-peek-shift-tip';
+  var tip = document.getElementById(id);
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = id;
+    tip.setAttribute('role', 'status');
+    tip.setAttribute('aria-live', 'polite');
+    tip.style.position = 'fixed';
+    tip.style.left = '14px';
+    tip.style.bottom = '14px';
+    tip.style.zIndex = '3000';
+    tip.style.maxWidth = '320px';
+    tip.style.background = 'rgba(20, 20, 20, 0.85)';
+    tip.style.color = '#fff';
+    tip.style.padding = '10px 12px';
+    tip.style.borderRadius = '12px';
+    tip.style.fontSize = '14px';
+    tip.style.lineHeight = '1.4';
+    tip.style.boxShadow = '0 6px 18px rgba(0,0,0,0.25)';
+    tip.style.opacity = '0';
+    tip.style.transform = 'translateY(8px)';
+    tip.style.transition = 'opacity 160ms ease, transform 160ms ease';
+    document.body.appendChild(tip);
+  }
+
+  tip.textContent = '小贴士：按 Shift 也可以切换背景透视模式';
+
+  requestAnimationFrame(function () {
+    tip.style.opacity = '1';
+    tip.style.transform = 'translateY(0)';
+  });
+
+  if (tip.__hideTimer) {
+    clearTimeout(tip.__hideTimer);
+  }
+  tip.__hideTimer = setTimeout(function () {
+    tip.style.opacity = '0';
+    tip.style.transform = 'translateY(8px)';
+  }, 2000);
+}
+
+// 手动按钮：点击切换（PC 按钮）
+if (bgPeekBtn) {
+  bgPeekBtn.addEventListener('click', function (e) {
+    if (e) e.preventDefault();
     toggleBgPeekMode();
+    showBgPeekShiftTip();
   });
 }
 
-// 屏幕尺寸切换时：如果处在开启状态，自动把 class 挂到正确端
-window.addEventListener('resize', () => {
+// 移动端按钮：点击切换
+if (typeof bgPeekMobileBtn !== 'undefined') {
+  if (bgPeekMobileBtn) {
+    bgPeekMobileBtn.addEventListener('click', function (e) {
+      if (e) e.preventDefault();
+      toggleBgPeekMode();
+    });
+  }
+}
+
+// 屏幕尺寸切换时：如果处在开启状态，把 class 挂到正确端
+window.addEventListener('resize', function () {
   if (!isBgPeekMode) return;
-  // 先清干净再按当前端重新加
-  document.body.classList.remove('bg-peek-mobile-mode');
-  setBgPeekMode(true);
+  applyBgPeekState();
 });
-
-      
-function toggleBgPeekMode() {
-  setBgPeekMode(!isBgPeekMode);
-}
-
-// 手动按钮：点击切换
-if (bgPeekBtn) {
-  bgPeekBtn.addEventListener('click', () => toggleBgPeekMode());
-}
 
 /**
  * ✅ 关键点：只在“单独按一下 Shift（没有搭配其它按键/鼠标动作）”时触发
- * 这样 Shift+方向键、Shift+字母（打大写）、Shift+点击选区 都不会误触发
  */
 let shiftDown = false;
 let shiftUsedWithOther = false;
 
 function shouldIgnoreKeyTarget(target) {
   if (!target) return false;
-  const tag = (target.tagName || '').toUpperCase();
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
   if (target.isContentEditable) return true;
+
+  var tag = (target.tagName || '').toLowerCase();
+  if (tag === 'input') return true;
+  if (tag === 'textarea') return true;
+  if (tag === 'select') return true;
   return false;
 }
 
-document.addEventListener('keydown', (e) => {
-  if (!isDesktop()) return;
+document.addEventListener('keydown', function (e) {
+  if (!bgPeekIsDesktop()) return;
 
   if (e.key === 'Shift') {
-    if (shiftDown) return; // 已经按住了，忽略重复
+    if (shiftDown) return;
     if (shouldIgnoreKeyTarget(e.target)) return;
-
     shiftDown = true;
     shiftUsedWithOther = false;
     return;
   }
 
-  // Shift 按住期间按了其它键：标记为“组合键”，不触发切换
-  if (shiftDown) shiftUsedWithOther = true;
+  if (shiftDown) {
+    shiftUsedWithOther = true;
+  }
 });
 
-document.addEventListener('mousedown', () => {
-  // Shift+鼠标点击（常用于选区）：也视为组合操作，不触发
+// 只要 Shift 按着时发生鼠标动作，就视为“搭配其它动作”
+document.addEventListener('mousedown', function () {
   if (shiftDown) shiftUsedWithOther = true;
 }, true);
 
-document.addEventListener('keyup', (e) => {
-  if (!isDesktop()) return;
+document.addEventListener('keyup', function (e) {
+  if (!bgPeekIsDesktop()) return;
   if (e.key !== 'Shift') return;
 
   if (!shouldIgnoreKeyTarget(e.target)) {
-    if (shiftDown && !shiftUsedWithOther) {
-      toggleBgPeekMode();
+    if (shiftDown) {
+      if (!shiftUsedWithOther) {
+        toggleBgPeekMode();
+      }
     }
   }
 
@@ -1055,41 +1371,75 @@ document.addEventListener('keyup', (e) => {
 });
 
 
+
 // 初始化 / 重新渲染楼层模式
-function renderScrollMode(initialTargetPageIndex = 0) {
-    currentMode = 'scroll';
-    bookContent.innerHTML = '';
-    renderedFloorCount = 0;
+async function renderScrollMode(initialTargetPageIndex = 0) {
+  currentMode = 'scroll';
+  if (!bookContent) return;
 
-    const total = activePages ? activePages.length : 0;
-    if (!total) return;
+  bookContent.innerHTML = '';
+  renderedFloorCount = 0;
 
-    // 初次至少渲染前 5 楼，如果有目标楼层则保证目标楼层也在首批内
-    const safeTarget = Math.min(Math.max(initialTargetPageIndex, 0), total - 1);
-    const initialEnd = Math.min(
-        total,
-        Math.max(FLOOR_BATCH_SIZE, safeTarget + 1)
-    );
+  const total = Array.isArray(activePages) ? activePages.length : 0;
+  if (!total) return;
 
-    renderFloorsRange(0, initialEnd);
-    renderedFloorCount = initialEnd;
+  // ✅ 关键：进入 scroll 模式时，重置“按需内容准备”游标（不要全量预处理）
+  resetLazyPrepareState();
 
-    // 侧边栏只负责总楼层导航
-    renderSidebar(total, 'floor');
+  // 弱网模式：强制从第 1 楼开始，不跳转到目标楼层
+  const safeTarget = isWeakLazyMode
+    ? 0
+    : Math.min(Math.max(initialTargetPageIndex, 0), total - 1);
 
-    // 绑定懒加载滚动
-    setupFloorLazyLoading();
+  const initialEnd = isWeakLazyMode
+    ? Math.min(total, WEAK_INITIAL_PAGES)
+    : Math.min(total, Math.max(FLOOR_BATCH_SIZE, safeTarget + 1));
 
-    // 如果有指定目标楼层，滚动过去
-    if (safeTarget > 0) {
-        const targetFloor = document.querySelector(`.floor[data-page-index="${safeTarget}"]`);
-        if (targetFloor) {
-          boostBgHeartbeat(6000);
-            targetFloor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+  // 先渲染楼层壳（floor-body 会是占位“正在加载...”）
+  renderFloorsRange(0, initialEnd);
+  renderedFloorCount = initialEnd;
+
+  // 侧边栏只负责总楼层导航
+  renderSidebar(total, 'floor');
+
+  // 绑定懒加载滚动
+  setupFloorLazyLoading();
+
+  // ✅ 显示加载提示 + 启动超时监测
+  showLazyToast('正在加载…');
+  startLazySlowWatchdog();
+
+  try {
+    // ✅ 按需准备首批楼层内容（用户进入页面：算 userInitiated）
+    await ensurePagesPreparedUpTo(initialEnd, { userInitiated: true });
+
+    // ✅ hydrate：把占位替换为真实内容
+    hydrateRenderedFloorsRange(0, initialEnd);
+
+    // ✅ 把评论数（…）更新成真实数字
+    for (let i = 0; i < initialEnd; i++) {
+      const btn = document.querySelector(`.floor[data-page-index="${i}"] .comment-view-btn`);
+      if (btn) btn.textContent = `查看本楼评论（${getCommentsCountForPage(i)}）`;
     }
-  // 新增：无论是否跳楼层，记录一下当前推荐位置（初次进入也会记为第 1 楼）
-    saveLastViewToStorage('scroll', safeTarget);
+  } finally {
+    // 弱网模式提示一般要常驻（你也可以改成延时隐藏）
+    if (!isWeakLazyMode) hideLazyToast();
+  }
+
+  // ✅ 非弱网模式下才滚动到目标楼层
+  if (!isWeakLazyMode) {
+  if (safeTarget > 0) {
+    const targetFloor = document.querySelector(`.floor[data-page-index="${safeTarget}"]`);
+    if (targetFloor) {
+      boostBgHeartbeat(6000);
+      targetFloor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+}
+
+
+  // ✅ 记录位置：弱网模式一定记 0（第 1 楼）
+  saveLastViewToStorage('scroll', safeTarget);
 }
 
 // 确保某一楼已经被渲染（供导航/外部跳转使用）
@@ -1111,57 +1461,103 @@ function ensureFloorRendered(targetPageIndex) {
 }
 
 function setupFloorLazyLoading() {
-    if (floorLazyScrollHandler) {
-        window.removeEventListener('scroll', floorLazyScrollHandler);
+  if (floorLazyScrollHandler) {
+    window.removeEventListener('scroll', floorLazyScrollHandler);
+  }
+
+  let lastTriggerAt = 0;
+
+  floorLazyScrollHandler = () => {
+    if (currentMode !== 'scroll') return;
+
+    // ⭐ 1) 记录最近阅读楼层（保留你原逻辑）
+    if (bookContent) {
+      const floorEls = bookContent.querySelectorAll('.floor');
+      if (floorEls.length > 0) {
+        const viewportTop = window.scrollY;
+        const viewportMiddle = viewportTop + window.innerHeight * 0.3;
+
+        let nearestIndex = 0;
+        let minDiff = Infinity;
+
+        floorEls.forEach(el => {
+          const rect = el.getBoundingClientRect();
+          const floorTop = rect.top + window.scrollY;
+          const diff = Math.abs(floorTop - viewportMiddle);
+          if (diff < minDiff) {
+            minDiff = diff;
+            const idxStr = el.getAttribute('data-page-index') || '0';
+            const idx = parseInt(idxStr, 10);
+            if (!isNaN(idx)) nearestIndex = idx;
+          }
+        });
+
+        saveLastViewToStorage('scroll', nearestIndex);
+      }
     }
 
-    floorLazyScrollHandler = () => {
-        if (currentMode !== 'scroll') return;
+    // ⭐ 2) 触底懒加载（改为 requestLoadMoreFloors）
+    const scrollPos = window.scrollY + window.innerHeight;
+    const docHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
 
-        // ⭐ 新增：根据视口位置计算当前楼层，并记录
-        if (bookContent) {
-            const floorEls = bookContent.querySelectorAll('.floor');
-            if (floorEls.length > 0) {
-                const viewportTop = window.scrollY;
-                const viewportMiddle = viewportTop + window.innerHeight * 0.3;
+    // 防抖：避免滚动回弹/多次触发
+    if (scrollPos + 300 >= docHeight) {
+      const now = Date.now();
+      if (now - lastTriggerAt < 350) return;
+      lastTriggerAt = now;
 
-                let nearestIndex = 0;
-                let minDiff = Infinity;
+      requestLoadMoreFloors();
+    }
 
-                floorEls.forEach(el => {
-                    const rect = el.getBoundingClientRect();
-                    const floorTop = rect.top + window.scrollY;
-                    const diff = Math.abs(floorTop - viewportMiddle);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        const idxStr = el.getAttribute('data-page-index') || '0';
-                        const idx = parseInt(idxStr, 10);
-                        if (!isNaN(idx)) {
-                            nearestIndex = idx;
-                        }
-                    }
-                });
+    // ⭐ 3) 弱网模式：当只渲染了前两楼时，用户继续滑到底也会继续加载（requestLoadMoreFloors 已覆盖）
+    // 不需要额外分支
+  };
 
-                saveLastViewToStorage('scroll', nearestIndex);
-            }
-        }
-
-        // 原有：靠近底部时懒加载后续楼层
-        const scrollPos = window.scrollY + window.innerHeight;
-        const docHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
-
-        if (scrollPos + 300 >= docHeight) {
-            const total = activePages.length;
-            if (renderedFloorCount < total) {
-                const nextEnd = Math.min(total, renderedFloorCount + FLOOR_BATCH_SIZE);
-                renderFloorsRange(renderedFloorCount, nextEnd);
-                renderedFloorCount = nextEnd;
-            }
-        }
-    };
-
-    window.addEventListener('scroll', floorLazyScrollHandler);
+  // 建议 passive，减少滚动开销
+  window.addEventListener('scroll', floorLazyScrollHandler, { passive: true });
 }
+
+
+      async function requestLoadMoreFloors() {
+  if (isLoadingMoreFloors) return;
+  if (currentMode !== 'scroll') return;
+  if (!Array.isArray(activePages)) return;
+
+  const total = activePages.length;
+  if (renderedFloorCount >= total) return;
+
+  isLoadingMoreFloors = true;
+
+  const prevStart = renderedFloorCount;
+  const nextEnd = Math.min(total, renderedFloorCount + FLOOR_BATCH_SIZE);
+
+  // 先渲染楼层壳（floor-body 用占位“正在加载...”）
+  showLazyToast('正在加载…');
+  renderFloorsRange(prevStart, nextEnd);
+  renderedFloorCount = nextEnd;
+
+  // 启动 60s 监测：准备太久就切弱网模式
+  startLazySlowWatchdog();
+
+  try {
+    // 关键：按需准备内容（用户触发：弱网模式也允许继续）
+    await ensurePagesPreparedUpTo(nextEnd, { userInitiated: true });
+
+    // 把占位替换为真实 segmentedHtml
+    hydrateRenderedFloorsRange(prevStart, nextEnd);
+
+    // 更新评论数按钮（把 … 替换成数字）
+    for (let i = prevStart; i < nextEnd; i++) {
+      const btn = document.querySelector(`.floor[data-page-index="${i}"] .comment-view-btn`);
+      if (btn) btn.textContent = `查看本楼评论（${getCommentsCountForPage(i)}）`;
+    }
+  } finally {
+    isLoadingMoreFloors = false;
+    // 弱网模式下你可能希望提示常驻，所以这里仅在非弱网时隐藏
+    if (!isWeakLazyMode) hideLazyToast();
+  }
+}
+
 
         /* ---------- 渲染器：翻页（单页）模式 ---------- */
         function destroyPageModeQuill() {
@@ -1194,6 +1590,7 @@ function renderPageMode() {
     bookContent.innerHTML = '';
     const pageDiv = document.createElement('div');
     pageDiv.className = 'page-view';
+  pageDiv.id = 'page-view'; // ✅ 新增：让背景系统能准确拿到容器
     // container for Quill
     const quillContainer = document.createElement('div');
     quillContainer.id = 'quill-page-view';
@@ -1309,7 +1706,7 @@ function loadPageIntoPageQuill(pageIndex) {
     // 5. 标记内容并绑定事件 (绑定句末评论标识和句子点击事件)
 const pageCommentBtn = document.getElementById('page-view-comment-btn');
 if (pageCommentBtn) {
-    const commentCount = getCommentsCountForPage(pageIndex);
+    const commentCount = getCommentsCountForPage(currentPageIndex);
     pageCommentBtn.textContent = `查看评论 (${commentCount})`;
 }
   processContentForSentenceIds(pageQuill.root);
@@ -2082,11 +2479,20 @@ function disableCommentInputArea(disable) {
 
       // 【新增函数：在 renderComments 或 fetchPageComments 附近插入】
 
-function openCommentPanelForPage(pageIndex) {
-    const pageObj = activePages[pageIndex];
-    if (!pageObj) return;
-    
-    const pageTitle = `第 ${pageIndex + 1} 楼/页`;
+async function openCommentPanelForPage(pageIndex) {
+  const pageObj = activePages[pageIndex];
+  if (!pageObj) return;
+
+  // 没准备好就先准备（用户触发：允许弱网模式继续加载）
+  if (!pageObj.segmentedHtml) {
+    showLazyToast('正在加载本楼内容…');
+    await ensurePagesPreparedUpTo(pageIndex + 1, { userInitiated:true });
+    hydrateRenderedFloorsRange(pageIndex, pageIndex + 1);
+    hideLazyToast();
+  }
+
+  // ↓↓↓ 下面保留你原来的逻辑即可
+  const pageTitle = `第 ${pageIndex + 1} 楼/页`;
     const commentPanel = document.getElementById('comment-panel');
     const header = commentPanel.querySelector('h4');
     
@@ -2109,7 +2515,9 @@ function openCommentPanelForPage(pageIndex) {
     header.textContent = `${pageTitle} 的所有评论 (${commentsForPage.length} 条)`;
     
     commentPanel.classList.add('show');
+
 }
+
 
 
 // 【新增函数】：打开评论区并加载/过滤评论 (句子级别：统一入口)
@@ -2426,23 +2834,16 @@ function renderCurrentMode() {
 
 function getCommentsCountForPage(pageIndex) {
   const pageObj = activePages[pageIndex];
+  if (!pageObj || !pageObj.segmentedHtml) return '…';   // 关键：未准备好就先显示省略号
+
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = pageObj.segmentedHtml || '';
   const pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
     .map(el => el.getAttribute('data-sentence-id'));
+
   const commentsForPage = allComments.filter(c => pageSentenceIds.includes(c.sentenceId));
-  
-  if (window.READER_DEBUG_VERBOSE) {
-    console.log(
-      `🧩 Page ${pageIndex + 1} 的句子IDs（前 20 条示例）:`,
-      pageSentenceIds.slice(0, 20)
-    );
-    console.log(`🧩 Page ${pageIndex + 1} 匹配的评论数:`, commentsForPage.length);
-  }
-  
   return commentsForPage.length;
 }
-
 
 
       const container = document.getElementById('book-content');

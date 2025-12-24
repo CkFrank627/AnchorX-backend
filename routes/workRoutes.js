@@ -329,7 +329,7 @@ router.get('/public', async (req, res) => {
     }
 });
 
-// ✅ 阅读端：只取元信息（可在这里增加 views）
+// 阅读端：只取元信息（可在这里增加 views）
 // GET /api/works/:id/meta
 router.get('/:id/meta', optionalAuth, async (req, res) => {
   try {
@@ -360,7 +360,7 @@ router.get('/:id/meta', optionalAuth, async (req, res) => {
   }
 });
 
-// ✅ 阅读端：按批次取楼层内容（默认5楼；weak=1 强制2楼）
+// 阅读端：按批次取楼层内容（默认5楼；weak=1 强制2楼）
 // GET /api/works/:id/page-batch?offset=0&limit=5&weak=1
 router.get('/:id/page-batch', optionalAuth, async (req, res) => {
   try {
