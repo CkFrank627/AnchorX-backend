@@ -470,6 +470,109 @@ const bgPeekMobileBtn = document.getElementById('bg-peek-mobile-btn');
         let rendererQuill = null;    // 隐藏的 Quill 用于 Delta -> HTML 转换
 
         // 楼层懒加载相关
+
+      // ======================
+// ✅ 真·懒加载：按需拉 pages（依赖后端新增 /:id/meta 与 /:id/pages）
+// ======================
+
+let totalPageCount = 0;
+
+// 连续已拉到的 pages 游标：表示 [0, pagesFetchCursor) 的 content 都已拿到
+let pagesFetchCursor = 0;
+let pagesFetchInFlight = null;
+let pagesFetchAbort = null;
+
+function getActiveWorkIdForRead() {
+  return (activeWork && (activeWork._id || activeWork.workId)) || null;
+}
+
+async function fetchWorkMeta(id) {
+  const headers = getAuthHeader();
+  const res = await fetch(`${API_WORKS}/${id}/meta`, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status} - 获取作品 meta 失败`);
+  return res.json();
+}
+
+// 约定后端返回：{ pageCount, pages: [ { index, content, sentenceStartIndex? } ... ] }
+async function fetchWorkPagesBatch(id, start, limit, weak = false) {
+  const headers = getAuthHeader();
+
+  // ✅ 改成后端已有的 /page-batch，并用 offset
+  const qs = new URLSearchParams({
+    offset: String(start),
+    limit: String(limit),
+    weak: weak ? "1" : "0",
+  });
+
+  if (pagesFetchAbort) {
+    try { pagesFetchAbort.abort(); } catch (_) {}
+  }
+  pagesFetchAbort = new AbortController();
+
+  const res = await fetch(`${API_WORKS}/${id}/page-batch?${qs.toString()}`, {
+    headers,
+    signal: pagesFetchAbort.signal
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} - 获取作品 pages 失败`);
+  return res.json();
+}
+
+async function ensurePagesFetchedUpTo(targetEnd, weak = false) {
+  const workId = getActiveWorkIdForRead();
+  if (!workId) return;
+
+  while (pagesFetchCursor < targetEnd) {
+    if (pagesFetchInFlight) {
+      await pagesFetchInFlight;
+      continue;
+    }
+
+    const start = pagesFetchCursor;
+    const batch = weak ? WEAK_INITIAL_PAGES : FLOOR_BATCH_SIZE;
+    const limit = Math.min(batch, targetEnd - start);
+
+    pagesFetchInFlight = (async () => {
+      const data = await fetchWorkPagesBatch(workId, start, limit, weak);
+      const pages = Array.isArray(data.pages) ? data.pages : [];
+
+      // ✅ 兼容后端返回 pageCount（以及你未来可能改成 totalPages）
+      const serverTotal =
+        (typeof data.totalPages === "number" && data.totalPages > 0) ? data.totalPages :
+        (typeof data.pageCount === "number" && data.pageCount > 0) ? data.pageCount :
+        0;
+
+      if (serverTotal) {
+        totalPageCount = serverTotal;
+        if (!Array.isArray(activePages) || activePages.length !== totalPageCount) {
+          const old = Array.isArray(activePages) ? activePages : [];
+          activePages = new Array(totalPageCount).fill(null);
+          for (let i = 0; i < Math.min(old.length, activePages.length); i++) {
+            if (old[i]) activePages[i] = old[i];
+          }
+        }
+      }
+
+      for (let i = 0; i < pages.length; i++) {
+        const p = pages[i] || {};
+        const idx = (typeof p.index === "number") ? p.index : (start + i);
+
+        if (!activePages[idx]) activePages[idx] = {};
+        activePages[idx].content = p.content || { ops: [] };
+
+        if (typeof p.sentenceStartIndex === "number") {
+          activePages[idx].sentenceStartIndex = p.sentenceStartIndex;
+        }
+      }
+
+      pagesFetchCursor = start + pages.length;
+    })().finally(() => {
+      pagesFetchInFlight = null;
+    });
+
+    await pagesFetchInFlight;
+  }
+}
+
         const FLOOR_BATCH_SIZE = 5;          // 一次渲染 5 楼
         let renderedFloorCount = 0;          // 当前已经渲染到第几楼（数量）
         let floorLazyScrollHandler = null;   // 楼层模式滚动监听器
@@ -820,108 +923,109 @@ function endGlobalLoading() {
 }
 
 async function loadWorkContentById(id) {
-    if (!id) return displayError('作品ID无效，请返回主页。');
+  if (!id) return displayError('作品ID无效，请返回主页。');
 
-    // ✅ 新增：开始进度条
-    startGlobalLoading();
+  startGlobalLoading();
 
+  try {
+    updateGlobalLoadingProgress(15, '正在获取作品信息…');
+
+    // ✅ 1) 优先走 meta（小包）
+    let meta = null;
     try {
-        const token = localStorage.getItem('token');
-        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const res = await fetch(`${API_WORKS}/${id}`, { headers });
-        if (!res.ok) throw new Error(`HTTP ${res.status} - 获取作品失败`);
-
-        // ✅ 进度更新
-        updateGlobalLoadingProgress(30, '正在解析作品数据...');
-
-        const work = await res.json();
-        activeWork = work;
-
-      // 新增：加载特效
-const effectsPublished = work.effectsPublished || [];
-
-            // 读取自定义特效代码，只会真正加载一次
-await ensureCustomEffectsLoaded();
-      
-activeWork.effectsPublished = effectsPublished;
-console.log("🎨 已加载特效：", effectsPublished);
-
-
-        // ✅ 进度更新
-        updateGlobalLoadingProgress(50, '正在加载评论...');
-
-        // 获取作品的所有评论
-        await fetchAllWorkComments(work.workId || id);
-
-        // ✅ 进度更新
-        updateGlobalLoadingProgress(70, '正在渲染作品内容...');
-
-        // 处理 pages / content
-        if (Array.isArray(work.pages)) {
-    if (work.pages.length > 0) {
-        activePages = work.pages;
-    } else {
-        if (Array.isArray(work.content)) {
-            if (work.content.length > 0) {
-                activePages = work.content;
-            } else {
-                activePages = [{ content: { ops: [] } }];
-            }
-        } else {
-            activePages = [{ content: { ops: [] } }];
-        }
+      meta = await fetchWorkMeta(id);
+    } catch (e) {
+      // 兜底：如果你后端还没上 meta/pages，就退回旧接口（但就不是真懒加载了）
+      console.warn('meta 接口不可用，回退到整本加载：', e);
+      const headers = getAuthHeader();
+      const res = await fetch(`${API_WORKS}/${id}`, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status} - 获取作品失败`);
+      meta = await res.json();
+      meta.__fallbackFull = true;
     }
-} else if (Array.isArray(work.content)) {
-    if (work.content.length > 0) {
-        activePages = work.content;
+
+    activeWork = meta;
+
+    // ✅ 2) 特效（仍然只加载一次）
+    const effectsPublished = meta.effectsPublished || [];
+    await ensureCustomEffectsLoaded();
+    activeWork.effectsPublished = effectsPublished;
+
+    // ✅ 3) pages：真懒加载模式下只建“空壳数组”，不填 content
+    if (meta.__fallbackFull) {
+      // 旧模式：你原来那套
+      updateGlobalLoadingProgress(45, '正在加载评论…');
+      await fetchAllWorkComments(meta.workId || id); // 旧模式仍然会重
+      updateGlobalLoadingProgress(70, '正在渲染作品内容…');
+
+      if (Array.isArray(meta.pages) && meta.pages.length > 0) activePages = meta.pages;
+      else if (Array.isArray(meta.content) && meta.content.length > 0) activePages = meta.content;
+      else activePages = [{ content: { ops: [] } }];
+
+      totalPageCount = activePages.length;
+      pagesFetchCursor = totalPageCount; // 已经全量
     } else {
-        activePages = [{ content: { ops: [] } }];
+      // ✅ 真懒加载：只知道总页数，不一次性拿 content
+      totalPageCount = meta.totalPages || meta.pageCount || meta.pagesCount || 0;
+      if (!totalPageCount) totalPageCount = 1;
+
+      activePages = new Array(totalPageCount).fill(null);
+      pagesFetchCursor = 0;
+
+      // ✅ 评论：别一进来就拉全量（你原来这里会 await fetchAllWorkComments） :contentReference[oaicite:2]{index=2}
+      // 建议：先不拉，或仅拉轻量“已评论 sentenceId 列表”（后端已有 /work/commented-sentences/:workId 更合适）
+      // ——这里先保持不拉全量，避免弱网卡死
+      allComments = [];
+      commentedSentenceIds = new Set();
     }
-} else {
-    activePages = [{ content: { ops: [] } }];
+
+    // 页面信息
+    document.title = (activeWork.title || '作品') + ' - 作品详情';
+    workTitle.textContent = activeWork.title || '未命名';
+    workAuthor.textContent = activeWork.author ? (activeWork.author.username || '作者') : '未知';
+    workDate.textContent = activeWork.updatedAt
+      ? `更新时间：${new Date(activeWork.updatedAt).toLocaleString()}`
+      : `更新时间：未知`;
+
+    // ✅ 关键：重置懒加载状态（你本来就有这句）
+    resetLazyPrepareState();
+
+    updateGlobalLoadingProgress(80, '正在渲染…');
+    renderCurrentMode();
+    initReadingBackgroundSystem();
+
+    updateGlobalLoadingProgress(100, '加载完成！');
+  } catch (err) {
+    console.error(err);
+    displayError('加载作品失败：' + (err.message || err));
+  } finally {
+    endGlobalLoading();
+  }
 }
 
-
-        // 更新页面基本信息
-        document.title = (work.title || '作品') + ' - 作品详情';
-        workTitle.textContent = work.title || '未命名';
-        workAuthor.textContent = work.author ? (work.author.username || '作者') : '未知';
-        workDate.textContent = work.updatedAt
-            ? `更新时间：${new Date(work.updatedAt).toLocaleString()}`
-            : `更新时间：未知`;
-
- resetLazyPrepareState();   // ✅ 关键：不再预处理全书，只重置懒懒加载状态
-
-        renderCurrentMode();
-      initReadingBackgroundSystem();
-
-        // ✅ 加载完成
-        updateGlobalLoadingProgress(100, '加载完成！');
-
-    } catch (err) {
-        console.error('loadWorkContentById 错误:', err);
-        displayError(`加载作品失败: ${err.message}`);
-        updateGlobalLoadingProgress(100, '加载失败');
-    } finally {
-        // ✅ 新增：结束进度条
-        endGlobalLoading();
-    }
-}
-
-
-      function resetLazyPrepareState() {
+function resetLazyPrepareState() {
   pagePrepareCursor = 0;
   pageSentenceCounter = 0;
   pagePrepareToken++;
 
-  if (Array.isArray(activePages)) {
-    activePages.forEach(p => {
-      if (!p.content) p.content = { ops: [] };
-      delete p.segmentedHtml;
-      delete p.sentenceStartIndex;
-    });
+  // ✅ 真懒加载：fetch 游标也重置
+  pagesFetchCursor = 0;
+  pagesFetchInFlight = null;
+  if (pagesFetchAbort) {
+    try { pagesFetchAbort.abort(); } catch (_) {}
   }
+  pagesFetchAbort = null;
+
+  if (!Array.isArray(activePages)) return;
+  activePages.forEach((p) => {
+    if (!p) return; // ✅ 关键：允许 null 占位
+    // 只清理准备态缓存
+    delete p.segmentedHtml;
+    delete p.__sentenceIdsCount;
+    // sentenceStartIndex 你可以保留（如果后端给了就别删）
+  });
 }
+
 
 // ⭐ 工具函数：为内容按“有效句子”编号并写入 data-sentence-id / data-sentence-index
 function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
@@ -972,7 +1076,7 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
   return { element: tempDiv, nextIndex: counter };
 }
 
-      async function ensurePagesPreparedUpTo(targetCount, { userInitiated=false } = {}) {
+async function ensurePagesPreparedUpTo(targetCount, { userInitiated = false } = {}) {
   if (!activeWork || !activeWork._id) return;
   if (!Array.isArray(activePages) || activePages.length === 0) return;
 
@@ -987,7 +1091,7 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
   if (pagePrepareCursor >= hardTarget) return;
 
   pagePrepareRunning = true;
-  const start = Date.now();
+  const loopStart = Date.now();
 
   try {
     while (pagePrepareCursor < hardTarget) {
@@ -1003,23 +1107,48 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
 }
 
 
-      const page = activePages[pagePrepareCursor];
-      if (!page) { pagePrepareCursor++; continue; }
+      // ✅ 真懒加载关键：如果这一页还没拿到 content（可能是 null 占位 / 空对象），先去后端拉
+      let page = activePages[pagePrepareCursor];
+      const needFetch = !page || !page.content || !Array.isArray(page.content.ops);
 
-      if (typeof page.sentenceStartIndex !== 'number' || typeof page.segmentedHtml !== 'string') {
-        const startIndex = pageSentenceCounter;
-        page.sentenceStartIndex = startIndex;
+      if (needFetch) {
+        // 若你还没实现 ensurePagesFetchedUpTo，这里会直接 return（避免死循环）
+        if (typeof ensurePagesFetchedUpTo !== 'function') {
+          return;
+        }
 
-        const rawHtml = deltaToHtml(page.content);                 // 你已有（:contentReference[oaicite:8]{index=8}）
-        const segmented = segmentContentAndAddIds(rawHtml, activeWork._id, startIndex);
-        pageSentenceCounter = segmented.nextIndex;
-        page.segmentedHtml = segmented.element.innerHTML;
+        // 只确保当前页（cursor 这页）拿到即可
+        await ensurePagesFetchedUpTo(pagePrepareCursor + 1, { userInitiated });
+
+        if (myToken !== pagePrepareToken) return;
+        page = activePages[pagePrepareCursor];
+
+        // 拉完依然没有，说明到头了/失败了，避免死循环
+        if (!page || !page.content || !Array.isArray(page.content.ops)) {
+          return;
+        }
       }
+
+      // ✅ 已准备过就跳过
+      if (typeof page.sentenceStartIndex === 'number' && typeof page.segmentedHtml === 'string') {
+        pagePrepareCursor++;
+        continue;
+      }
+
+      // ✅ 生成 sentenceStartIndex + segmentedHtml
+      const startIndex = pageSentenceCounter;
+      page.sentenceStartIndex = startIndex;
+
+      const rawHtml = deltaToHtml(page.content || { ops: [] });
+      const segmented = segmentContentAndAddIds(rawHtml, activeWork._id, startIndex);
+
+      pageSentenceCounter = segmented.nextIndex;
+      page.segmentedHtml = segmented.element.innerHTML;
 
       pagePrepareCursor++;
 
       // 让出主线程，避免长循环卡死
-      if (Date.now() - start > 12) {
+      if (Date.now() - loopStart > 12) {
         await sleep(0);
       }
     }
@@ -1027,6 +1156,7 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
     pagePrepareRunning = false;
   }
 }
+
 
 function floorPlaceholderHtml() {
   return `<div class="lazy-floor-placeholder"><span class="spinner"></span><span>正在加载…</span></div>`;
@@ -1087,6 +1217,7 @@ if (currentMode === 'scroll') {
       const total = activePages.length;
       const initialEnd = Math.min(total, WEAK_INITIAL_PAGES);
 
+      resetLazyPrepareState(); // ✅ 必须：重置 cursor/token/counter
       renderFloorsRange(0, initialEnd);
       renderedFloorCount = initialEnd;
 
@@ -1518,7 +1649,7 @@ function setupFloorLazyLoading() {
 }
 
 
-      async function requestLoadMoreFloors() {
+async function requestLoadMoreFloors() {
   if (isLoadingMoreFloors) return;
   if (currentMode !== 'scroll') return;
   if (!Array.isArray(activePages)) return;
@@ -1529,7 +1660,16 @@ function setupFloorLazyLoading() {
   isLoadingMoreFloors = true;
 
   const prevStart = renderedFloorCount;
-  const nextEnd = Math.min(total, renderedFloorCount + FLOOR_BATCH_SIZE);
+
+  // ✅ 关键改动：弱网每次 +2（懒懒加载），正常每次 +FLOOR_BATCH_SIZE（比如 5）
+  const step = isWeakLazyMode ? WEAK_INITIAL_PAGES : FLOOR_BATCH_SIZE;
+  const nextEnd = Math.min(total, renderedFloorCount + step);
+
+  // 防御：万一 step 配置异常导致 nextEnd 不动，避免死循环
+  if (nextEnd <= prevStart) {
+    isLoadingMoreFloors = false;
+    return;
+  }
 
   // 先渲染楼层壳（floor-body 用占位“正在加载...”）
   showLazyToast('正在加载…');

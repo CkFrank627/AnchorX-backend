@@ -505,24 +505,120 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 
-router.get('/:id/pages', auth, async (req, res) => {
+// ✅ 兼容：作者全量 pages + 阅读端分页 batch（start/limit）
+// GET /api/works/:id/pages
+//   - 作者写作端（不传 start/limit）：返回全量 pages
+//   - 阅读端（传 start/limit）：返回 batch（已发布 或 作者本人可读）
+// 参数：start=0&limit=5&weak=1
+router.get('/:id/pages', optionalAuth, async (req, res) => {
   try {
-    const work = await Work.findOne({ _id: req.params.id, author: req.userId });
-    if (!work) return res.status(404).json({ message: '作品不存在或无权查看' });
+    const workId = req.params.id;
+
+    // 是否 batch 模式（阅读端会传 start/limit）
+    const hasStart = req.query.start !== undefined;
+    const hasLimit = req.query.limit !== undefined;
+    const isBatchMode = hasStart || hasLimit;
+
+    const startRaw = parseInt(req.query.start, 10);
+    const limitRaw = parseInt(req.query.limit, 10);
+    const weak = String(req.query.weak || '') === '1';
+
+    let start = Number.isFinite(startRaw) ? Math.max(startRaw, 0) : 0;
+    let limit = Number.isFinite(limitRaw) ? limitRaw : 5;
+
+    // weak 模式：至少 2，且强制上限 2（懒懒加载）
+    if (weak) {
+      if (!Number.isFinite(limit) || limit < 2) limit = 2;
+      if (limit > 2) limit = 2;
+    } else {
+      // 正常懒加载：建议 1~10，默认 5
+      if (!Number.isFinite(limit) || limit <= 0) limit = 5;
+      limit = Math.min(limit, 10);
+    }
+
+    const work = await Work.findById(workId).lean();
+    if (!work) return res.status(404).json({ message: '作品不存在' });
+
+    const isOwner =
+      req.userId && String(work.author) === String(req.userId);
+
+    // 阅读权限：作者本人 OR 已发布
+    const canRead = isOwner || work.isPublished === true;
+
+    // 1) 阅读端 batch：允许已发布作品分段读取
+    if (isBatchMode) {
+      if (!canRead) {
+        return res.status(404).json({ message: '作品不存在或无权查看' });
+      }
+
+      // pageCount
+      let pageCount = 0;
+      if (work.pageStorage === 'separate') {
+        pageCount = Number.isFinite(work.pageCount) ? work.pageCount : 0;
+        if (!pageCount) {
+          pageCount = await WorkPage.countDocuments({ workId: work._id });
+        }
+
+        const docs = await WorkPage.find({
+          workId: work._id,
+          index: { $gte: start, $lt: start + limit },
+        })
+          .sort({ index: 1 })
+          .lean();
+
+        const pages = docs.map(p => ({
+          index: p.index,
+          content: rewriteUploadsInDelta(p.content || { ops: [] }),
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+        }));
+
+        const hasMore = start + pages.length < pageCount;
+
+        return res.json({
+          pageCount,
+          start,
+          limit,
+          hasMore,
+          pages,
+        });
+      }
+
+      // 非 separate：从 work.content 切片返回
+      const embedded = Array.isArray(work.content) ? work.content : [];
+      pageCount = embedded.length;
+
+      const slice = embedded.slice(start, start + limit).map((p, i) => {
+        const obj = (p && typeof p.toObject === 'function') ? p.toObject() : p;
+        const idx = start + i;
+        return {
+          index: idx,
+          ...obj,
+          content: rewriteUploadsInDelta(obj?.content || { ops: [] }),
+        };
+      });
+
+      const hasMore = start + slice.length < pageCount;
+
+      return res.json({
+        pageCount,
+        start,
+        limit,
+        hasMore,
+        pages: slice,
+      });
+    }
+
+    // 2) 作者全量模式（写作端兼容）：必须是 owner
+    if (!isOwner) {
+      return res.status(401).json({ message: '请先登录' });
+    }
 
     if (work.pageStorage !== 'separate') {
-      // 旧作品暂时直接返回嵌入 content（你说后面再考虑迁移）
-      if (work.pageStorage !== 'separate') {
-  const pages = (work.content || []).map(p => {
-    const obj = (p && typeof p.toObject === 'function') ? p.toObject() : p;
-    return {
-      ...obj,
-      content: rewriteUploadsInDelta(obj?.content),
-    };
-  });
-  return res.json({ pages });
-}
-
+      const pages = (work.content || []).map(p => {
+        const obj = (p && typeof p.toObject === 'function') ? p.toObject() : p;
+        return { ...obj, content: rewriteUploadsInDelta(obj?.content || { ops: [] }) };
+      });
       return res.json({ pages });
     }
 
@@ -533,11 +629,13 @@ router.get('/:id/pages', auth, async (req, res) => {
       updatedAt: p.updatedAt,
     }));
 
-    res.json({ pages });
+    return res.json({ pages });
   } catch (e) {
-    res.status(500).json({ message: '获取 pages 失败', error: e.message });
+    return res.status(500).json({ message: '获取 pages 失败', error: e.message });
   }
 });
+
+
 
 router.patch('/:id/pages/:pageIndex', auth, async (req, res) => {
   try {
