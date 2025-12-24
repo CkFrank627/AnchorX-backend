@@ -172,6 +172,51 @@ const getSeparatedPages = async (workId) => {
   return pageDocs.map(p => normalizePageForResponse(p));
 };
 
+// ✅ 新增：按范围获取 separate pages（用于阅读端懒加载）
+const getSeparatedPagesRange = async (workId, offset = 0, limit = 5) => {
+  const o = Math.max(parseInt(offset, 10) || 0, 0);
+  const l = Math.min(Math.max(parseInt(limit, 10) || 5, 1), 50);
+
+  const pageDocs = await WorkPage.find({
+    workId,
+    index: { $gte: o, $lt: o + l }
+  }).sort({ index: 1 }).lean();
+
+  return pageDocs.map(p => ({
+    ...normalizePageForResponse(p),
+    index: p.index,
+    content: rewriteUploadsInDelta(p.content || { ops: [] }),
+  }));
+};
+
+// ✅ 新增：计算 pageCount（separate 优先用 work.pageCount，否则 count WorkPage）
+const getWorkPageCount = async (work) => {
+  if (!work) return 1;
+  if (work.pageStorage === 'separate') {
+    if (typeof work.pageCount === 'number' && work.pageCount > 0) return work.pageCount;
+    return await WorkPage.countDocuments({ workId: work._id });
+  }
+  if (Array.isArray(work.content) && work.content.length > 0) return work.content.length;
+  return 1;
+};
+
+// ✅ 新增：embedded（非 separate）按范围切片
+const getEmbeddedPagesRange = (work, offset = 0, limit = 5) => {
+  const pages = (Array.isArray(work.content) && work.content.length > 0)
+    ? work.content
+    : [{ content: { ops: [] } }];
+
+  const o = Math.max(parseInt(offset, 10) || 0, 0);
+  const l = Math.min(Math.max(parseInt(limit, 10) || 5, 1), 50);
+
+  return pages.slice(o, o + l).map((p, i) => ({
+    ...normalizePageForResponse(p),
+    index: o + i,
+    content: rewriteUploadsInDelta(p?.content || { ops: [] }),
+  }));
+};
+
+
 // **接收 JSON 数据中的 coverImageUrl**
 router.patch('/:id/cover', auth, async (req, res) => {
     try {
@@ -283,6 +328,75 @@ router.get('/public', async (req, res) => {
         res.status(500).json({ message: '获取作品失败', error: error.message });
     }
 });
+
+// ✅ 阅读端：只取元信息（可在这里增加 views）
+// GET /api/works/:id/meta
+router.get('/:id/meta', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const noView = req.query.noView === '1';
+
+    const work = noView
+      ? await Work.findById(id).populate('author', 'username')
+      : await Work.findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true })
+          .populate('author', 'username');
+
+    if (!work) return res.status(404).json({ message: '作品不存在' });
+
+    const pageCount = await getWorkPageCount(work);
+    const obj = work.toObject();
+
+    // meta 接口不返回正文 pages/content（避免慢网速首屏卡死）
+    delete obj.pages;
+    delete obj.content;
+
+    res.json({
+      ...obj,
+      pageCount,
+      pageStorage: work.pageStorage || 'embedded',
+    });
+  } catch (e) {
+    res.status(500).json({ message: '获取作品元信息失败', error: e.message });
+  }
+});
+
+// ✅ 阅读端：按批次取楼层内容（默认5楼；weak=1 强制2楼）
+// GET /api/works/:id/page-batch?offset=0&limit=5&weak=1
+router.get('/:id/page-batch', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    let limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
+    const weak = (req.query.weak === '1') || (req.query.mode === 'weak');
+    if (weak) limit = 2;
+
+    const work = await Work.findById(id).populate('author', 'username');
+    if (!work) return res.status(404).json({ message: '作品不存在' });
+
+    const pageCount = await getWorkPageCount(work);
+    if (offset >= pageCount) {
+      return res.json({ workId: id, offset, limit, pageCount, hasMore: false, pages: [] });
+    }
+
+    const pages = (work.pageStorage === 'separate')
+      ? await getSeparatedPagesRange(work._id, offset, limit)
+      : getEmbeddedPagesRange(work, offset, limit);
+
+    res.json({
+      workId: work._id,
+      pageStorage: work.pageStorage || 'embedded',
+      offset,
+      limit,
+      pageCount,
+      hasMore: offset + pages.length < pageCount,
+      pages,
+    });
+  } catch (e) {
+    res.status(500).json({ message: '获取作品分页内容失败', error: e.message });
+  }
+});
+
 
 
 // 获取当前登录用户的作品

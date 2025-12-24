@@ -1800,14 +1800,6 @@
         window.location.href = 'https://zhidianworld.com/login/';
     }
 
-    /* ---------- 初始化 Quill ---------- */
-    const quill = new Quill('#editor', {
-        modules: {
-            toolbar: '#toolbar-quill'
-        },
-        theme: 'snow'
-    });
-
     /* --------- 进入 DOMContentLoaded 后初始化所有逻辑 --------- */
     document.addEventListener('DOMContentLoaded', () => {
 
@@ -2167,6 +2159,14 @@ class HiddenTextBlot extends Inline {
 
 // 注册自定义 Blot
 Quill.register(HiddenTextBlot);
+
+      /* ---------- 初始化 Quill ---------- */
+    const quill = new Quill('#editor', {
+        modules: {
+            toolbar: '#toolbar-quill'
+        },
+        theme: 'snow'
+    });
 
       // --- 新增代码：获取 Blot Formatter 的核心 Actions ---
 

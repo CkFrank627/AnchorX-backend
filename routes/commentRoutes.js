@@ -25,45 +25,55 @@ const auth = (req, res, next) => {
 };
 
 // GET: 获取某个作品下的所有评论
+// ✅ 修改：GET /api/comments/work/:workId 支持可选 skip/limit
 router.get('/work/:workId', async (req, res) => {
-    try {
-        const { workId } = req.params;
-        const token = req.header('Authorization')?.replace('Bearer ', '');
-        let currentUserId = null;
+  try {
+    const { workId } = req.params;
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    let currentUserId = null;
 
-        if (token) {
-            try {
-                const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
-                currentUserId = decoded.userId;
-            } catch (error) {
-                currentUserId = null;
-            }
-        }
-
-        const comments = await Comment.find({ workId })
-            .populate('author', 'username')
-            .sort({ createdAt: 1 });
-
-        const formattedComments = comments.map(comment => {
-            const isLikedByCurrentUser =
-                comment.likes && currentUserId
-                    ? comment.likes.some(likeId => likeId.toString() === currentUserId)
-                    : false;
-            return {
-                _id: comment._id,
-                content: comment.content,
-                author: comment.author.username,
-                createdAt: comment.createdAt,
-                sentenceId: comment.sentenceId, // ✅ 新增：返回 sentenceId
-                likesCount: comment.likes ? comment.likes.length : 0,
-                isLikedByCurrentUser
-            };
-        });
-
-        res.json(formattedComments);
-    } catch (error) {
-        res.status(500).json({ message: '获取作品评论失败', error: error.message });
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
+        currentUserId = decoded.userId;
+      } catch {
+        currentUserId = null;
+      }
     }
+
+    const skip = Math.max(parseInt(req.query.skip, 10) || 0, 0);
+    const limitRaw = req.query.limit;
+    const limit = limitRaw === undefined ? null : Math.min(Math.max(parseInt(limitRaw, 10) || 50, 1), 500);
+
+    let q = Comment.find({ workId })
+      .populate('author', 'username')
+      .sort({ createdAt: 1 });
+
+    if (skip) q = q.skip(skip);
+    if (limit !== null) q = q.limit(limit);
+
+    const comments = await q;
+
+    const formattedComments = comments.map(comment => {
+      const isLikedByCurrentUser =
+        comment.likes && currentUserId
+          ? comment.likes.some(likeId => likeId.toString() === currentUserId)
+          : false;
+      return {
+        _id: comment._id,
+        content: comment.content,
+        author: comment.author.username,
+        createdAt: comment.createdAt,
+        sentenceId: comment.sentenceId,
+        likesCount: comment.likes ? comment.likes.length : 0,
+        isLikedByCurrentUser
+      };
+    });
+
+    res.json(formattedComments);
+  } catch (error) {
+    res.status(500).json({ message: '获取作品评论失败', error: error.message });
+  }
 });
 
 // GET: 获取某个作品特定句子的所有评论

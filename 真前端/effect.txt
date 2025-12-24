@@ -1578,6 +1578,58 @@
   text-align: center;
 }
 
+  /* ✅ 提示栏：高亮 + 闪烁两次 */
+.effect-toolbar-left{
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+#effect-selected-line-label.tip-highlight{
+  background: #fff3cd;
+  color: #6c5200;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+@keyframes tipBlinkTwice {
+  0%   { box-shadow: 0 0 0 rgba(255,193,7,0); filter: none; }
+  50%  { box-shadow: 0 0 0 4px rgba(255,193,7,0.35); filter: brightness(1.05); }
+  100% { box-shadow: 0 0 0 rgba(255,193,7,0); filter: none; }
+}
+
+#effect-selected-line-label.tip-blink{
+  animation: tipBlinkTwice 0.45s ease-in-out 2;
+}
+
+/* ✅ “取消高亮”按钮：默认不显示，hover 时出现（不挤占布局） */
+.tip-cancel-highlight-btn{
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+
+  padding: 3px 8px;
+  border: 1px solid #ced4da;
+  background: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #555;
+  cursor: pointer;
+}
+
+.effect-toolbar-left.tip-highlight-active:hover .tip-cancel-highlight-btn{
+  display: inline-flex;
+}
+
+.tip-cancel-highlight-btn:hover{
+  background: #f1f3f5;
+}
+
+
 </style>
   
 <body>
@@ -2112,9 +2164,6 @@ function applyEffect(targetEl) {
   </style>
 
   <!-- ⭐ JS：作品列表 + 特效编辑逻辑 -->
-  </style>
-
-  <!-- ⭐ JS：作品列表 + 特效编辑逻辑 -->
   <script>
     // 和 write 保持一致的 API 地址
     const API_BASE_URL = 'https://api.anchorx.ca/api/works';
@@ -2480,6 +2529,70 @@ renderBgTransitionList();
   }
 }
 
+// ✅ 提示高亮/闪烁控制（本页面生命周期内）
+const tipCancelHighlightBtn = document.getElementById('effect-tip-cancel-highlight');
+let tipHighlightDisabled = false;
+
+function clearToolbarTipHighlight() {
+  selectedLineLabel.classList.remove('tip-highlight');
+  selectedLineLabel.classList.remove('tip-blink');
+  if (selectedLineLabel && selectedLineLabel.parentElement) {
+    selectedLineLabel.parentElement.classList.remove('tip-highlight-active');
+  }
+}
+
+function blinkToolbarTipTwice() {
+  if (tipHighlightDisabled) return;
+
+  selectedLineLabel.classList.add('tip-highlight');
+
+  if (selectedLineLabel && selectedLineLabel.parentElement) {
+    selectedLineLabel.parentElement.classList.add('tip-highlight-active');
+  }
+
+  // 关键：重启动画（保证每次都闪两次）
+  selectedLineLabel.classList.remove('tip-blink');
+  void selectedLineLabel.offsetWidth; // reflow
+  selectedLineLabel.classList.add('tip-blink');
+}
+
+// 你现在的需求：主要针对 “请选择一个背景图片” 这种提示
+function maybeBlinkToolbarTip() {
+  if (tipHighlightDisabled) return;
+
+  // 非背景模式：不高亮
+  if (currentEffectMode !== 'background') {
+    clearToolbarTipHighlight();
+    return;
+  }
+
+  const t = (selectedLineLabel.textContent || '').trim();
+
+  // 只在“请选择 + 背景/图片”时触发（避免误伤其它提示）
+  if (t.indexOf('请选择') !== -1 && (t.indexOf('背景') !== -1 || t.indexOf('图片') !== -1)) {
+    blinkToolbarTipTwice();
+  } else {
+    clearToolbarTipHighlight();
+  }
+}
+
+if (tipCancelHighlightBtn) {
+  tipCancelHighlightBtn.addEventListener('click', function (e) {
+    e.preventDefault();
+    tipHighlightDisabled = true;
+    clearToolbarTipHighlight();
+  });
+}
+
+// ✅ 保险：任何地方只要改了提示文本，都自动判断要不要闪
+if (selectedLineLabel) {
+  const tipObserver = new MutationObserver(function () {
+    maybeBlinkToolbarTip();
+  });
+  tipObserver.observe(selectedLineLabel, { childList: true, characterData: true, subtree: true });
+}
+
+      
 function renderLineList() {
   lineListEl.innerHTML = '';
 
@@ -2582,6 +2695,7 @@ function renderLineList() {
     // 背景模式：提示行完全由 selectedLineLabel 文本负责
     effectToolbarTipPrefix.textContent = '';
     selectedLineLabel.textContent = '请选择一个背景图片';
+    maybeBlinkToolbarTip(); // ✅ 新增：高亮 + 闪两次
 
     effectInsertLabel.textContent = '插入背景变化特效：';
     textEffectGroup.classList.add('hidden');
