@@ -1,4 +1,4 @@
-    <script>
+       <script>
   /* ---------- 1. 注册自定义 Blot（插件） - 确保阅读端能解析 HiddenTextBlot ---------- */
     // 导入 Quill 核心 Blot 类
     const Inline = Quill.import('blots/inline');
@@ -680,6 +680,43 @@ let commentedSentenceIds = new Set(); // 存储所有有评论的 sentenceId (�
 let currentViewingSentenceId = null;  // 当前评论区显示的特定句子 ID
 let currentViewingPageSentenceIds = null; // 当前评论区显示的页面句子 ID 列表
 
+      let hasLoadedAllComments = false;
+let commentedIdsReadyPromise = null;
+let commentedIdsReady = false;
+
+async function fetchCommentedSentenceIds(workId) {
+  try {
+    const headers = getAuthHeader();
+    const res = await fetch(`${API_COMMENTS}/work/commented-sentences/${workId}`, { headers });
+    if (!res.ok) throw new Error('获取 commentedSentenceIds 失败');
+    const ids = await res.json();
+    commentedSentenceIds = new Set(Array.isArray(ids) ? ids : []);
+  } catch (e) {
+    console.error('加载 commentedSentenceIds 失败:', e);
+    commentedSentenceIds = new Set();
+  } finally {
+    commentedIdsReady = true;
+  }
+}
+
+function refreshRenderedFloorCommentCounts() {
+  document.querySelectorAll('.floor').forEach(floor => {
+    const idx = parseInt(floor.dataset.pageIndex || '-1', 10);
+    if (Number.isNaN(idx) || idx < 0) return;
+    const btn = floor.querySelector('.comment-view-btn');
+    if (!btn) return;
+    const countText = getCommentsCountForPage(idx);
+    btn.textContent = `查看本楼评论（${countText}）`;
+  });
+}
+
+function refreshRenderedCommentMarkers() {
+  document.querySelectorAll('.floor-body[data-hydrated="1"]').forEach(body => {
+    processContentForSentenceIds(body); // 下文我会把它改成“幂等”，可重复调用
+  });
+}
+
+
         // 局部修改: 关闭评论区时，同时取消“查看模式”
 closeCommentBtn.addEventListener('click', () => {
     commentPanel.classList.remove('show');
@@ -977,6 +1014,14 @@ async function loadWorkContentById(id) {
       // ——这里先保持不拉全量，避免弱网卡死
       allComments = [];
       commentedSentenceIds = new Set();
+
+      const workIdForComments = meta.workId || id;
+commentedIdsReadyPromise = fetchCommentedSentenceIds(workIdForComments).then(() => {
+  // 等句子ID到位后，给已渲染的楼层补上“评论符号”
+  refreshRenderedCommentMarkers();
+  refreshRenderedFloorCommentCounts();
+});
+
     }
 
     // 页面信息
@@ -992,7 +1037,6 @@ async function loadWorkContentById(id) {
 
     updateGlobalLoadingProgress(80, '正在渲染…');
     renderCurrentMode();
-    initReadingBackgroundSystem();
 
     updateGlobalLoadingProgress(100, '加载完成！');
   } catch (err) {
@@ -1172,17 +1216,45 @@ function hydrateRenderedFloorsRange(startIndex, endIndex) {
     floorBody.innerHTML = page.segmentedHtml;
     floorBody.dataset.hydrated = '1';
     processContentForSentenceIds(floorBody);
+    // 如果评论标记还在路上：等它到了再给本楼补一次“评论符号”
+if (commentedIdsReadyPromise) {
+  if (!commentedIdsReady) {
+    if (!floorBody.dataset.commentMarkPending) {
+      floorBody.dataset.commentMarkPending = '1';
+      commentedIdsReadyPromise.then(() => {
+        if (floorBody.isConnected) {
+          processContentForSentenceIds(floorBody);
+        }
+      });
+    }
+  }
+}
+
+
   }
 
-  // 背景系统位置重算（你原来 renderFloorsRange 末尾就有类似逻辑 :contentReference[oaicite:9]{index=9}）
+  // 弱网：不加载背景特效（省内存）
+  if (isWeakLazyMode) {
+    setBgEffectsDisabled(true);
+    return;
+  }
+
+  if (isBgEffectsDisabled()) return;
+
+  // ✅ 关键：内容真正进入 DOM 后，重新 init（重建 bgSegments）
+  if (typeof initReadingBackgroundSystem === 'function') {
+    initReadingBackgroundSystem();
+    return;
+  }
+
   if (typeof recalcBgSegmentPositions === 'function') {
-  if (typeof updateReadingBackgroundByScroll === 'function') {
-    recalcBgSegmentPositions();
-    updateReadingBackgroundByScroll(false);
+    if (typeof updateReadingBackgroundByScroll === 'function') {
+      recalcBgSegmentPositions();
+      updateReadingBackgroundByScroll(false);
+    }
   }
 }
 
-}
 
 function startLazySlowWatchdog() {
   clearTimeout(lazySlowTimer);
@@ -1190,9 +1262,28 @@ function startLazySlowWatchdog() {
     if (currentMode !== 'scroll') return;
     if (isWeakLazyMode) return;
 
-    // 如果 60s 后，当前已渲染楼层还没准备好对应内容 → 切弱网模式
     const need = Math.min(renderedFloorCount, activePages.length);
-    if (pagePrepareCursor < need) {
+
+    var notReady = false;
+
+    if (typeof pagePrepareCursor === 'number') {
+      if (pagePrepareCursor < need) notReady = true;
+    }
+
+    // 适配“真·懒加载按需拉 pages”
+    if (!notReady) {
+      if (typeof pagesFetchCursor === 'number') {
+        if (pagesFetchCursor < need) notReady = true;
+      }
+    }
+
+    if (!notReady) {
+      if (typeof pagesFetchInFlight !== 'undefined') {
+        if (pagesFetchInFlight) notReady = true;
+      }
+    }
+
+    if (notReady) {
       switchToWeakLazyMode();
     }
   }, LAZY_SLOW_THRESHOLD_MS);
@@ -1200,7 +1291,8 @@ function startLazySlowWatchdog() {
 
 function switchToWeakLazyMode() {
   if (isWeakLazyMode) return;
-  isWeakLazyMode = true;
+isWeakLazyMode = true;
+setBgEffectsDisabled(true); // ✅ 弱网：关闭背景系统
   pagePrepareToken++; // 取消正在进行的 prepare
 
   showLazyToast(
@@ -1245,11 +1337,11 @@ async function fetchAllWorkComments(workId) {
     const commentsRes = await fetch(`${API_COMMENTS}/work/${workId}`, { headers });
     if (!commentsRes.ok) throw new Error('获取所有作品评论失败');
     allComments = await commentsRes.json();
+    hasLoadedAllComments = true;
     commentedSentenceIds = new Set(allComments.map(c => c.sentenceId));
-
     console.log("🧩 allComments 示例：", allComments.slice(0, 5));
     console.log("🧩 commentedSentenceIds 示例：", Array.from(commentedSentenceIds).slice(0, 5));
-    console.log(`作品共有 ${allComments.length} 条评论，分布在 ${commentedSentenceIds.size} 个句子上。`);
+    console.log(`作品共有 ${allComments.length} 条评论，分布在 ${commentedSentenceIds.size} 个句子上。`);    
   } catch (error) {
     console.error('加载评论数据失败:', error);
   }
@@ -1271,6 +1363,8 @@ async function fetchAllWorkComments(workId) {
 function renderFloorsRange(startIndex, endIndex) {
   if (!activePages || activePages.length === 0) return;
   if (!bookContent) return;
+
+  var didRenderHydrated = false;
 
   for (let pageIndex = startIndex; pageIndex < endIndex; pageIndex++) {
     if (pageIndex >= activePages.length) break;
@@ -1303,24 +1397,63 @@ function renderFloorsRange(startIndex, endIndex) {
     const commentBtn = floorDiv.querySelector('.comment-view-btn');
     if (commentBtn) {
       commentBtn.addEventListener('click', () => {
-        openCommentPanelForPage(pageIndex); // openCommentPanelForPage 下面也要改成 async
+        openCommentPanelForPage(pageIndex);
       });
     }
 
     // 只有真正有内容时才绑定句子点击
     if (page && page.segmentedHtml) {
+      didRenderHydrated = true;
       floorBody.dataset.hydrated = '1';
       processContentForSentenceIds(floorBody);
     }
   }
 
-  // 末尾：背景系统重算（保留你原来的逻辑 :contentReference[oaicite:12]{index=12}）
+  // ✅ 关键：占位渲染阶段不要 init 背景（否则扫不到句子节点就“清空背景”）
+  if (isBgEffectsDisabled()) return;
+  if (!didRenderHydrated) return;
+
   if (typeof initReadingBackgroundSystem === 'function') {
     initReadingBackgroundSystem();
-  } else if (typeof recalcBgSegmentPositions === 'function' &&
-             typeof updateReadingBackgroundByScroll === 'function') {
-    recalcBgSegmentPositions();
-    updateReadingBackgroundByScroll(false);
+  } else {
+    if (typeof recalcBgSegmentPositions === 'function') {
+      if (typeof updateReadingBackgroundByScroll === 'function') {
+        recalcBgSegmentPositions();
+        updateReadingBackgroundByScroll(false);
+      }
+    }
+  }
+}
+
+      // ====== 背景系统开关（弱网模式禁用以省内存） ======
+let bgEffectsDisabled = false;
+
+function isBgEffectsDisabled() {
+  if (isWeakLazyMode) return true;
+  if (bgEffectsDisabled) return true;
+  return false;
+}
+
+function setBgEffectsDisabled(disabled) {
+  bgEffectsDisabled = !!disabled;
+
+  // 隐藏背景容器（如果你背景系统用的就是这个 id）
+  var wrap = document.getElementById('read-bg-wrapper');
+  if (wrap) {
+    wrap.style.display = bgEffectsDisabled ? 'none' : '';
+  }
+
+  if (bgEffectsDisabled) {
+    // 立刻清掉背景图，释放显存/内存
+    try {
+      if (typeof stopBgHeartbeat === 'function') stopBgHeartbeat();
+    } catch (_) {}
+    try {
+      if (typeof clearReadingBackground === 'function') clearReadingBackground();
+    } catch (_) {}
+
+    // 弱网下也禁用“背景透视”
+    try { setBgPeekMode(false); } catch (_) {}
   }
 }
 
@@ -1339,6 +1472,11 @@ function bgPeekIsDesktop() {
 
 // 统一应用：桌面用 bg-peek-mode，移动端用 bg-peek-mobile-mode
 function applyBgPeekState() {
+  // 弱网/禁用背景：强制关闭透视
+  if (isBgEffectsDisabled()) {
+    isBgPeekMode = false;
+  }
+
   document.body.classList.remove('bg-peek-mode');
   document.body.classList.remove('bg-peek-mobile-mode');
 
@@ -1367,6 +1505,8 @@ function applyBgPeekState() {
     }
   }
 }
+
+
 
 function setBgPeekMode(on) {
   isBgPeekMode = !!on;
@@ -2648,6 +2788,13 @@ async function openCommentPanelForPage(pageIndex) {
     const pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
         .map(el => el.getAttribute('data-sentence-id'));
 
+  const workId = activeWork? (activeWork._id || activeWork.workId) : null;
+if (workId && !hasLoadedAllComments) {
+  await fetchAllWorkComments(workId);
+  refreshRenderedFloorCommentCounts();
+  refreshRenderedCommentMarkers();
+}
+
     // 过滤出该页的所有评论
     const commentsForPage = allComments.filter(c => pageSentenceIds.includes(c.sentenceId));
     
@@ -2658,90 +2805,94 @@ async function openCommentPanelForPage(pageIndex) {
 
 }
 
+      
+async function openCommentPanelForSentence(sentenceId, isNewCommentMode = false) {
+  const panel = document.getElementById('comment-panel');
+  const header = panel.querySelector('h4');
 
+  const workId = activeWork? (activeWork._id || activeWork.workId) : null;
+  if (!workId) { alert('作品尚未加载完成'); return; }
 
-// 【新增函数】：打开评论区并加载/过滤评论 (句子级别：统一入口)
-function openCommentPanelForSentence(sentenceId, isNewCommentMode = false) {
-    const panel = document.getElementById('comment-panel');
-    const header = panel.querySelector('h4');
-    
-    // 1. 过滤评论：只保留目标句子ID的评论
-  console.log("🧩 打开句子评论面板:", sentenceId);
+  // ✅ 第一次打开时把评论拉下来（否则 allComments 为空一定渲染不出旧评论）
+  if (!hasLoadedAllComments) {
+    header.textContent = '正在加载评论…';
+    renderComments([]);
+    await fetchAllWorkComments(workId); // 下面我会让它设置 hasLoadedAllComments
+    refreshRenderedFloorCommentCounts();
+    refreshRenderedCommentMarkers();
+  }
+
   const filteredComments = allComments.filter(c => c.sentenceId === sentenceId);
-  console.log("🧩 当前句子对应的评论:", filteredComments);
-    
-    // 2. 渲染评论列表
-    renderComments(filteredComments);
+  renderComments(filteredComments);
 
-    // 3. 切换评论区状态
-    if (isNewCommentMode) {
-        header.textContent = `评论目标句子`;
-        disableCommentInputArea(false); // 启用输入区 (撰写模式)
-        
-        // 更新全局状态，供 submitComment 使用
-        activeSentenceEl = document.querySelector(`[data-sentence-id="${sentenceId}"]`);
-    } else {
-        header.textContent = `句子评论 (${filteredComments.length} 条)`;
-        disableCommentInputArea(true); // 禁用输入区 (仅查看模式)
-        activeSentenceEl = null; 
+  if (isNewCommentMode) {
+    header.textContent = `评论目标句子（已有 ${filteredComments.length} 条）`;
+    disableCommentInputArea(false);
+
+    if (!activeSentenceEl || activeSentenceEl.dataset.sentenceId !== sentenceId) {
+      activeSentenceEl = document.querySelector(`[data-sentence-id="${sentenceId}"]`);
     }
+    currentViewingSentenceId = sentenceId;
+    setTimeout(() => commentTextarea?.focus?.(), 0);
+  } else {
+    header.textContent = `句子评论 (${filteredComments.length} 条)`;
+    disableCommentInputArea(true);
+    currentViewingSentenceId = sentenceId;
+    activeSentenceEl = null;
+  }
 
-    // 4. 高亮当前句子
-    // 移除所有高亮
-    document.querySelectorAll('.active-comment-target').forEach(el => el.classList.remove('active-comment-target'));
-    // 为目标句子元素添加高亮
-    const targetEl = document.querySelector(`[data-sentence-id="${sentenceId}"]`);
-    if (targetEl) {
-        targetEl.classList.add('active-comment-target');
-    }
+  document.querySelectorAll('.active-comment-target').forEach(el => el.classList.remove('active-comment-target'));
+  const targetEl = document.querySelector(`[data-sentence-id="${sentenceId}"]`);
+  if (targetEl) targetEl.classList.add('active-comment-target');
 
-    // 5. 显示评论区
-    panel.classList.add('show');
+  panel.classList.add('show');
 }
 
-function processContentForSentenceIds(containerEl) {
-   // 确保移除旧的高亮和标识
-    document.querySelectorAll('.active-comment-target').forEach(el => el.classList.remove('active-comment-target'));
-    containerEl.querySelectorAll('.comment-indicator').forEach(el => el.remove());
 
-    // ⭐ 先按句子 ID 应用特效（scroll 模式 / 翻页模式都会走到这里）
+function processContentForSentenceIds(containerEl) {
+  // 只清本容器的评论符号（避免越跑越多）
+  containerEl.querySelectorAll('.comment-indicator').forEach(el => el.remove());
+
+  // 特效只应用一次（避免重复包裹/重复注入）
+  if (!containerEl.dataset.effectsApplied) {
     if (activeWork && Array.isArray(activeWork.effectsPublished) && activeWork.effectsPublished.length) {
-        // 如果有些作品是用 workId 而不是 _id，也可以更稳一点：
-        const workIdForEffect = activeWork._id || activeWork.workId;
-        applyEffectsToBlocks(containerEl, activeWork.effectsPublished, workIdForEffect);
+      const workIdForEffect = activeWork._id || activeWork.workId;
+      applyEffectsToBlocks(containerEl, activeWork.effectsPublished, workIdForEffect);
+    }
+    containerEl.dataset.effectsApplied = '1';
+  }
+
+  const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
+
+  sentenceElements.forEach(el => {
+    const sentenceId = el.getAttribute('data-sentence-id');
+    if (!sentenceId) return;
+
+    // ✅ 句末评论符号：有评论才显示
+    if (commentedSentenceIds.has(sentenceId)) {
+      const indicator = document.createElement('span');
+      indicator.className = 'comment-indicator';
+      indicator.setAttribute('data-sentence-id', sentenceId);
+      el.appendChild(indicator);
+
+      // ✅ 关键：点击符号也进入“可输入模式”，并把 activeSentenceEl 指向这句
+      indicator.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeSentenceEl = el;
+        Promise.resolve(openCommentPanelForSentence(sentenceId, true)).catch(console.error);
+      });
     }
 
-    const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
-    
-    sentenceElements.forEach(el => {
-        const sentenceId = el.getAttribute('data-sentence-id');
-        
-        // 1. 添加句末评论标识 (如果该句子有评论)
-        if (commentedSentenceIds.has(sentenceId)) {
-            const indicator = document.createElement('span');
-            indicator.className = 'comment-indicator';
-            indicator.setAttribute('data-sentence-id', sentenceId);
-            
-            // 将标识添加到句子内容的末尾
-            el.appendChild(indicator);
-            
-            // 监听点击事件：展开评论区并过滤到该句子 (仅查看模式)
-            indicator.addEventListener('click', (e) => {
-                e.stopPropagation(); // 阻止事件冒泡到父级
-                openCommentPanelForSentence(sentenceId, false); 
-            });
-        }
-
-        // 2. 监听整个句子的点击事件（用于发表新评论）
-        el.addEventListener('click', (e) => {
-            // 如果点击的是评论标识，则跳过
-            if (e.target.classList.contains('comment-indicator')) {
-                return;
-            }
-            // 切换目标句子的激活状态 & 开启评论区，进入撰写评论模式
-            openCommentPanelForSentence(sentenceId, true); 
-        });
-    });
+    // ✅ 句子点击：只绑定一次（避免多次 hydrate/刷新导致重复触发）
+    if (!el.dataset.commentBound) {
+      el.dataset.commentBound = '1';
+      el.addEventListener('click', (e) => {
+        if (e.target && e.target.classList && e.target.classList.contains('comment-indicator')) return;
+        activeSentenceEl = el;
+        Promise.resolve(openCommentPanelForSentence(sentenceId, true)).catch(console.error);
+      });
+    }
+  });
 }
 
 // 【修改 openCommentPanelForViewerMode 函数体，约 附近】
@@ -2780,7 +2931,7 @@ async function openCommentPanelForViewerMode(workId, pageIndex) {
                 alert('评论发表成功！');
                 commentTextarea.value = '';
                 // 【新增】：成功后，重新获取并标记内容
-                await fetchAllWorkComments(activeWork._id); // 重新获取数据
+                await fetchAllWorkComments(activeWork._id || activeWork.workId);// 重新获取数据
                 // 刷新当前模式的 UI (重新运行标记逻辑)
                 renderCurrentMode(); 
                 // 重新加载并显示当前句子的评论列表，保持撰写模式
