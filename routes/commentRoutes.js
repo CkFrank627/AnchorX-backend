@@ -237,29 +237,30 @@ router.post('/:id/like', auth, async (req, res) => {
 
 // 新增 GET: 获取某个作品下所有有评论的句子 ID 列表
 // 这个接口用于前端判断哪些句子需要显示“评论”标识
+// 新增 GET: 获取某个作品下所有有评论的句子 ID 列表
 router.get('/work/commented-sentences/:workId', async (req, res) => {
-    try {
-        const { workId } = req.params;
-        
-        // 确保 workId 是一个有效的 ObjectId
-        if (!mongoose.Types.ObjectId.isValid(workId)) {
-            return res.status(400).json({ message: '作品ID格式无效' });
-        }
+  try {
+    const { workId } = req.params;
 
-        // 使用聚合 (Aggregation) 来查找 workId 下所有不重复的 sentenceId
-        const result = await Comment.aggregate([
-            { $match: { workId: mongoose.Types.ObjectId(workId) } }, // 1. 过滤作品ID
-            { $group: { _id: "$sentenceId" } }                        // 2. 按 sentenceId 分组
-        ]);
-
-        // 提取 sentenceId 数组
-        const commentedSentenceIds = result.map(item => item._id);
-
-        res.json(commentedSentenceIds);
-    } catch (error) {
-        // 在生产环境中，应记录 error.message
-        res.status(500).json({ message: '获取有评论的句子ID失败' });
+    if (!mongoose.Types.ObjectId.isValid(workId)) {
+      return res.status(400).json({ message: '作品ID格式无效' });
     }
+
+    // ✅ 兼容：有些库里 workId 可能是 String，有些是 ObjectId
+    const oid = new mongoose.Types.ObjectId(workId);
+
+    const result = await Comment.aggregate([
+      { $match: { $or: [{ workId: workId }, { workId: oid }] } },
+      { $group: { _id: '$sentenceId' } }
+    ]);
+
+    const ids = result.map(r => r._id).filter(Boolean);
+    res.json(ids);
+  } catch (error) {
+    console.error('[GET commented-sentences] Error:', error);
+    res.status(500).json({ message: '获取有评论的句子ID失败', error: error.message });
+  }
 });
+
 
 module.exports = router;
