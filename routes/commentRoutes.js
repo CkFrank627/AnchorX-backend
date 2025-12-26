@@ -24,6 +24,95 @@ const auth = (req, res, next) => {
     }
 };
 
+// 放在 router.get('/work/:workId', ...) 之前
+router.post('/work/by-sentence-ids/:workId', async (req, res) => {
+  try {
+    const workId = req.params.workId;
+    const body = req.body || {};
+    const sentenceIdsRaw = body.sentenceIds;
+
+    if (!Array.isArray(sentenceIdsRaw)) {
+      return res.status(400).json({ message: 'sentenceIds 必须是数组' });
+    }
+
+    const sentenceIds = sentenceIdsRaw
+      .map(v => (v == null ? '' : String(v)).trim())
+      .filter(v => v);
+
+    if (sentenceIds.length === 0) {
+      return res.json([]);
+    }
+
+    if (sentenceIds.length > 800) {
+      return res.status(400).json({ message: 'sentenceIds 过多，请分批请求' });
+    }
+
+    // 可选：用于计算 isLikedByCurrentUser（不强制登录）
+    const tokenHeader = req.header('Authorization');
+    let currentUserId = null;
+
+    if (tokenHeader) {
+      const token = String(tokenHeader).replace('Bearer ', '');
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
+          currentUserId = decoded.userId;
+        } catch (e) {
+          currentUserId = null;
+        }
+      }
+    }
+
+    const workOr = [{ workId: workId }];
+    if (mongoose.Types.ObjectId.isValid(workId)) {
+      workOr.push({ workId: new mongoose.Types.ObjectId(workId) });
+    }
+
+    const comments = await Comment.find({
+      sentenceId: { $in: sentenceIds },
+      $or: workOr
+    })
+      .populate('author', 'username')
+      .sort({ createdAt: 1 });
+
+    const formatted = comments.map(c => {
+      let isLikedByCurrentUser = false;
+
+      if (currentUserId) {
+        if (Array.isArray(c.likes)) {
+          for (let i = 0; i < c.likes.length; i++) {
+            const likeId = c.likes[i];
+            if (String(likeId) === String(currentUserId)) {
+              isLikedByCurrentUser = true;
+              break;
+            }
+          }
+        }
+      }
+
+      let authorName = '匿名用户';
+      if (c.author) {
+        if (c.author.username) authorName = c.author.username;
+      }
+
+      return {
+        _id: c._id,
+        content: c.content,
+        author: authorName,
+        createdAt: c.createdAt,
+        sentenceId: c.sentenceId,
+        likesCount: Array.isArray(c.likes) ? c.likes.length : 0,
+        isLikedByCurrentUser
+      };
+    });
+
+    res.json(formatted);
+  } catch (error) {
+    res.status(500).json({ message: '批量获取评论失败', error: error.message });
+  }
+});
+
+
 // GET: 获取某个作品下的所有评论
 // ✅ 修改：GET /api/comments/work/:workId 支持可选 skip/limit
 router.get('/work/:workId', async (req, res) => {
