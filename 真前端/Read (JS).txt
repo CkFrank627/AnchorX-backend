@@ -1,4 +1,4 @@
-       <script>
+<script>
   /* ---------- 1. 注册自定义 Blot（插件） - 确保阅读端能解析 HiddenTextBlot ---------- */
     // 导入 Quill 核心 Blot 类
     const Inline = Quill.import('blots/inline');
@@ -2810,14 +2810,14 @@ async function openCommentPanelForSentence(sentenceId, isNewCommentMode = false)
   const panel = document.getElementById('comment-panel');
   const header = panel.querySelector('h4');
 
-  const workId = activeWork? (activeWork._id || activeWork.workId) : null;
+  const workId = activeWork ? (activeWork._id || activeWork.workId) : null;
   if (!workId) { alert('作品尚未加载完成'); return; }
 
-  // ✅ 第一次打开时把评论拉下来（否则 allComments 为空一定渲染不出旧评论）
+  // ✅ 第一次打开先拉全量评论，否则 allComments 为空一定显示不出旧评论
   if (!hasLoadedAllComments) {
     header.textContent = '正在加载评论…';
     renderComments([]);
-    await fetchAllWorkComments(workId); // 下面我会让它设置 hasLoadedAllComments
+    await fetchAllWorkComments(workId);
     refreshRenderedFloorCommentCounts();
     refreshRenderedCommentMarkers();
   }
@@ -2841,7 +2841,9 @@ async function openCommentPanelForSentence(sentenceId, isNewCommentMode = false)
     activeSentenceEl = null;
   }
 
-  document.querySelectorAll('.active-comment-target').forEach(el => el.classList.remove('active-comment-target'));
+  document.querySelectorAll('.active-comment-target')
+    .forEach(el => el.classList.remove('active-comment-target'));
+
   const targetEl = document.querySelector(`[data-sentence-id="${sentenceId}"]`);
   if (targetEl) targetEl.classList.add('active-comment-target');
 
