@@ -1,0 +1,93 @@
+<meta charset="UTF-8">
+    <title>正在讨论模组</title>
+    <style>
+        /* =================== */
+        /* === 整体容器样式 === */
+        /* =================== */
+        .chat-list-container {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            padding: 16px;
+            max-width: 800px;
+            margin: 20px auto;
+            font-family: Arial, sans-serif;
+        }
+
+        /* =================== */
+        /* === 标题样式 === */
+        /* =================== */
+        .title-text {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        /* =================== */
+        /* === 列表样式 === */
+        /* =================== */
+        .chat-items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* =================== */
+        /* === 单个讨论项样式 === */
+        /* =================== */
+        .chat-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 6px;
+            transition: background 0.2s ease;
+        }
+        .chat-item:hover {
+            background: #f0f8ff;
+        }
+
+        /* =================== */
+        /* === 标题链接样式 === */
+        /* =================== */
+        .chat-title {
+            flex: 1;
+            font-size: 1rem;
+            color: #333;
+            text-decoration: none;
+            transition: color 0.2s ease, text-decoration 0.2s ease;
+        }
+        .chat-title:hover {
+            color: #0077cc;
+            text-decoration: underline;
+        }
+
+        /* =================== */
+        /* === 评论数样式 === */
+        /* =================== */
+        .comment-num {
+            font-size: 0.85rem;
+            color: #666;
+            flex-shrink: 0;
+        }
+    </style>
+
+
+
+<div class="chat-list-container">
+    <div class="title-text">推荐</div>
+    <div class="chat-items-list">
+        <div class="chat-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" fill="#363636"></circle>
+                <rect width="13" height="13" x="2" y="9" fill="#363636" rx="3"></rect>
+                <rect width="12" height="2" x="6" y="8" fill="#fff" rx="1"></rect>
+                <rect width="8" height="2" x="6" y="14" fill="#fff" rx="1"></rect>
+            </svg>
+            <a target="_blank" class="chat-title" href="https://zhidianworld.com/%e5%85%a5%e7%ab%99%e9%a0%88%e7%9f%a5/">入站须知</a>
+            <div class="comment-num">评论数0</div>
+        </div>
+    </div>
+</div>

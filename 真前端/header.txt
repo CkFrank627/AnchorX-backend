@@ -744,20 +744,54 @@ function renderMessages(notifications) {
         </div>
       `;
 
-      messageItem.addEventListener('click', async () => {
-        // ✅ 原有点击标记已读+跳转逻辑保持不变
-        try {
-          await fetch(`https://api.anchorx.ca/api/notifications/mark-read/${notification._id}`, {
+           // 🔥 新版：点击消息 = 标记已读 + 跳转到对应帖子/作品
+      messageItem.addEventListener('click', (e) => {
+        const token = localStorage.getItem('token');
+        const targetUrl = getNotificationTargetUrl(notification);
+
+        // 先给一点本地反馈：变成“已读”样式
+        messageItem.classList.remove('unread');
+        messageItem.classList.add('read-fade');
+
+        // 后台标记已读（异步，别阻塞跳转）
+        if (token) {
+          fetch(`https://api.anchorx.ca/api/notifications/mark-read/${notification._id}`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-          });
-          messageItem.classList.add('read-fade');
-          
-          fetchAndRenderNotifications();
-        } catch (err) {
-          console.error('标记已读失败', err);
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+            .then(() => {
+              // 更新角落小蓝点
+              if (typeof updateNotificationBadge === 'function') {
+                updateNotificationBadge();
+              }
+            })
+            .catch(err => {
+              console.error('标记已读失败', err);
+            });
+        }
+
+        // 🔗 真正的跳转逻辑
+        if (targetUrl) {
+          console.log('🔗 即将跳转到通知目标页面:', targetUrl, notification);
+
+          // 支持 Ctrl / Cmd + 点击在新标签打开
+          if (e.ctrlKey || e.metaKey) {
+            window.open(targetUrl, '_blank');
+          } else {
+            window.location.href = targetUrl;
+          }
+        } else {
+          // 找不到跳转链接时的兜底处理
+          console.warn('⚠️ 这条通知没有可用的跳转地址:', notification);
+          alert('找不到对应的帖子或作品，可能已被删除或后端未提供跳转信息。');
+
+          // 如果你希望此时顺便刷新列表，也可以保留：
+          if (typeof fetchAndRenderNotifications === 'function') {
+            fetchAndRenderNotifications();
+          }
         }
       });
+
 
       messageSection.appendChild(messageItem);
     });
@@ -922,6 +956,54 @@ document.addEventListener('click', async (e) => {
     }
   }
 });
+
+// 根据不同结构的通知对象，解析出应该跳转的 URL
+function getNotificationTargetUrl(notification) {
+  // 调试时可以先看一下后端到底给了什么字段
+  console.log('📩 解析通知跳转链接：', notification);
+
+  // 1️⃣ 后端如果直接给了 URL，优先使用
+  if (notification.url) return notification.url;
+  if (notification.targetUrl) return notification.targetUrl;
+  if (notification.link) return notification.link;
+
+  // 2️⃣ 可选：构造评论锚点（如果你阅读页/讨论区支持 #reply-xxx）
+  let anchor = '';
+  if (notification.comment) {
+    anchor = `#reply-${notification.comment}`;
+  } else if (notification.likedComment) {
+    anchor = `#reply-${notification.likedComment}`;
+  }
+
+  // 3️⃣ 【讨论区】现在后端统一用 topic 字段存主题 ID
+  if (notification.topic) {
+    return `https://zhidianworld.com/topic/?id=${notification.topic}${anchor}`;
+  }
+
+  // 4️⃣ 兼容旧字段（如果以后你又加回 topicId 之类的）
+  if (notification.topicId) {
+    return `https://zhidianworld.com/topic/?id=${notification.topicId}${anchor}`;
+  }
+
+  // 5️⃣ 【作品区】尝试按常见命名推断
+  if (notification.work) {
+    return `https://zhidianworld.com/read/?id=${notification.work}${anchor}`;
+  }
+  if (notification.workId) {
+    return `https://zhidianworld.com/read/?id=${notification.workId}${anchor}`;
+  }
+
+  // 6️⃣ 兜底：没有 topic，又有 likedWork 的情况，可能是作品
+  // 注意：你的讨论区点赞也有 likedWork 字段，但那种情况 topic 也存在，
+  // 所以上面已经 return 了，这里只在没有 topic 时当成作品处理。
+  if (!notification.topic && notification.likedWork) {
+    return `https://zhidianworld.com/read/?id=${notification.likedWork}${anchor}`;
+  }
+
+  // 7️⃣ 实在拼不出链接，返回 null，外层会提示“找不到”
+  return null;
+}
+
 
 
 </script>
