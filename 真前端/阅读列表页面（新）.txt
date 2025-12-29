@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>阅读列表</title>
+  <style>
+    :root{
+      --card-bg: rgba(255,255,255,0.92);
+      --card-border: rgba(0,0,0,0.08);
+      --shadow: 0 2px 10px rgba(0,0,0,0.12);
+      --radius: 10px;
+      --text: #222;
+      --muted: #666;
+      --link: #0077cc;
+    }
+
+    body{
+      margin:0;
+      font-family: Arial, sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      background:
+        linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38)),
+        url("https://i.ibb.co/6RZ0XbH/dark-bg.jpg");
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+
+    /* 雪花容器样式 */
+    .snowflakes-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+      overflow: hidden;
+    }
+
+    .snowflake {
+      position: absolute;
+      top: -10px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 1em;
+      user-select: none;
+      animation: fall linear infinite;
+    }
+
+    @keyframes fall {
+      0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0.3;
+      }
+    }
+
+    .rl-wrap{
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 18px 14px 60px;
+    }
+
+    /* 为card添加相对定位以便放置装饰 */
+    .card{
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: visible;
+      position: relative;
+    }
+
+    /* 圣诞灯条装饰容器 */
+    .christmas-lights-decoration {
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      right: -8px;
+      bottom: -8px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .card > *:not(.christmas-lights-decoration) {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* 灯泡闪烁动画 */
+    @keyframes lightTwinkle {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; }
+    }
+
+    .light-bulb {
+      animation: lightTwinkle 3s ease-in-out infinite;
+    }
+
+    .card-title-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding: 14px 14px 0;
+    }
+
+    .card-title{
+      font-size: 1.15rem;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+    }
+
+    .title-link{
+      color: #333;
+      text-decoration: none;
+      font-weight: bold;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .title-link:hover{
+      color: var(--link);
+      text-decoration: underline;
+    }
+
+    .placeholder{
+      padding: 14px;
+      color: #888;
+      font-size: 0.95rem;
+    }
+
+    /* ===== 顶部三栏：左（征文/强推） 中（banner） 右（讨论区） ===== */
+    .hero-row{
+      display:grid;
+      grid-template-columns: 300px 1fr 360px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .hero-left{
+      display:flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* ✅ banner 往下一点 + 更大一点 */
+    .banner-card{
+      margin-top: 14px;       /* 往下多一点 */
+    }
+
+    .banner-box{
+      height: 330px;          /* 比讨论区更大 */
+      position: relative;
+    }
+    .banner-box img{
+      width: 100%;
+      height: 330px;
+      object-fit: cover;
+      display:block;
+    }
+
+    /* ===== 讨论区列表 ===== */
+    .topic-mini-list{
+      display:flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+    }
+    .topic-mini-item{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      padding: 10px;
+      background: #fafafa;
+      border-radius: 8px;
+      transition: background 0.2s ease;
+      cursor: pointer;
+    }
+    .topic-mini-item:hover{
+      background: #f0f8ff;
+    }
+    .topic-mini-title{
+      flex:1;
+      font-size: 0.98rem;
+      color: #333;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .topic-mini-meta{
+      flex-shrink:0;
+      font-size: 0.85rem;
+      color: #666;
+    }
+    .mini-icon{
+      width:24px;height:24px;flex-shrink:0;
+    }
+
+    /* ===== 居中往下：入站须知 + 作品列表 ===== */
+    .center-stack{
+      max-width: 980px;
+      margin: 18px auto 0;   /* ✅ 居中 */
+      display:flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 入站须知卡片 */
+    .notice-card .notice-list{
+      display:flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+    }
+    .notice-item{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding: 10px;
+      background:#fafafa;
+      border-radius: 8px;
+      transition: background 0.2s ease;
+    }
+    .notice-item:hover{ background:#f0f8ff; }
+    .notice-link{
+      flex:1;
+      color:#333;
+      text-decoration:none;
+    }
+    .notice-link:hover{ color: var(--link); text-decoration: underline; }
+    .notice-meta{ color:#666; font-size:0.85rem; }
+
+    /* 作品区：列表/表格切换 */
+    .works-header{
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .view-toggle{
+      display:inline-flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .toggle-btn{
+      border: 1px solid rgba(0,0,0,0.18);
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .toggle-btn.active{
+      border-color: rgba(0,119,204,0.55);
+      color: var(--link);
+      font-weight: bold;
+    }
+
+    /* 列表模式 */
+    .recommend-list{
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .recommend-item{
+      background:#fff;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 10px;
+      padding: 12px 12px 10px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.08);
+    }
+    .work-title-link{ text-decoration:none; }
+    .recommend-title{
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+      color:#222;
+      font-weight: bold;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .recommend-info{
+      margin:0 0 8px;
+      font-size: 0.88rem;
+      color: var(--muted);
+      display:flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items:center;
+    }
+    .recommend-content{
+      display:grid;
+      grid-template-columns: 1fr 150px;
+      gap: 12px;
+      align-items: center;
+    }
+    .content-text{
+      margin:0;
+      color:#444;
+      line-height: 1.55;
+      font-size: 0.95rem;
+      max-height: 4.6em;
+      overflow: hidden;
+    }
+    .content-image{
+      width: 150px;
+      height: 110px;
+      object-fit: cover;
+      border-radius: 10px;
+      display:block;
+      margin-left:auto;
+    }
+    .recommend-bottom{
+      margin-top: 10px;
+      display:flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .word-count{
+      font-size: 0.86rem;
+      color:#444;
+    }
+    .ankou-tags{
+      display:flex;
+      gap: 6px;
+      align-items:center;
+      flex-wrap: wrap;
+    }
+    .tag{
+      display:inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      background:#f1f1f1;
+      color:#333;
+    }
+    .tag-published{ background:#4CAF50; color:#fff; font-weight:bold; }
+    .tag-draft{ background:#ff9800; color:#fff; }
+
+    /* 表格模式：每行三个（封面居中） */
+    .works-grid{
+      padding: 14px;
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .grid-item{
+      background:#fff;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.08);
+      display:flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 320px;
+    }
+    .grid-cover{
+      width: 160px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin: 0 auto;
+      display:block;
+    }
+    .grid-body .recommend-title{
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .grid-body .recommend-content{
+      grid-template-columns: 1fr;
+    }
+    .grid-body .content-text{
+      max-height: 4.6em;
+    }
+
+    .loading-line{
+      padding: 10px 14px 16px;
+      color:#666;
+      text-align:center;
+    }
+
+    #load-progress-container{
+      display:none;
+      position:fixed;
+      top:45%;
+      left:50%;
+      transform:translate(-50%, -50%);
+      width:320px;
+      background:#fff;
+      border:1px solid #ccc;
+      border-radius:8px;
+      box-shadow:0 4px 10px rgba(0,0,0,0.2);
+      text-align:center;
+      padding:20px;
+      z-index:2000;
+    }
+
+    @media (max-width: 1100px){
+      .hero-row{ grid-template-columns: 1fr; }
+      .banner-card{ margin-top: 0; }
+      .banner-box{ height: 260px; }
+      .banner-box img{ height: 260px; }
+      .works-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .center-stack{ max-width: 100%; }
+    }
+    @media (max-width: 620px){
+      .works-grid{ grid-template-columns: 1fr; }
+      .recommend-content{ grid-template-columns: 1fr; }
+      .content-image{ width: 100%; height: 160px; margin: 10px 0 0; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 雪花飘落容器 -->
+  <div class="snowflakes-container" id="snowflakes"></div>
+
+  <div class="rl-wrap">
+
+    <!-- 顶部三栏 -->
+    <section class="hero-row">
+      <!-- 左：冬季征文 + 本月强推 -->
+      <div class="hero-left">
+        <div class="card">
+          <div class="christmas-lights-decoration"></div>
+          <div class="card-title-row">
+            <h3 class="card-title">冬季征文</h3>
+          </div>
+          <div class="placeholder">暂未完工</div>
+        </div>
+
+        <div class="card">
+          <div class="christmas-lights-decoration"></div>
+          <div class="card-title-row">
+            <h3 class="card-title">本月强推</h3>
+          </div>
+          <div class="placeholder">暂未完工</div>
+        </div>
+      </div>
+
+      <!-- 中：宣传图（更大 + 往下） -->
+      <div class="card banner-card">
+        <div class="christmas-lights-decoration"></div>
+        <div class="banner-box">
+          <img src="https://api.anchorx.ca/banners/xmas.png" alt="冬季活动banner" />
+        </div>
+      </div>
+
+      <!-- 右：讨论区 -->
+      <div class="card">
+        <div class="christmas-lights-decoration"></div>
+        <div class="card-title-row">
+          <a class="title-link" id="discussionHeaderLink" href="#">讨论区&gt;</a>
+        </div>
+        <div class="topic-mini-list" id="topicMiniList">
+          <div style="color:#999; padding: 6px 0;">正在加载讨论帖子...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 居中往下：入站须知 + 作品列表 -->
+    <div class="center-stack">
+      <!-- 入站须知 -->
+      <section class="card notice-card">
+        <div class="christmas-lights-decoration"></div>
+        <div class="card-title-row">
+          <h3 class="card-title">入站须知</h3>
+        </div>
+        <div class="notice-list">
+          <div class="notice-item">
+            <svg class="mini-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" fill="#363636"></circle>
+              <rect width="13" height="13" x="2" y="9" fill="#363636" rx="3"></rect>
+              <rect width="12" height="2" x="6" y="8" fill="#fff" rx="1"></rect>
+              <rect width="8" height="2" x="6" y="14" fill="#fff" rx="1"></rect>
+            </svg>
+            <a class="notice-link" id="entryNoticeLink" href="#" target="_blank">入站须知</a>
+            <div class="notice-meta">评论数0</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 作品列表 -->
+      <section class="card">
+        <div class="christmas-lights-decoration"></div>
+        <div class="works-header">
+          <h3 class="card-title" style="margin:0;">作品列表</h3>
+          <div class="view-toggle">
+            <button class="toggle-btn active" id="btnList" type="button">列表</button>
+            <button class="toggle-btn" id="btnGrid" type="button">表格</button>
+          </div>
+        </div>
+
+        <section class="recommend-list" id="worksList">
+          <p style="text-align:center;color:#999;margin:18px 0;">正在加载作品...</p>
+        </section>
+
+        <section class="works-grid" id="worksGrid" style="display:none;"></section>
+
+        <div class="loading-line" id="worksLoadingLine" style="display:none;">正在加载...</div>
+      </section>
+    </div>
+  </div>
+
+  <!-- 全局加载进度条 -->
+  <div id="load-progress-container">
+    <p id="load-progress-text" style="margin:0 0 8px; font-size:0.9rem; color:#555;">正在加载作品...</p>
+    <div style="width:90%; margin:0 auto; height:8px; background:#eee; border-radius:5px; overflow:hidden;">
+      <div id="load-progress-bar" style="width:0%; height:100%; background:#0077cc; transition:width 0.2s ease;"></div>
+    </div>
+  </div>
+
+  <script>
+  function createSnowflakes() {
+    var snowflakesContainer = document.getElementById('snowflakes');
+    var snowflakeCount = 50; // 雪花数量，不会太多挡视野
+    
+    for (var i = 0; i < snowflakeCount; i++) {
+      var snowflake = document.createElement('div');
+      snowflake.className = 'snowflake';
+      snowflake.textContent = '❄';
+      
+      // 随机位置
+      snowflake.style.left = Math.random() * 100 + '%';
+      
+      // 随机大小
+      var size = Math.random() * 0.5 + 0.5;
+      snowflake.style.fontSize = size + 'em';
+      
+      // 随机动画持续时间和延迟
+      var duration = Math.random() * 10 + 15; // 15-25秒
+      var delay = Math.random() * 10; // 0-10秒延迟
+      
+      snowflake.style.animationDuration = duration + 's';
+      snowflake.style.animationDelay = delay + 's';
+      
+      snowflakesContainer.appendChild(snowflake);
+    }
+  }
+
+  function createChristmasLights(container, cardIndex) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.style.position = 'absolute';
+    svg.style.top = '0';
+    svg.style.left = '0';
+    svg.style.pointerEvents = 'none';
+    
+    // 深邃的灯泡颜色
+    var colors = [
+      '#8B0000', // 深红
+      '#00008B', // 深蓝
+      '#006400', // 深绿
+      '#4B0082', // 靛蓝
+      '#8B008B', // 深紫
+      '#B8860B'  // 深金
+    ];
+    
+    // 获取容器尺寸
+    var rect = container.getBoundingClientRect();
+    var width = rect.width + 16;
+    var height = rect.height + 16;
+    
+    // 为每个卡片创建不同的树枝路径（蜿蜒曲折）
+    var branchPaths = [
+      // 路径1: 左上角开始的曲折路径
+      'M 0,20 Q 15,15 30,25 T 60,20 T 90,30',
+      // 路径2: 右上角开始
+      'M ' + width + ',15 Q ' + (width-20) + ',25 ' + (width-40) + ',20 T ' + (width-80) + ',30',
+      // 路径3: 左侧向下
+      'M 15,50 Q 20,70 15,90 T 25,130',
+      // 路径4: 右侧向下
+      'M ' + (width-15) + ',60 Q ' + (width-20) + ',80 ' + (width-15) + ',100',
+      // 路径5: 底部左侧
+      'M 30,' + (height-10) + ' Q 50,' + (height-15) + ' 70,' + (height-10) + ' T 110,' + (height-15),
+      // 路径6: 底部右侧
+      'M ' + (width-120) + ',' + (height-10) + ' Q ' + (width-90) + ',' + (height-20) + ' ' + (width-60) + ',' + (height-10)
+    ];
+    
+    // 根据卡片索引选择不同的路径组合，使每个卡片都略有不同
+    var selectedPaths = [];
+    var pathCount = 3 + (cardIndex % 3); // 每个卡片3-5条树枝
+    
+    for (var i = 0; i < pathCount; i++) {
+      var pathIndex = (cardIndex * 7 + i * 3) % branchPaths.length;
+      selectedPaths.push(branchPaths[pathIndex]);
+    }
+    
+    selectedPaths.forEach(function(pathData, pathIndex) {
+      // 树枝路径
+      var branch = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      branch.setAttribute('d', pathData);
+      branch.setAttribute('stroke', '#2d4a2b');
+      branch.setAttribute('stroke-width', '2');
+      branch.setAttribute('fill', 'none');
+      branch.setAttribute('opacity', '0.8');
+      svg.appendChild(branch);
+      
+      // 在树枝上添加灯泡
+      var pathLength = 80;
+      var bulbCount = 4 + (pathIndex % 3); // 每条树枝4-6个灯泡
+      
+      for (var j = 0; j < bulbCount; j++) {
+        var progress = (j + 1) / (bulbCount + 1);
+        var point = getPointOnPath(pathData, progress);
+        
+        if (point) {
+          // 创建菱形灯泡
+          var diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+          var size = 6;
+          var angle = (cardIndex * 30 + pathIndex * 20 + j * 15) % 40 - 20; // -20到20度的倾斜
+          
+          // 计算旋转后的菱形点
+          var points = [
+            rotatePoint(0, -size, point.x, point.y, angle),
+            rotatePoint(size * 0.6, 0, point.x, point.y, angle),
+            rotatePoint(0, size, point.x, point.y, angle),
+            rotatePoint(-size * 0.6, 0, point.x, point.y, angle)
+          ].map(function(p) { return p.x + ',' + p.y; }).join(' ');
+          
+          diamond.setAttribute('points', points);
+          diamond.setAttribute('fill', colors[(cardIndex + pathIndex + j) % colors.length]);
+          diamond.setAttribute('opacity', '0.85');
+          diamond.setAttribute('class', 'light-bulb');
+          
+          // 为每个灯泡设置不同的闪烁延迟
+          var delay = (cardIndex * 0.3 + pathIndex * 0.5 + j * 0.4) % 3;
+          diamond.style.animationDelay = delay + 's';
+          
+          // 添加发光效果
+          var filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+          var filterId = 'glow-' + cardIndex + '-' + pathIndex + '-' + j;
+          filter.setAttribute('id', filterId);
+          
+          var feGaussianBlur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+          feGaussianBlur.setAttribute('stdDeviation', '1.5');
+          feGaussianBlur.setAttribute('result', 'coloredBlur');
+          filter.appendChild(feGaussianBlur);
+          
+          var feMerge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
+          var feMergeNode1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+          feMergeNode1.setAttribute('in', 'coloredBlur');
+          var feMergeNode2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+          feMergeNode2.setAttribute('in', 'SourceGraphic');
+          feMerge.appendChild(feMergeNode1);
+          feMerge.appendChild(feMergeNode2);
+          filter.appendChild(feMerge);
+          
+          svg.appendChild(filter);
+          diamond.setAttribute('filter', 'url(#' + filterId + ')');
+          
+          svg.appendChild(diamond);
+        }
+      }
+    });
+    
+    container.appendChild(svg);
+  }
+
+  // 辅助函数：旋转点
+  function rotatePoint(x, y, cx, cy, angle) {
+    var radians = angle * Math.PI / 180;
+    var cos = Math.cos(radians);
+    var sin = Math.sin(radians);
+    return {
+      x: cx + (x * cos - y * sin),
+      y: cy + (x * sin + y * cos)
+    };
+  }
+
+  // 简化的路径点获取函数
+  function getPointOnPath(pathData, progress) {
+    // 从路径数据中提取坐标
+    var coords = pathData.match(/[\d.]+/g);
+    if (!coords || coords.length < 4) return null;
+    
+    // 简单线性插值
+    var startX = parseFloat(coords[0]);
+    var startY = parseFloat(coords[1]);
+    var endX = parseFloat(coords[coords.length - 2]);
+    var endY = parseFloat(coords[coords.length - 1]);
+    
+    return {
+      x: startX + (endX - startX) * progress,
+      y: startY + (endY - startY) * progress
+    };
+  }
+
+  // 初始化圣诞装饰
+  function initChristmasDecorations() {
+    var decorationContainers = document.querySelectorAll('.christmas-lights-decoration');
+    decorationContainers.forEach(function(container, index) {
+      createChristmasLights(container, index);
+    });
+  }
+
+  // 页面加载完成后初始化
+  window.addEventListener('load', function() {
+    createSnowflakes();
+    initChristmasDecorations();
+  });
+
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var WORKS_API = 'https://api.anchorx.ca/api/works/public';
+    var TOPICS_API = 'https://api.anchorx.ca/api/topics';
+
+    var READ_DETAIL_BASE = 'https://zhidianworld.com/read/?id=';
+
+    var DISCUSSION_HOME_URL = '/discussion/';
+    var TOPIC_DETAIL_BASE = '/topic/?id=';
+
+    var ENTRY_NOTICE_URL = 'https://zhidianworld.com/%e5%85%a5%e7%ab%99%e9%a0%88%e7%9f%a5/';
+
+    var worksListEl = document.getElementById('worksList');
+    var worksGridEl = document.getElementById('worksGrid');
+    var btnList = document.getElementById('btnList');
+    var btnGrid = document.getElementById('btnGrid');
+    var worksLoadingLine = document.getElementById('worksLoadingLine');
+
+    var topicMiniList = document.getElementById('topicMiniList');
+    var discussionHeaderLink = document.getElementById('discussionHeaderLink');
+
+    var entryNoticeLink = document.getElementById('entryNoticeLink');
+
+    var progressContainer = document.getElementById('load-progress-container');
+    var progressText = document.getElementById('load-progress-text');
+    var progressBar = document.getElementById('load-progress-bar');
+
+    discussionHeaderLink.href = DISCUSSION_HOME_URL;
+    entryNoticeLink.href = ENTRY_NOTICE_URL;
+
+    function safeText(s) {
+      if (typeof s !== 'string') return '';
+      return s.replace(/[<>]/g, '');
+    }
+
+    /* ========== 讨论区：最新 5 条 ========== */
+    function renderTopicsMini(topics) {
+      topicMiniList.innerHTML = '';
+
+      if (!topics || topics.length === 0) {
+        topicMiniList.innerHTML = '<div style="color:#999; padding: 6px 0;">暂无讨论帖子</div>';
+        return;
+      }
+
+      for (var i = 0; i < topics.length; i++) {
+        var t = topics[i];
+        if (!t) continue;
+
+        var title = '未命名主题';
+        if (typeof t.title === 'string') {
+          if (t.title.trim() !== '') {
+            title = t.title;
+          }
+        }
+        title = safeText(title);
+
+        var replies = 0;
+        if (typeof t.repliesCount === 'number') replies = t.repliesCount;
+
+        var item = document.createElement('div');
+        item.className = 'topic-mini-item';
+
+        item.addEventListener('click', (function (id) {
+          return function () {
+            window.location.href = TOPIC_DETAIL_BASE + encodeURIComponent(id);
+          };
+        })(t._id));
+
+        item.innerHTML =
+          '<svg class="mini-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">' +
+            '<circle cx="12" cy="12" r="10" fill="#363636"></circle>' +
+            '<rect width="13" height="13" x="2" y="9" fill="#363636" rx="3"></rect>' +
+            '<rect width="12" height="2" x="6" y="8" fill="#fff" rx="1"></rect>' +
+            '<rect width="8" height="2" x="6" y="14" fill="#fff" rx="1"></rect>' +
+          '</svg>' +
+          '<div class="topic-mini-title">' + title + '</div>' +
+          '<div class="topic-mini-meta">评论数' + replies + '</div>';
+
+        topicMiniList.appendChild(item);
+      }
+    }
+
+    function loadTopicsMini() {
+      topicMiniList.innerHTML = '<div style="color:#999; padding: 6px 0;">正在加载讨论帖子...</div>';
+      var url = TOPICS_API + '?page=1&limit=5';
+
+      fetch(url, { method: 'GET' })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          var topics = [];
+          if (data) {
+            if (Array.isArray(data.topics)) topics = data.topics;
+          }
+          renderTopicsMini(topics);
+        })
+        .catch(function () {
+          topicMiniList.innerHTML = '<div style="color:#c00; padding: 6px 0;">讨论区加载失败</div>';
+        });
+    }
+
+    /* ========== 作品：列表/表格切换 + 懒加载 ========== */
+    var currentView = 'list';
+    var currentPage = 1;
+    var PAGE_SIZE = 9;
+    var isLoading = false;
+    var hasMore = true;
+
+    var worksCache = [];
+
+    function formatDate(dateString) {
+      if (!dateString) return '未知';
+      try {
+        return new Date(dateString).toLocaleDateString('zh-CN');
+      } catch (e) {
+        return '未知';
+      }
+    }
+
+    function getLatestUpdateTime(work) {
+      if (!work) return null;
+      if (work.updatedAt) return work.updatedAt;
+      if (work.createdAt) return work.createdAt;
+      return null;
+    }
+
+    function extractSnippet(work) {
+      var snippet = '';
+
+      if (work) {
+        if (Array.isArray(work.content)) {
+          if (work.content.length > 0) {
+            var firstPage = work.content[0];
+            if (firstPage) {
+              if (firstPage.content) {
+                var text = '';
+
+                if (typeof firstPage.content === 'string') {
+                  text = firstPage.content;
+                } else {
+                  if (typeof firstPage.content === 'object') {
+                    if (Array.isArray(firstPage.content.ops)) {
+                      var ops = firstPage.content.ops;
+                      var parts = [];
+                      for (var i = 0; i < ops.length; i++) {
+                        var op = ops[i];
+                        if (op) {
+                          if (typeof op.insert === 'string') parts.push(op.insert);
+                        }
+                      }
+                      text = parts.join('');
+                    }
+                  }
+                }
+
+                var clean = String(text).replace(/[\n\r\t\u200B-\u200D\uFEFF#*`]/g, '').trim();
+                if (clean.length > 100) snippet = clean.substring(0, 100) + '...';
+                else snippet = clean;
+              }
+            }
+          }
+        }
+      }
+
+      if (!snippet) snippet = '已发布安科小说的摘要内容...';
+      return snippet;
+    }
+
+    function getCover(work) {
+      if (work) {
+        if (work.coverImage) return work.coverImage;
+      }
+      return 'https://i.ibb.co/QFPHMF8T/Copilot-20250922-174349.png';
+    }
+
+    function getStatusTagHtml(work) {
+      if (work) {
+        if (work.isPublished) return '<span class="tag tag-published">✅ 已发布</span>';
+      }
+      return '<span class="tag tag-draft">✏️ 草稿</span>';
+    }
+
+    function getWorkId(work) {
+      var id = '';
+      if (work) {
+        if (work._id) id = work._id;
+      }
+      return id;
+    }
+
+    function getAuthorName(work) {
+      var authorName = '✍️用户';
+      if (work) {
+        var a = work.author;
+        if (a) {
+          if (a.username) authorName = a.username;
+        }
+      }
+      return authorName;
+    }
+
+    function getNumberField(work, key) {
+      var v = 0;
+      if (work) {
+        var t = work[key];
+        if (typeof t === 'number') v = t;
+      }
+      return v;
+    }
+
+    function getWorkTitle(work) {
+      var title = '未命名作品';
+      if (work) {
+        if (typeof work.title === 'string') {
+          if (work.title.trim() !== '') {
+            title = work.title;
+          }
+        }
+      }
+      return title;
+    }
+
+    function workListItemHtml(work) {
+      var title = getWorkTitle(work);
+      var authorName = getAuthorName(work);
+      var dt = formatDate(getLatestUpdateTime(work));
+      var wordCount = getNumberField(work, 'wordCount');
+      var views = getNumberField(work, 'views');
+      var likes = getNumberField(work, 'likesCount');
+
+      var snippet = extractSnippet(work);
+      var cover = getCover(work);
+      var statusTag = getStatusTagHtml(work);
+      var id = getWorkId(work);
+
+      return ''
+        + '<article class="recommend-item">'
+        + '  <a class="work-title-link" href="' + READ_DETAIL_BASE + encodeURIComponent(id) + '">'
+        + '    <h4 class="recommend-title">' + safeText(title) + '</h4>'
+        + '  </a>'
+        + '  <p class="recommend-info">'
+        + '    <span class="info-author">✍️ ' + safeText(authorName) + '</span>'
+        + '    <span class="info-update">⏰ ' + dt + ' 更新</span>'
+        + '    <span class="info-stats">'
+        + '      <span class="info-views"><span class="icon">&#x1F441;</span>' + views + '</span>'
+        + '      <span class="info-likes"><span class="icon">&#x2764;</span>' + likes + '</span>'
+        + '    </span>'
+        + '  </p>'
+        + '  <div class="recommend-content">'
+        + '    <p class="content-text">' + safeText(snippet) + '</p>'
+        + '    <img class="content-image" src="' + cover + '" alt="安科封面" />'
+        + '  </div>'
+        + '  <div class="recommend-bottom">'
+        + '    <span class="word-count">安科·' + wordCount + '字</span>'
+        + '    <div class="ankou-tags"><span class="tag">安科</span>' + statusTag + '</div>'
+        + '  </div>'
+        + '</article>';
+    }
+
+    function workGridItemHtml(work) {
+      var title = getWorkTitle(work);
+      var authorName = getAuthorName(work);
+      var dt = formatDate(getLatestUpdateTime(work));
+      var wordCount = getNumberField(work, 'wordCount');
+      var views = getNumberField(work, 'views');
+      var likes = getNumberField(work, 'likesCount');
+
+      var snippet = extractSnippet(work);
+      var cover = getCover(work);
+      var statusTag = getStatusTagHtml(work);
+      var id = getWorkId(work);
+
+      return ''
+        + '<article class="grid-item">'
+        + '  <a class="work-title-link" href="' + READ_DETAIL_BASE + encodeURIComponent(id) + '">'
+        + '    <img class="grid-cover" src="' + cover + '" alt="安科封面" />'
+        + '  </a>'
+        + '  <div class="grid-body">'
+        + '    <a class="work-title-link" href="' + READ_DETAIL_BASE + encodeURIComponent(id) + '">'
+        + '      <h4 class="recommend-title">' + safeText(title) + '</h4>'
+        + '    </a>'
+        + '    <p class="recommend-info">'
+        + '      <span class="info-author">✍️ ' + safeText(authorName) + '</span>'
+        + '      <span class="info-update">⏰ ' + dt + ' 更新</span>'
+        + '      <span class="info-stats">'
+        + '        <span class="info-views"><span class="icon">&#x1F441;</span>' + views + '</span>'
+        + '        <span class="info-likes"><span class="icon">&#x2764;</span>' + likes + '</span>'
+        + '      </span>'
+        + '    </p>'
+        + '    <div class="recommend-content">'
+        + '      <p class="content-text">' + safeText(snippet) + '</p>'
+        + '    </div>'
+        + '    <div class="recommend-bottom">'
+        + '      <span class="word-count">安科·' + wordCount + '字</span>'
+        + '      <div class="ankou-tags"><span class="tag">安科</span>' + statusTag + '</div>'
+        + '    </div>'
+        + '  </div>'
+        + '</article>';
+    }
+
+    function applyViewVisibility() {
+      if (currentView === 'list') {
+        worksListEl.style.display = 'flex';
+        worksGridEl.style.display = 'none';
+        btnList.classList.add('active');
+        btnGrid.classList.remove('active');
+      } else {
+        worksListEl.style.display = 'none';
+        worksGridEl.style.display = 'grid';
+        btnList.classList.remove('active');
+        btnGrid.classList.add('active');
+      }
+    }
+
+    function renderAllFromCache() {
+      worksListEl.innerHTML = '';
+      worksGridEl.innerHTML = '';
+
+      if (!worksCache || worksCache.length === 0) {
+        worksListEl.innerHTML = '<p style="text-align:center;color:#999;margin:18px 0;">暂无作品。</p>';
+        applyViewVisibility();
+        return;
+      }
+
+      var listHtml = [];
+      var gridHtml = [];
+
+      for (var i = 0; i < worksCache.length; i++) {
+        listHtml.push(workListItemHtml(worksCache[i]));
+        gridHtml.push(workGridItemHtml(worksCache[i]));
+      }
+
+      worksListEl.innerHTML = listHtml.join('');
+      worksGridEl.innerHTML = gridHtml.join('');
+      applyViewVisibility();
+    }
+
+    function appendNewWorks(works) {
+      if (!works || works.length === 0) return;
+
+      if (currentView === 'list') {
+        var html1 = [];
+        for (var i = 0; i < works.length; i++) html1.push(workListItemHtml(works[i]));
+        worksListEl.insertAdjacentHTML('beforeend', html1.join(''));
+      } else {
+        var html2 = [];
+        for (var j = 0; j < works.length; j++) html2.push(workGridItemHtml(works[j]));
+        worksGridEl.insertAdjacentHTML('beforeend', html2.join(''));
+      }
+    }
+
+    function loadNextWorks(initial) {
+      if (isLoading) return;
+      if (!hasMore) return;
+
+      isLoading = true;
+
+      if (initial) {
+        progressContainer.style.display = 'block';
+        progressText.textContent = '正在请求数据...';
+        progressBar.style.width = '5%';
+      } else {
+        worksLoadingLine.style.display = 'block';
+      }
+
+      var url = WORKS_API + '?page=' + currentPage + '&limit=' + PAGE_SIZE;
+
+      fetch(url, { method: 'GET' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('网络请求失败');
+          if (initial) progressBar.style.width = '20%';
+          return res.json();
+        })
+        .then(function (data) {
+          var works = [];
+          if (data) {
+            if (Array.isArray(data.works)) works = data.works;
+          }
+
+          if (initial) {
+            worksListEl.innerHTML = '';
+            worksGridEl.innerHTML = '';
+          }
+
+          if (!works || works.length === 0) {
+            if (initial) worksListEl.innerHTML = '<p style="text-align:center;color:#999;margin:18px 0;">暂无作品。</p>';
+            hasMore = false;
+            return;
+          }
+
+          for (var i = 0; i < works.length; i++) worksCache.push(works[i]);
+          appendNewWorks(works);
+
+          currentPage += 1;
+
+          hasMore = false;
+          if (data) {
+            if (typeof data.hasMore === 'boolean') hasMore = data.hasMore;
+          }
+
+          if (initial) {
+            progressText.textContent = '加载完成';
+            progressBar.style.width = '100%';
+            setTimeout(function () {
+              progressContainer.style.display = 'none';
+              progressBar.style.width = '0%';
+            }, 500);
+          }
+        })
+        .catch(function () {
+          if (initial) {
+            worksListEl.innerHTML = '<p style="text-align:center;color:#c00;margin:18px 0;">加载失败，请刷新页面。</p>';
+            progressContainer.style.display = 'none';
+          }
+        })
+        .finally(function () {
+          isLoading = false;
+          worksLoadingLine.style.display = 'none';
+        });
+    }
+
+    btnList.addEventListener('click', function () {
+      currentView = 'list';
+      renderAllFromCache();
+    });
+    btnGrid.addEventListener('click', function () {
+      currentView = 'grid';
+      renderAllFromCache();
+    });
+
+    window.addEventListener('scroll', function () {
+      if (!hasMore) return;
+      if (isLoading) return;
+
+      var scrollBottom = window.innerHeight + window.scrollY;
+      var docHeight = document.body.offsetHeight;
+
+      if (scrollBottom >= docHeight - 220) {
+        loadNextWorks(false);
+      }
+    });
+
+    applyViewVisibility();
+    loadTopicsMini();
+    loadNextWorks(true);
+  });
+  </script>
+</body>
+</html>
