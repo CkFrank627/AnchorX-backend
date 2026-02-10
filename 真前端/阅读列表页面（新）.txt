@@ -80,10 +80,11 @@
     /* 圣诞灯条装饰容器 */
     .christmas-lights-decoration {
       position: absolute;
-      top: -8px;
-      left: -8px;
-      right: -8px;
-      bottom: -8px;
+      /* ✅ 外扩 + 上移：灯条贴边且不压到标题文字 */
+      top: -26px;
+      left: -18px;
+      right: -18px;
+      bottom: -18px;
       pointer-events: none;
       z-index: 1;
     }
@@ -564,7 +565,8 @@
     svg.style.top = '0';
     svg.style.left = '0';
     svg.style.pointerEvents = 'none';
-    
+    svg.setAttribute('preserveAspectRatio', 'none');
+
     // 深邃的灯泡颜色
     var colors = [
       '#8B0000', // 深红
@@ -574,105 +576,145 @@
       '#8B008B', // 深紫
       '#B8860B'  // 深金
     ];
-    
-    // 获取容器尺寸
+
+    // 获取容器尺寸（⚠️ rect 已经是实际尺寸，不要再额外 +16）
     var rect = container.getBoundingClientRect();
-    var width = rect.width + 16;
-    var height = rect.height + 16;
-    
+    var width = rect.width;
+    var height = rect.height;
+
+    // 设定 viewBox：坐标系与像素一致，灯泡可精准贴合树枝曲线
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+
+    // defs（滤镜集中放这里）
+    var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    svg.appendChild(defs);
+
     // 为每个卡片创建不同的树枝路径（蜿蜒曲折）
     var branchPaths = [
-      // 路径1: 左上角开始的曲折路径
-      'M 0,20 Q 15,15 30,25 T 60,20 T 90,30',
-      // 路径2: 右上角开始
-      'M ' + width + ',15 Q ' + (width-20) + ',25 ' + (width-40) + ',20 T ' + (width-80) + ',30',
-      // 路径3: 左侧向下
-      'M 15,50 Q 20,70 15,90 T 25,130',
-      // 路径4: 右侧向下
-      'M ' + (width-15) + ',60 Q ' + (width-20) + ',80 ' + (width-15) + ',100',
-      // 路径5: 底部左侧
-      'M 30,' + (height-10) + ' Q 50,' + (height-15) + ' 70,' + (height-10) + ' T 110,' + (height-15),
-      // 路径6: 底部右侧
-      'M ' + (width-120) + ',' + (height-10) + ' Q ' + (width-90) + ',' + (height-20) + ' ' + (width-60) + ',' + (height-10)
+      // 顶部：左上角开始的曲折路径
+      'M 0,22 Q 18,12 38,26 T 86,22 T 140,30 T 210,24',
+      // 顶部：右上角开始
+      'M ' + width + ',18 Q ' + (width-26) + ',28 ' + (width-54) + ',20 T ' + (width-120) + ',30',
+      // 左侧向下（贴边）
+      'M 16,64 Q 10,86 18,110 T 10,156 T 22,210',
+      // 右侧向下（贴边）
+      'M ' + (width-16) + ',70 Q ' + (width-8) + ',92 ' + (width-18) + ',118 T ' + (width-10) + ',178',
+      // 底部左侧
+      'M 36,' + (height-14) + ' Q 66,' + (height-26) + ' 98,' + (height-14) + ' T 158,' + (height-26),
+      // 底部右侧
+      'M ' + (width-180) + ',' + (height-14) + ' Q ' + (width-136) + ',' + (height-30) + ' ' + (width-92) + ',' + (height-14)
     ];
-    
+
     // 根据卡片索引选择不同的路径组合，使每个卡片都略有不同
     var selectedPaths = [];
-    var pathCount = 3 + (cardIndex % 3); // 每个卡片3-5条树枝
-    
+    var pathCount = 3 + (cardIndex % 3); // 每个卡片 3-5 条树枝
+
     for (var i = 0; i < pathCount; i++) {
       var pathIndex = (cardIndex * 7 + i * 3) % branchPaths.length;
       selectedPaths.push(branchPaths[pathIndex]);
     }
-    
+
     selectedPaths.forEach(function(pathData, pathIndex) {
       // 树枝路径
       var branch = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       branch.setAttribute('d', pathData);
       branch.setAttribute('stroke', '#2d4a2b');
-      branch.setAttribute('stroke-width', '2');
+      branch.setAttribute('stroke-width', '2.6'); // ✅ 略粗一点：灯条更“存在”
       branch.setAttribute('fill', 'none');
-      branch.setAttribute('opacity', '0.8');
+      branch.setAttribute('opacity', '0.80');
       svg.appendChild(branch);
-      
-      // 在树枝上添加灯泡
-      var pathLength = 80;
-      var bulbCount = 4 + (pathIndex % 3); // 每条树枝4-6个灯泡
-      
+
+      var totalLen = 0;
+      try {
+        totalLen = branch.getTotalLength();
+      } catch (e) {
+        totalLen = 0;
+      }
+
+      // 在树枝上添加灯泡（✅ 用 getPointAtLength 精准对齐树枝曲线）
+      var bulbCount = 4 + (pathIndex % 3); // 每条树枝 4-6 个灯泡
+
       for (var j = 0; j < bulbCount; j++) {
         var progress = (j + 1) / (bulbCount + 1);
-        var point = getPointOnPath(pathData, progress);
-        
-        if (point) {
-          // 创建菱形灯泡
-          var diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-          var size = 6;
-          var angle = (cardIndex * 30 + pathIndex * 20 + j * 15) % 40 - 20; // -20到20度的倾斜
-          
-          // 计算旋转后的菱形点
-          var points = [
-            rotatePoint(0, -size, point.x, point.y, angle),
-            rotatePoint(size * 0.6, 0, point.x, point.y, angle),
-            rotatePoint(0, size, point.x, point.y, angle),
-            rotatePoint(-size * 0.6, 0, point.x, point.y, angle)
-          ].map(function(p) { return p.x + ',' + p.y; }).join(' ');
-          
-          diamond.setAttribute('points', points);
-          diamond.setAttribute('fill', colors[(cardIndex + pathIndex + j) % colors.length]);
-          diamond.setAttribute('opacity', '0.85');
-          diamond.setAttribute('class', 'light-bulb');
-          
-          // 为每个灯泡设置不同的闪烁延迟
-          var delay = (cardIndex * 0.3 + pathIndex * 0.5 + j * 0.4) % 3;
-          diamond.style.animationDelay = delay + 's';
-          
-          // 添加发光效果
-          var filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
-          var filterId = 'glow-' + cardIndex + '-' + pathIndex + '-' + j;
-          filter.setAttribute('id', filterId);
-          
-          var feGaussianBlur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
-          feGaussianBlur.setAttribute('stdDeviation', '1.5');
-          feGaussianBlur.setAttribute('result', 'coloredBlur');
-          filter.appendChild(feGaussianBlur);
-          
-          var feMerge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
-          var feMergeNode1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
-          feMergeNode1.setAttribute('in', 'coloredBlur');
-          var feMergeNode2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
-          feMergeNode2.setAttribute('in', 'SourceGraphic');
-          feMerge.appendChild(feMergeNode1);
-          feMerge.appendChild(feMergeNode2);
-          filter.appendChild(feMerge);
-          
-          svg.appendChild(filter);
-          diamond.setAttribute('filter', 'url(#' + filterId + ')');
-          
-          svg.appendChild(diamond);
+        var point = null;
+        var angle = 0;
+
+        if (totalLen > 0 && branch.getPointAtLength) {
+          var L = totalLen * progress;
+          var p1 = branch.getPointAtLength(L);
+          var p2 = branch.getPointAtLength(Math.min(totalLen, L + 2));
+          point = { x: p1.x, y: p1.y };
+          angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+        } else {
+          // 兜底：若 getPointAtLength 不可用，就用简单线性插值
+          var coords = pathData.match(/[\d.]+/g);
+          if (coords && coords.length >= 4) {
+            var startX = parseFloat(coords[0]);
+            var startY = parseFloat(coords[1]);
+            var endX = parseFloat(coords[coords.length - 2]);
+            var endY = parseFloat(coords[coords.length - 1]);
+            point = {
+              x: startX + (endX - startX) * progress,
+              y: startY + (endY - startY) * progress
+            };
+            angle = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
+          }
         }
+
+        if (!point) continue;
+
+        // ✅ 让每颗灯泡沿树枝方向微调一点点，避免“齐刷刷”
+        var wobble = (((cardIndex + 1) * 17 + (pathIndex + 1) * 11 + (j + 1) * 13) % 21) - 10; // -10..10
+        var finalAngle = angle + wobble;
+
+        // 创建菱形灯泡（✅ 稍微变大一点点）
+        var diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        var size = 7.2;            // 原来 6 -> 7.2
+        var rx = size * 0.62;
+
+        var points = [
+          rotatePoint(0, -size, point.x, point.y, finalAngle),
+          rotatePoint(rx, 0, point.x, point.y, finalAngle),
+          rotatePoint(0, size, point.x, point.y, finalAngle),
+          rotatePoint(-rx, 0, point.x, point.y, finalAngle)
+        ].map(function(p) { return p.x + ',' + p.y; }).join(' ');
+
+        diamond.setAttribute('points', points);
+        diamond.setAttribute('fill', colors[(cardIndex + pathIndex + j) % colors.length]);
+        diamond.setAttribute('opacity', '0.88');
+        diamond.setAttribute('class', 'light-bulb');
+
+        // 为每个灯泡设置不同的闪烁延迟
+        var delay = (cardIndex * 0.3 + pathIndex * 0.5 + j * 0.4) % 3;
+        diamond.style.animationDelay = delay + 's';
+
+        // 添加发光效果（滤镜放 defs 里）
+        var filterId = 'glow-' + cardIndex + '-' + pathIndex + '-' + j;
+
+        var filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+        filter.setAttribute('id', filterId);
+
+        var feGaussianBlur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+        feGaussianBlur.setAttribute('stdDeviation', '2.0');
+        feGaussianBlur.setAttribute('result', 'coloredBlur');
+        filter.appendChild(feGaussianBlur);
+
+        var feMerge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
+        var feMergeNode1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+        feMergeNode1.setAttribute('in', 'coloredBlur');
+        var feMergeNode2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+        feMergeNode2.setAttribute('in', 'SourceGraphic');
+        feMerge.appendChild(feMergeNode1);
+        feMerge.appendChild(feMergeNode2);
+        filter.appendChild(feMerge);
+
+        defs.appendChild(filter);
+        diamond.setAttribute('filter', 'url(#' + filterId + ')');
+
+        svg.appendChild(diamond);
       }
     });
-    
+
     container.appendChild(svg);
   }
 
@@ -684,24 +726,6 @@
     return {
       x: cx + (x * cos - y * sin),
       y: cy + (x * sin + y * cos)
-    };
-  }
-
-  // 简化的路径点获取函数
-  function getPointOnPath(pathData, progress) {
-    // 从路径数据中提取坐标
-    var coords = pathData.match(/[\d.]+/g);
-    if (!coords || coords.length < 4) return null;
-    
-    // 简单线性插值
-    var startX = parseFloat(coords[0]);
-    var startY = parseFloat(coords[1]);
-    var endX = parseFloat(coords[coords.length - 2]);
-    var endY = parseFloat(coords[coords.length - 1]);
-    
-    return {
-      x: startX + (endX - startX) * progress,
-      y: startY + (endY - startY) * progress
     };
   }
 

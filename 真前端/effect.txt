@@ -1924,14 +1924,25 @@ function applyEffect(targetEl) {
       <button class="effect-btn" data-effect="highlight">高亮</button>
 
       <!-- ✅ 保留自定义特效下拉 -->
-      <div class="custom-effect-dropdown">
-        <button id="custom-effect-toggle-btn" type="button">
-          自定义特效 ▾
-        </button>
-        <div id="custom-effect-dropdown-list" class="custom-effect-dropdown-list hidden">
-          <!-- 这里由 JS 填充自定义特效按钮 -->
-        </div>
-      </div>
+      <!-- ✅ 自定义特效下拉（补齐 panel / close / manage，修复展开） -->
+<div class="custom-effect-dropdown">
+  <button id="custom-effect-toggle-btn" type="button">自定义特效 ▾</button>
+
+  <div id="custom-effect-dropdown-panel" class="custom-effect-dropdown-panel hidden">
+    <div class="custom-effect-dropdown-header">
+      <h4>自定义特效</h4>
+      <button id="custom-effect-dropdown-close" type="button" class="close-btn" aria-label="关闭">×</button>
+    </div>
+
+    <ul id="custom-effect-dropdown-list" class="custom-effect-dropdown-list">
+      <!-- 这里由 JS 填充自定义特效按钮 -->
+    </ul>
+
+    <div class="custom-effect-dropdown-footer">
+      <button id="custom-effect-open-manage-btn" type="button">管理</button>
+    </div>
+  </div>
+</div>
 
       <button id="effect-remove-btn">移除特效</button>
     </div>
@@ -3076,42 +3087,65 @@ async function uploadBgImageToImgbb(file, name) {
         });
       }
 
-      if (customEffectToggleBtn) {
-        customEffectToggleBtn.addEventListener('click', async () => {
-          const isHidden = customEffectDropdownPanel.classList.contains('hidden');
-          if (isHidden) {
-            await fetchCustomEffects();
-            renderCustomEffectDropdownList();
-            customEffectDropdownPanel.classList.remove('hidden');
-          } else {
-            customEffectDropdownPanel.classList.add('hidden');
-          }
-        });
-      }
+      function closeCustomEffectDropdown() {
+  if (!customEffectDropdownPanel) return;
+  customEffectDropdownPanel.classList.add('hidden');
+}
 
-      if (customEffectDropdownClose) {
-        customEffectDropdownClose.addEventListener('click', () => {
-          customEffectDropdownPanel.classList.add('hidden');
-        });
-      }
+if (customEffectToggleBtn && customEffectDropdownPanel && customEffectDropdownList) {
+  customEffectToggleBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
 
-      customEffectDropdownList.addEventListener('click', (e) => {
-        const btn = e.target.closest('button[data-effect-key]');
-        if (!btn) return;
+    const isHidden = customEffectDropdownPanel.classList.contains('hidden');
+    if (isHidden) {
+      await fetchCustomEffects();
+      renderCustomEffectDropdownList();
+      customEffectDropdownPanel.classList.remove('hidden');
+    } else {
+      closeCustomEffectDropdown();
+    }
+  });
+}
 
-        if (selectedLineIndex == null) {
-          alert('请先点击左侧某一行，再应用自定义特效');
-          return;
-        }
+if (customEffectDropdownClose && customEffectDropdownPanel) {
+  customEffectDropdownClose.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeCustomEffectDropdown();
+  });
+}
 
-        const key = btn.dataset.effectKey;
-        if (!key) return;
+// 点击外部自动收起
+document.addEventListener('click', (e) => {
+  if (!customEffectDropdownPanel || customEffectDropdownPanel.classList.contains('hidden')) return;
+  if (e.target.closest('.custom-effect-dropdown')) return;
+  closeCustomEffectDropdown();
+});
 
-        // ⭐ 约定：自定义特效在 effectsDraft 中的标记方式
-        const effectType = 'custom:' + key;
+// ESC 收起
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeCustomEffectDropdown();
+});
 
-        setEffectForLine(selectedLineIndex, effectType);
-      });
+if (customEffectDropdownList) {
+  customEffectDropdownList.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-effect-key]');
+    if (!btn) return;
+
+    if (selectedLineIndex == null) {
+      alert('请先点击左侧某一行，再应用自定义特效');
+      return;
+    }
+
+    const key = btn.dataset.effectKey;
+    if (!key) return;
+
+    const effectType = 'custom:' + key;
+    setEffectForLine(selectedLineIndex, effectType);
+
+    // 选中后自动收起（避免遮挡阅读/预览）
+    closeCustomEffectDropdown();
+  });
+}
 
       if (customEffectOpenManageBtn) {
         customEffectOpenManageBtn.addEventListener('click', () => {

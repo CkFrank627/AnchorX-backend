@@ -77,6 +77,17 @@ const workSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    // ⭐ 新增：作品标签（作者可编辑）
+// tags: 原始展示文本
+// tagsNorm: 统一小写/清洗后的版本（方便后续做不区分大小写筛选）
+tags: {
+  type: [String],
+  default: []
+},
+tagsNorm: {
+  type: [String],
+  default: []
+},
     wordCount: { type: Number, default: 0 },
     views: { type: Number, default: 0 }, // 新增：浏览量字段
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -142,5 +153,46 @@ backgroundPublished: {
     timestamps: true
 });
 
+function normalizeTagsInput(input) {
+  const arr = Array.isArray(input) ? input : [];
+  const out = [];
+  const outNorm = [];
+  const seen = new Set();
+
+  for (let raw of arr) {
+    if (raw === null || raw === undefined) continue;
+
+    let t = String(raw)
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!t) continue;
+    if (t.length > 32) t = t.slice(0, 32);
+
+    const n = t.toLowerCase();
+    if (seen.has(n)) continue;
+
+    seen.add(n);
+    out.push(t);
+    outNorm.push(n);
+
+    if (out.length >= 30) break; // 最多 30 个
+  }
+
+  return { tags: out, tagsNorm: outNorm };
+}
+
+// 当 tags 被保存时自动归一化（注意：findOneAndUpdate 不走 pre-save，所以路由里也会做一次）
+workSchema.pre('save', function (next) {
+  if (this.isModified('tags')) {
+    const { tags, tagsNorm } = normalizeTagsInput(this.tags);
+    this.tags = tags;
+    this.tagsNorm = tagsNorm;
+  }
+  next();
+});
+
+// ✅ 索引：后续 public 列表按标签筛选会快很多
+workSchema.index({ isPublished: 1, updatedAt: -1, tagsNorm: 1 });
 
 module.exports = mongoose.model('Work', workSchema);

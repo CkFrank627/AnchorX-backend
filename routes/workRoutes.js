@@ -248,6 +248,32 @@ router.patch('/:id/cover', auth, async (req, res) => {
 });
 
 
+const normalizeTagsInput = (input) => {
+  const arr = Array.isArray(input) ? input : [];
+  const out = [];
+  const outNorm = [];
+  const seen = new Set();
+
+  for (let raw of arr) {
+    if (raw === null || raw === undefined) continue;
+    let t = String(raw).replace(/\s+/g, ' ').trim();
+    if (!t) continue;
+    if (t.length === 0) continue;
+    if (t.length > 32) t = t.slice(0, 32);
+
+    const n = t.toLowerCase();
+    if (seen.has(n)) continue;
+
+    seen.add(n);
+    out.push(t);
+    outNorm.push(n);
+    if (out.length >= 30) break;
+  }
+
+  return { tags: out, tagsNorm: outNorm };
+};
+
+
 // ------------------------------------------------------------------
 
 // ------------------------------------------------------------------
@@ -298,35 +324,44 @@ if (req.body.pages !== undefined || req.body.content !== undefined) {
 // ✅ 新增：分页获取“已发布作品”（用于阅读列表）
 // GET /api/works/public?page=1&limit=5
 // ------------------------------------------------------------------
+// GET /api/works/public?page=1&limit=9&tag=题材:悬疑
+// GET /api/works/public?page=1&limit=9&tags=题材:悬疑,世界观:幻想乡
 router.get('/public', async (req, res) => {
-    try {
-        // 页码和每页数量，做一下安全处理
-        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
-        const skip = (page - 1) * limit;
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
+    const skip = (page - 1) * limit;
 
-        // 只查 isPublished = true，按更新时间倒序
-        const [works, total] = await Promise.all([
-            Work.find({ isPublished: true })
-                .sort({ updatedAt: -1, _id: -1 }) // 最新在前
-                .skip(skip)
-                .limit(limit)
-                .populate('author', 'username'),
-            Work.countDocuments({ isPublished: true })
-        ]);
+    const filter = { isPublished: true };
 
-        const hasMore = skip + works.length < total;
+    // ✅ tag/tags 过滤（用 tagsNorm 做不区分大小写）
+    let rawTags = req.query.tag || req.query.tags;
+    let list = [];
+    if (Array.isArray(rawTags)) list = rawTags;
+    else if (typeof rawTags === 'string' && rawTags.trim()) list = rawTags.split(',');
 
-        res.json({
-            works,
-            page,
-            limit,
-            total,
-            hasMore
-        });
-    } catch (error) {
-        res.status(500).json({ message: '获取作品失败', error: error.message });
-    }
+    const want = list.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+    if (want.length) filter.tagsNorm = { $all: want }; // 必须同时包含全部标签
+
+    const [works, total] = await Promise.all([
+      Work.find(filter)
+        .sort({ updatedAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('author', 'username'),
+      Work.countDocuments(filter)
+    ]);
+
+    res.json({
+      works,
+      page,
+      limit,
+      total,
+      hasMore: skip + works.length < total
+    });
+  } catch (error) {
+    res.status(500).json({ message: '获取作品失败', error: error.message });
+  }
 });
 
 // 阅读端：只取元信息（可在这里增加 views）

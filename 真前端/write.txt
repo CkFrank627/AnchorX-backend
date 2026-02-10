@@ -1791,6 +1791,7 @@
   
   <script src="https://api.anchorx.ca/vendor_assets/quill.js"></script>
   <script src="https://api.anchorx.ca/vendor_assets/browser-image-compression.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js"></script>
   
 <script>
     /* --------- 安全检查（token）--------- */
@@ -2649,13 +2650,14 @@ async function loadWorkById(id) {
   const work = await fetchWorkById(id);
   if (!work) return;
 
+  // ✅ 加在这里：缓存当前作品的存储模式（separate / embedded）
+  currentWorkPageStorage = work?.pageStorage || null;
+
   let loadedPages = [{ content: { ops: [] } }];
   try {
-    // ✅ 编辑器统一从 /:id/pages 获取（和后端 separate 版本一致）
     loadedPages = await fetchWorkPagesForEditor(id);
   } catch (e) {
     console.warn('fetchWorkPagesForEditor failed, fallback to work.pages/content', e);
-    // fallback（尽量别炸）
     if (Array.isArray(work.pages) && work.pages.length) loadedPages = work.pages;
     else if (Array.isArray(work.content) && work.content.length) loadedPages = work.content;
   }
@@ -2691,12 +2693,38 @@ async function loadWorkById(id) {
   }, 100);
 }
 
+
       /* ---------- 保存作品的核心逻辑 (返回是否成功) ---------- */
 /* ---------- 保存作品的核心逻辑 ---------- */
-async function performSave() {
+// 可选：缓存一下当前作品的 pageStorage，减少重复请求
+let currentWorkPageStorage = null;
+
+// ✅ 小工具：确保作品是 separate（否则单页保存一定失败）
+async function ensureWorkIsSeparate(workId) {
+  // 如果你在 loadWorkById 已经拿到 work.pageStorage，可以在那里赋值 currentWorkPageStorage
+  if (currentWorkPageStorage === 'separate') return true;
+
+  try {
+    const w = await fetchWorkById(workId); // 你已有的函数
+    currentWorkPageStorage = w?.pageStorage || null;
+    return currentWorkPageStorage === 'separate';
+  } catch (e) {
+    console.warn('ensureWorkIsSeparate failed:', e);
+    return false;
+  }
+}
+
+/* ---------- 保存作品的核心逻辑 ---------- */
+/* 只做：保存当前页 +（可选）保存 meta，绝不带 pages/content ---------- */
+async function performSave({ isAuto = false } = {}) {
   if (!currentWorkId) return false;
 
   // 1) 同步当前页内容到 pages[currentPageIndex]
+  if (!pages || !pages[currentPageIndex]) {
+    pages = [{ content: { ops: [] } }];
+    currentPageIndex = 0;
+  }
+
   if (isQuillActive) {
     pages[currentPageIndex].content = quill.getContents();
   } else {
@@ -2704,17 +2732,16 @@ async function performSave() {
     pages[currentPageIndex].content = { ops: lines.map(line => ({ insert: line + '\n' })) };
   }
 
-  const title = editorTitle.textContent.replace('正在编辑：', '');
+  const title = editorTitle.textContent.replace('正在编辑：', '').trim();
   const currentContent = pages[currentPageIndex]?.content || { ops: [] };
 
   try {
     isSaving = true;
 
-    // ✅ 2) 只保存“当前页”
+    // ✅ 2) 只保存“当前页”（让后端判断是否已迁移）
     await saveOnePage(currentWorkId, currentPageIndex, currentContent, title);
 
-    // ✅ 3) 如果你希望“保存按钮也顺便保存特效/背景”，就 PATCH /:id（绝对不能带 pages/content）
-    // 如果你没有这些变量，就删掉这个块。
+    // ✅ 3) 可选：保存 meta（绝不包含 pages/content）
     const meta = {};
     if (typeof effectsDraft !== 'undefined') meta.effectsDraft = effectsDraft;
     if (typeof effectsPublished !== 'undefined') meta.effectsPublished = effectsPublished;
@@ -2734,7 +2761,10 @@ async function performSave() {
     return true;
   } catch (err) {
     console.error('保存失败:', err);
-    alert('保存失败：' + (err.message || '网络错误'));
+    if (!isAuto) {
+      // 这里的 err.message 就会是后端真实返回的原因（比如确实没迁移）
+      alert('保存失败：' + (err.message || '网络错误'));
+    }
     return false;
   } finally {
     isSaving = false;
@@ -2743,49 +2773,125 @@ async function performSave() {
 
 
 /* ---------- 保存作品（自动/手动）---------- */
-// 接受一个参数 isAuto，用于区分是自动保存还是手动保存
 async function saveWork(isAuto = false) {
-    if (!currentWorkId) { 
-        if (!isAuto) { // 只有手动保存才弹窗
-            alert('请先保存或创建作品。');
-        }
-        return false; 
-    }
-    
-    // 手动保存时显示“正在保存...”
+  if (!currentWorkId) {
+    if (!isAuto) alert('请先保存或创建作品。');
+    return false;
+  }
+
+  // 手动保存时显示“正在保存...”
+  if (!isAuto) saveBtn.textContent = '正在保存...';
+
+  const success = await performSave({ isAuto });
+
+  if (success) {
+    saveBtn.textContent = '已保存';
+    hasUnsavedChanges = false;
+    addHistoryRecord(isAuto ? '自动保存' : '手动保存');
+
+    setTimeout(() => {
+      saveBtn.textContent = hasUnsavedChanges ? '保存*' : '保存';
+    }, 1500);
+  } else {
     if (!isAuto) {
-        saveBtn.textContent = '正在保存...';
+      saveBtn.textContent = '保存失败';
+      setTimeout(() => (saveBtn.textContent = '保存'), 1500);
     }
+  }
 
-    const success = await performSave();
-    
-    if (success) {
-        // 成功保存后，无论手动或自动，都重置 UI 状态
-        saveBtn.textContent = '已保存'; 
-        hasUnsavedChanges = false; // 重置未保存状态
-        addHistoryRecord(isAuto ? '自动保存' : '手动保存'); 
-
-        setTimeout(() => {
-            if (hasUnsavedChanges) {
-                saveBtn.textContent = '保存*';
-            } else {
-                saveBtn.textContent = '保存';
-            }
-        }, 1500);
-    } else {
-        // 保存失败，只有手动保存才提示
-        if (!isAuto) {
-            saveBtn.textContent = '保存失败';
-            setTimeout(() => saveBtn.textContent = '保存', 1500);
-        }
-    }
-    return success;
+  return success;
 }
 
+/* =========================
+   ✅ Word(.docx) 导出：工具函数
+   依赖：html-docx-js（全局 htmlDocx）
+========================= */
+
+// 复用下载逻辑
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// 离屏 Quill：用来把 Delta 渲染成 HTML（尽量保留格式）
+let __exportQuill = null;
+function ensureExportQuill() {
+  if (__exportQuill) return __exportQuill;
+
+  const holder = document.createElement('div');
+  holder.id = '__export_quill_holder__';
+  holder.style.position = 'fixed';
+  holder.style.left = '-100000px';
+  holder.style.top = '-100000px';
+  holder.style.width = '800px';
+  holder.style.height = '1px';
+  holder.style.overflow = 'hidden';
+  holder.style.opacity = '0';
+  document.body.appendChild(holder);
+
+  __exportQuill = new Quill(holder, { readOnly: true, theme: 'snow' });
+  return __exportQuill;
+}
+
+function deltaToHtml(delta) {
+  const q = ensureExportQuill();
+  const safeDelta = delta && delta.ops ? delta : { ops: [{ insert: '\n' }] };
+  q.setContents(safeDelta);
+  return q.root.innerHTML || '';
+}
+
+function buildDocxHtmlFromBackup(backupData) {
+  const title = (backupData?.meta?.title || '未命名作品').toString();
+  const exportedAt = backupData?.meta?.exportedAt || new Date().toISOString();
+  const pages = Array.isArray(backupData?.pages) ? backupData.pages : [];
+
+  // 注意：Word 对 CSS 支持有限，这里只用最基础的结构
+  let body = `
+    <h1>${escapeHtml(title)}</h1>
+    <p>导出时间：${escapeHtml(exportedAt)}</p>
+    <hr/>
+  `;
+
+  pages.forEach((p, idx) => {
+    const delta = p?.content || p; // 兼容你 pages 结构：每项至少有 content（:contentReference[oaicite:10]{index=10}）
+    const pageHtml = deltaToHtml(delta);
+
+    body += `
+      <h2>第 ${idx + 1} 页</h2>
+      ${pageHtml}
+      <br style="page-break-after: always;" />
+    `;
+  });
+
+  return `<!doctype html><html><head><meta charset="utf-8"></head><body>${body}</body></html>`;
+}
+
+function exportBackupAsDocx(backupData, safeTitle) {
+  if (!window.htmlDocx || typeof window.htmlDocx.asBlob !== 'function') {
+    alert('缺少 Word 导出库：请确认已在页面引入 html-docx-js。');
+    return;
+  }
+
+  const html = buildDocxHtmlFromBackup(backupData);
+
+  // README 推荐：htmlDocx.asBlob(html) 生成 Blob :contentReference[oaicite:11]{index=11}
+  const docxBlob = window.htmlDocx.asBlob(html);
+
+  const fname = `${safeTitle}_本地备份_${new Date().toISOString().slice(0,10)}.docx`;
+  downloadBlob(docxBlob, fname);
+}
+
+      
 /* ---------- 新增：导出所有楼层到本地 JSON ---------- */
 async function downloadLocalBackup() {
     if (!currentWorkId) {
-        alert('请先保存或创建作品，再导出到本地。');
+        alert('没找到需要保存的对象。请先保存或创建作品，再导出到本地。');
         return;
     }
 
@@ -2849,11 +2955,21 @@ async function downloadLocalBackup() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
+  // ✅ 新增：可选同时导出 Word(.docx)
+if (confirm('同时导出 Word(.docx) 吗？')) {
+  exportBackupAsDocx(backupData, safeTitle);
+  addHistoryRecord('导出本地备份（DOCX）');
+}
+  
     // 可选：记一条历史记录
     addHistoryRecord('导出本地备份');
 }
 
-        saveBtn.addEventListener('click', saveWork);
+        saveBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  saveWork(false);
+});
+
 
 // ✅ 新增：给“保存到本地”按钮绑定点击事件
 if (localSaveBtn) {
@@ -2989,87 +3105,47 @@ publishBtn.addEventListener('click', async () => {
     }
 });
 
+// ✅ 删页：用新接口，不要再 PATCH /works/:id 带 pages/content
 async function deleteCurrentPage() {
-  if (!currentWorkId || !Array.isArray(pages) || pages.length === 0) {
-    alert('数据异常，无法删除。');
-    return;
-  }
-  if (pages.length === 1) {
-    alert('至少保留一页。');
-    return;
-  }
-
+  if (!currentWorkId) return;
   const deleteIndex = currentPageIndex;
-  if (!confirm(`确定要删除第 ${deleteIndex + 1} 页吗？此操作不可恢复。`)) return;
 
+  // 先停自动保存（可选但推荐）
   const wasAutoSave = autoSaveEnabled;
   autoSaveEnabled = false;
-  if (autoSaveTimer) clearInterval(autoSaveTimer);
 
   try {
-    // ✅ 1) 先删后端（后端会 reindex）
-    await deletePage(currentWorkId, deleteIndex);
-
-    // ✅ 2) 更新本地 pages
-    const newPages = pages.filter((_, idx) => idx !== deleteIndex);
-
-    // ✅ 3) 重构 history（索引整体左移）
-    const newHistories = {};
-    Object.keys(pageHistories).forEach(key => {
-      const idx = parseInt(key, 10);
-      if (idx < deleteIndex) newHistories[idx] = pageHistories[idx];
-      else if (idx > deleteIndex) newHistories[idx - 1] = pageHistories[idx];
+    // 1) 后端删页（会自动把后面页 index -1，并更新 pageCount/wordCount）
+    const r = await fetch(`${API_BASE_URL}/${currentWorkId}/pages/${deleteIndex}`, {
+      method: 'DELETE',
+      headers: authHeaders(true),
     });
-    pageHistories = newHistories;
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.message || `删除页失败 (${r.status})`);
 
-    // ✅ 4) 新 currentPageIndex（删最后一页就前移）
-    let nextIndex = deleteIndex;
-    if (nextIndex >= newPages.length) nextIndex = newPages.length - 1;
+    // 2) 前端本地同步（把当前 pages 数组也删一页）
+    pages.splice(deleteIndex, 1);
+    if (pages.length === 0) pages = [{ content: { ops: [] } }];
 
-    // ✅ 5) 应用
-    pages = newPages;
-    currentPageIndex = nextIndex;
+    currentPageIndex = Math.min(deleteIndex, pages.length - 1);
 
-    // ✅ 6) 加载新页
+    // 3) 切到新当前页
     const nextContent = pages[currentPageIndex]?.content || { ops: [] };
     quill.setContents(nextContent, 'silent');
 
-    // ✅ 6.1) 恢复该页的历史
-    quill.history.clear();
-    if (pageHistories[currentPageIndex]) {
-      quill.history.stack = deserializeHistoryStack(pageHistories[currentPageIndex]);
-    } else {
-      quill.history.stack = { undo: [], redo: [] };
-    }
-
-    // ✅ 7) 更新 UI
+    // 4) UI
     renderPageList();
     updatePageDisplay();
 
-    // ✅ 8) 可选：轻量同步标题（不带 pages/content）
-    const metaRes = await fetch(`${API_BASE_URL}/${currentWorkId}`, {
-      method: 'PATCH',
-      headers: authHeaders(true),
-      body: JSON.stringify({
-        title: editorTitle.textContent.replace('正在编辑：', '')
-      })
-    });
-    const metaJ = await metaRes.json().catch(() => ({}));
-    if (!metaRes.ok) throw new Error(metaJ.message || '同步元信息失败');
-
-    hasUnsavedChanges = false;
-    saveBtn.textContent = '已保存';
-    addHistoryRecord(`删除第 ${deleteIndex + 1} 页`);
-  } catch (err) {
-    console.error('删除页面失败:', err);
-    alert('删除失败：' + (err.message || '请刷新页面重试。'));
+  } catch (e) {
+    console.error('删除页面失败:', e);
+    alert('删除失败：' + (e.message || '网络错误'));
   } finally {
-    if (wasAutoSave) {
-      autoSaveEnabled = true;
-      startAutoSave();
-    }
+    autoSaveEnabled = wasAutoSave;
+    if (autoSaveEnabled) startAutoSave();
   }
 }
+
 
         /* ---------- 页码管理（统一使用 pages 与 currentPageIndex）---------- */
         function updatePageDisplay() {
@@ -3101,27 +3177,40 @@ async function deleteCurrentPage() {
 
 deletePageBtn.addEventListener('click', deleteCurrentPage);
 
-  addPageBtn.addEventListener('click', async () => {
+addPageBtn.addEventListener('click', async () => {
   if (!currentWorkId) return;
 
+  const wasAutoSave = autoSaveEnabled;
+  autoSaveEnabled = false;
+
   try {
-    // 先把当前页内容同步到 pages，避免丢字
+    // 先把当前页内容落到 pages[currentPageIndex]
     pages[currentPageIndex].content = quill.getContents();
 
-    const newIndex = await createPage(currentWorkId);
+    const r = await fetch(`${API_BASE_URL}/${currentWorkId}/pages`, {
+      method: 'POST',
+      headers: authHeaders(true),
+      body: JSON.stringify({}), // 后端不需要内容，默认空页
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.message || `新增页失败 (${r.status})`);
 
-    // 本地补一页（后端也是在末尾新增）
-    pages.splice(newIndex, 0, { content: { ops: [] } });
-    pageHistories[newIndex] = { undo: [], redo: [] };
+    const newIndex = j.index;           // 后端返回的新页 index
+    pages[newIndex] = { content: { ops: [] } };
+    currentPageIndex = newIndex;
 
-    goToPage(newIndex);
+    quill.setContents({ ops: [] }, 'silent');
     renderPageList();
     updatePageDisplay();
   } catch (e) {
-    console.error('新增页失败', e);
+    console.error(e);
     alert('新增页失败：' + (e.message || '网络错误'));
+  } finally {
+    autoSaveEnabled = wasAutoSave;
+    if (autoSaveEnabled) startAutoSave();
   }
 });
+
 
 
         /* ---------- 切换页码（带历史记录隔离）---------- */

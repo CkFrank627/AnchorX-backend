@@ -1148,7 +1148,33 @@ body.bg-peek-mobile-mode .read-page-wrapper > :not(#read-bg-wrapper):not(#bg-pee
   animation: lazySpin .9s linear infinite;
 }
 
-      
+      /* ===== 评论原句框 ===== */
+.comment-context-box{
+  border: 1px solid #d0d7de;
+  background: rgba(0,0,0,0.02);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 8px 0;
+  font-size: 0.92rem;
+}
+.comment-context-title{
+  font-weight: 700;
+  font-size: 0.78rem;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+.comment-context-text{
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+/* 暗色适配（你是给 comment-panel 加 dark-mode 类的） */
+.comment-panel.dark-mode .comment-context-box{
+  border: 1px solid #444;
+  background: rgba(255,255,255,0.05);
+}
+
     </style>
 <div id="global-loading-bar"></div>
 
@@ -4229,34 +4255,102 @@ function setupCommentDelegation() {
     });
 }
       
-        /* ---------- 评论：渲染 & 操作 ---------- */
-        function renderComments(comments) {
-            commentList.innerHTML = '';
-            if (!comments || comments.length === 0) {
-                commentList.innerHTML = '<p class="no-comments-tip">暂无评论，快来发表第一条评论吧！</p>';
-                return;
-            }
-            comments.forEach(c => {
-                const item = document.createElement('div');
-                item.className = 'comment-item';
-                item.dataset.commentId = c._id;
-                const author = escapeHtml(c.author || '匿名');
-                const content = escapeHtml(c.content || '');
-                const likes = Number(c.likesCount || 0);
-                const likedClass = c.isLikedByCurrentUser ? 'liked' : '';
-                item.innerHTML = `
-                    <strong class="comment-author">${author}</strong>
-                    <p class="comment-content">${content}</p>
-                    <div class="comment-actions">
-                        <button class="like-btn ${likedClass}">❤</button>
-                        <span class="like-count">${likes}</span>
-                    </div>
-                `;
-                commentList.appendChild(item);
-            });
-            // 绑定动作
-            //addCommentActionListeners(); （帮我检查一遍，不再需要这个了是吧？）
-        }
+// ===== 新增：工具函数（放在 renderComments 上方，同一作用域）=====
+function normalizeSentenceText(t) {
+  return String(t || '').replace(/\s+/g, ' ').trim();
+}
+function clipText(t, maxLen = 160) {
+  const s = String(t || '');
+  if (s.length <= maxLen) return s;
+  return s.slice(0, maxLen) + '…';
+}
+function safeSentenceSelector(sentenceId) {
+  const sid = String(sentenceId || '');
+  return `[data-sentence-id="${sid.replace(/"/g, '\\"')}"]`;
+}
+function getSentenceTextFromDom(sentenceId) {
+  if (!sentenceId) return '';
+  const el = document.querySelector(safeSentenceSelector(sentenceId));
+  if (!el) return '';
+  return normalizeSentenceText(el.textContent);
+}
+function extractSentenceIdsAndTextMapFromHtml(htmlContent) {
+  const ids = [];
+  const idSet = new Set();
+  const textMap = new Map();
+
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlContent || '';
+
+  tempDiv.querySelectorAll('[data-sentence-id]').forEach(el => {
+    const sid = el.getAttribute('data-sentence-id');
+    if (!sid) return;
+
+    if (!idSet.has(sid)) {
+      idSet.add(sid);
+      ids.push(sid);
+    }
+
+    const txt = normalizeSentenceText(el.textContent);
+    if (txt && !textMap.has(sid)) textMap.set(sid, txt);
+  });
+
+  return { ids, idSet, textMap };
+}
+
+/* ---------- 评论：渲染 & 操作 ---------- */
+function renderComments(comments, sentenceTextMap) {
+  commentList.innerHTML = '';
+
+  if (!Array.isArray(comments) || comments.length === 0) {
+    commentList.innerHTML = '<p class="no-comments-tip">暂无评论，快来发表第一条评论吧！</p>';
+    return;
+  }
+
+  const hasMap = sentenceTextMap instanceof Map;
+
+  comments.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'comment-item';
+    item.dataset.commentId = c._id;
+
+    const author = escapeHtml(c.author || '匿名');
+    const content = escapeHtml(c.content || '');
+    const likes = Number(c.likesCount || 0);
+    const likedClass = c.isLikedByCurrentUser ? 'liked' : '';
+
+    // ✅ 新增：原句框（仅在传入 map 时显示）
+    let quoteHtml = '';
+    if (hasMap) {
+      const sid = (c && c.sentenceId) ? String(c.sentenceId) : '';
+      const full = sid ? (sentenceTextMap.get(sid) || '') : '';
+      const finalFull = full ? full : '（原句未加载）';
+      const short = clipText(finalFull, 160);
+
+      if (sid) item.dataset.sentenceId = sid;
+
+      quoteHtml = `
+        <div class="comment-context-box" title="${escapeHtml(finalFull)}">
+          <div class="comment-context-title">评论原句</div>
+          <div class="comment-context-text">${escapeHtml(short)}</div>
+        </div>
+      `;
+    }
+
+    item.innerHTML = `
+      ${quoteHtml}
+      <strong class="comment-author">${author}</strong>
+      <p class="comment-content">${content}</p>
+      <div class="comment-actions">
+        <button class="like-btn ${likedClass}">❤</button>
+        <span class="like-count">${likes}</span>
+      </div>
+    `;
+
+    commentList.appendChild(item);
+  });
+}
+
 
 
       // ... 紧接在 submitComment 函数之前
@@ -4275,68 +4369,67 @@ async function openCommentPanelForPage(pageIndex) {
   // 没准备好就先准备（用户触发：允许弱网模式继续加载）
   if (!pageObj.segmentedHtml) {
     showLazyToast('正在加载本楼内容…');
-    await ensurePagesPreparedUpTo(pageIndex + 1, { userInitiated:true });
+    await ensurePagesPreparedUpTo(pageIndex + 1, { userInitiated: true });
     hydrateRenderedFloorsRange(pageIndex, pageIndex + 1);
     hideLazyToast();
   }
 
-  // ↓↓↓ 下面保留你原来的逻辑即可
   const pageTitle = `第 ${pageIndex + 1} 楼/页`;
-    const commentPanel = document.getElementById('comment-panel');
-    const header = commentPanel.querySelector('h4');
-    
-    disableCommentInputArea(true);
-    activeSentenceEl = null;
+  const commentPanel = document.getElementById('comment-panel');
+  const header = commentPanel.querySelector('h4');
 
-    // ✅ 改动点：直接使用已缓存的 HTML，而不是再跑 deltaToHtml
-    const htmlContent = pageObj.segmentedHtml || '<p>（空白）</p>';
+  disableCommentInputArea(true);
+  activeSentenceEl = null;
 
-    // 临时解析 HTML，提取所有句子 ID
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
-    const pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
-        .map(el => el.getAttribute('data-sentence-id'));
+  // ✅ 直接用已缓存 HTML
+  const htmlContent = pageObj.segmentedHtml || '<p>（空白）</p>';
+
+  // ✅ 一次解析：拿到 sentenceIds（去重+保序）+ 原句映射
+  const extracted = extractSentenceIdsAndTextMapFromHtml(htmlContent);
+  const pageSentenceIds = extracted.ids;     // 这是数组（保序）
+  const idSet = extracted.idSet;             // 用于去重
+  const sentenceTextMap = extracted.textMap; // sentenceId -> 原句
 
   const workId = getActiveWorkIdForComments();
   if (!workId) { alert('作品尚未加载完成'); return; }
 
+  // ✅ 把 sentenceStartIndex/count 作为“补全”，但用 Set 去重，避免重复汇总
+  if (typeof pageObj.sentenceStartIndex === 'number' && typeof pageObj.__sentenceIdsCount === 'number') {
+    const start = pageObj.sentenceStartIndex;
+    const count = pageObj.__sentenceIdsCount;
 
-
-  if (typeof pageObj.sentenceStartIndex === 'number') {
-    if (typeof pageObj.__sentenceIdsCount === 'number') {
-      const start = pageObj.sentenceStartIndex;
-      const count = pageObj.__sentenceIdsCount;
-
-      if (count > 0) {
-        for (let k = 0; k < count; k++) {
-          pageSentenceIds.push(buildSentenceId(workId, start + k));
-        }
+    for (let k = 0; k < count; k++) {
+      const sid = buildSentenceId(workId, start + k);
+      if (!idSet.has(sid)) {
+        idSet.add(sid);
+        pageSentenceIds.push(sid);
       }
     }
   }
 
-  if (pageSentenceIds.length === 0) {
-    const htmlContent = pageObj.segmentedHtml || '<p>（空白）</p>';
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
-
-    pageSentenceIds = Array.from(tempDiv.querySelectorAll('[data-sentence-id]'))
-      .map(el => el.getAttribute('data-sentence-id'))
-      .filter(v => v);
-  }
-
-  // 关键：只确保本楼范围的评论已加载（不会全量拉整篇）
+  // 只确保本楼范围的评论已加载
   await ensureCommentsLoadedForPagesRange(pageIndex, pageIndex + 1);
 
-  // 汇总本楼评论
+  // ✅ 汇总本楼评论：再按 commentId 去重（双保险）
   const commentsForPage = [];
+  const seenCommentIds = new Set();
+
   for (let i = 0; i < pageSentenceIds.length; i++) {
     const sid = pageSentenceIds[i];
     const arr = commentBySentenceId.get(sid);
     if (!Array.isArray(arr)) continue;
 
     for (let j = 0; j < arr.length; j++) {
-      commentsForPage.push(arr[j]);
+      const c = arr[j];
+      if (!c) continue;
+
+      const cid = c._id ? String(c._id) : '';
+      if (cid) {
+        if (seenCommentIds.has(cid)) continue;
+        seenCommentIds.add(cid);
+      }
+
+      commentsForPage.push(c);
     }
   }
 
@@ -4348,15 +4441,10 @@ async function openCommentPanelForPage(pageIndex) {
     return 0;
   });
 
-  renderComments(commentsForPage);
+  // ✅ 只渲染一次，并把原句映射传进去
+  renderComments(commentsForPage, sentenceTextMap);
   header.textContent = `${pageTitle} 的所有评论 (${commentsForPage.length} 条)`;
   commentPanel.classList.add('show');
-    
-    renderComments(commentsForPage);
-    header.textContent = `${pageTitle} 的所有评论 (${commentsForPage.length} 条)`;
-    
-    commentPanel.classList.add('show');
-
 }
 
       

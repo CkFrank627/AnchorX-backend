@@ -924,15 +924,6 @@ async function ensureWorkIsSeparate(workId) {
 async function performSave({ isAuto = false } = {}) {
   if (!currentWorkId) return false;
 
-  // 0) 先确认 separate（避免老作品/缓存脚本导致走错）
-  const okSeparate = await ensureWorkIsSeparate(currentWorkId);
-  if (!okSeparate) {
-    if (!isAuto) {
-      alert('保存失败：该作品仍为旧存储模式或未正确迁移，请刷新页面后再试；如仍失败请联系站务。');
-    }
-    return false;
-  }
-
   // 1) 同步当前页内容到 pages[currentPageIndex]
   if (!pages || !pages[currentPageIndex]) {
     pages = [{ content: { ops: [] } }];
@@ -952,7 +943,7 @@ async function performSave({ isAuto = false } = {}) {
   try {
     isSaving = true;
 
-    // ✅ 2) 只保存“当前页”
+    // ✅ 2) 只保存“当前页”（让后端判断是否已迁移）
     await saveOnePage(currentWorkId, currentPageIndex, currentContent, title);
 
     // ✅ 3) 可选：保存 meta（绝不包含 pages/content）
@@ -975,7 +966,10 @@ async function performSave({ isAuto = false } = {}) {
     return true;
   } catch (err) {
     console.error('保存失败:', err);
-    if (!isAuto) alert('保存失败：' + (err.message || '网络错误'));
+    if (!isAuto) {
+      // 这里的 err.message 就会是后端真实返回的原因（比如确实没迁移）
+      alert('保存失败：' + (err.message || '网络错误'));
+    }
     return false;
   } finally {
     isSaving = false;
@@ -1085,7 +1079,11 @@ async function downloadLocalBackup() {
     addHistoryRecord('导出本地备份');
 }
 
-        saveBtn.addEventListener('click', () => saveWork(false));
+        saveBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  saveWork(false);
+});
+
 
 // ✅ 新增：给“保存到本地”按钮绑定点击事件
 if (localSaveBtn) {
