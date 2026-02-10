@@ -412,7 +412,11 @@ router.get('/:id/meta', optionalAuth, async (req, res) => {
 
     const work = noView
       ? await Work.findById(id).populate('author', 'username')
-      : await Work.findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true })
+      : await Work.findByIdAndUpdate(
+    id,
+    { $inc: { views: 1 } },
+    { new: true, timestamps: false }  // ✅ 关键：不要动 updatedAt
+  )
           .populate('author', 'username');
 
     if (!work) return res.status(404).json({ message: '作品不存在' });
@@ -1033,38 +1037,41 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 // **新增：作品点赞/取消点赞的路由**
 router.post('/:id/like', auth, async (req, res) => {
-    try {
-        const work = await Work.findById(req.params.id);
-        if (!work) {
-            return res.status(404).json({ message: '作品未找到' });
-        }
+  try {
+    const workId = req.params.id;
+    const userId = String(req.userId);
 
-        const userId = String(req.userId);
-const index = Array.isArray(work.likedBy)
-  ? work.likedBy.findIndex(x => String(x) === userId)
-  : -1;
+    const work = await Work.findById(workId).select('likedBy likesCount');
+    if (!work) return res.status(404).json({ message: '作品未找到' });
 
-        
-        if (index > -1) {
-  work.likedBy.splice(index, 1);
-  work.likesCount = Math.max((work.likesCount || 0) - 1, 0);
-} else {
-  work.likedBy.push(req.userId);
-  work.likesCount = (work.likesCount || 0) + 1;
-}
+    const hasLiked = Array.isArray(work.likedBy) && work.likedBy.some(x => String(x) === userId);
 
+    const update = hasLiked
+      ? { $pull: { likedBy: req.userId }, $inc: { likesCount: -1 } }
+      : { $addToSet: { likedBy: req.userId }, $inc: { likesCount: 1 } };
 
-        await work.save();
+    const updated = await Work.findByIdAndUpdate(
+      workId,
+      update,
+      { new: true, timestamps: false } // ✅ 不更新 updatedAt
+    ).select('likesCount');
 
-        res.json({
-            likesCount: work.likesCount,
-            isLikedByCurrentUser: index === -1 // 如果是新增点赞，则状态为 true
-        });
+    // 防止出现负数（极端并发/历史数据）
+    const likesCount = Math.max(updated?.likesCount || 0, 0);
 
-    } catch (error) {
-        console.error('Work like/unlike error:', error);
-        res.status(500).json({ message: '点赞操作失败', error: error.message });
-    }
+    // 若你想强制修正为非负，可额外写一次（仍然 timestamps:false）
+    if (updated && updated.likesCount < 0) {
+      await Work.findByIdAndUpdate(workId, { $set: { likesCount: 0 } }, { timestamps: false });
+    }
+
+    res.json({
+      likesCount,
+      isLikedByCurrentUser: !hasLiked
+    });
+  } catch (error) {
+    console.error('Work like/unlike error:', error);
+    res.status(500).json({ message: '点赞操作失败', error: error.message });
+  }
 });
 
 // **新增：角色相关的 API 路由**
