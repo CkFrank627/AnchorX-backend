@@ -273,6 +273,45 @@ const normalizeTagsInput = (input) => {
   return { tags: out, tagsNorm: outNorm };
 };
 
+// ------------------------------------------------------------------
+// ✅ 新增：作者编辑作品标签
+// PATCH /api/works/:id/tags
+// body: { tags: ["题材:悬疑", "世界观:幻想乡"] }
+// ------------------------------------------------------------------
+router.patch('/:id/tags', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 支持 tags 既可以是数组，也可以是 JSON 字符串
+    let tags = req.body.tags;
+    if (typeof tags === 'string') {
+      try { tags = JSON.parse(tags); } catch (e) {}
+    }
+
+    if (!Array.isArray(tags)) {
+      return res.status(400).json({ message: 'tags 必须是数组' });
+    }
+
+    const work = await Work.findOne({ _id: id, author: req.userId });
+    if (!work) {
+      return res.status(404).json({ message: '作品不存在或无权修改' });
+    }
+
+    const normalized = normalizeTagsInput(tags);
+    work.tags = normalized.tags;
+    work.tagsNorm = normalized.tagsNorm;
+    work.updatedAt = new Date();
+
+    await work.save();
+
+    return res.json({
+      ok: true,
+      tags: work.tags
+    });
+  } catch (e) {
+    return res.status(500).json({ message: '更新标签失败', error: e.message });
+  }
+});
 
 // ------------------------------------------------------------------
 
