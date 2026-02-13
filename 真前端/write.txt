@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>创作页面</title>
     <link href="https://api.anchorx.ca/vendor_assets/quill.snow.css" rel="stylesheet">
-  
+
 <style> /* 隐藏类 */ .hidden {
   display:none !important;
 }
@@ -1424,6 +1424,308 @@
   }
 }
 
+/* =========================
+   AnchorX 创作端：图片缩放面板 UI（可读性增强）
+   依赖：panel.id = 'ax-imgsize-panel'
+   ========================= */
+
+/* 主题变量：你可以只改这里就整体换风格 */
+:root{
+  --axPanelBg: rgba(22, 22, 22, 0.92);
+  --axPanelFg: #ffffff;
+  --axPanelBorder: rgba(255,255,255,0.14);
+  --axShadow: 0 10px 26px rgba(0,0,0,0.28);
+
+  --axBtnBg: rgba(255,255,255,0.12);
+  --axBtnBd: rgba(255,255,255,0.18);
+  --axBtnFg: #ffffff;
+
+  --axBtnHoverBg: rgba(255,255,255,0.18);
+  --axBtnActiveBg: rgba(255,255,255,0.26);
+
+  --axPrimary: #4aa3ff;
+  --axDanger: #ff5d5d;
+}
+
+/* 面板整体（覆盖你 JS 里 inline 的白底） */
+#ax-imgsize-panel{
+  background: var(--axPanelBg) !important;
+  color: var(--axPanelFg) !important;
+  border: 1px solid var(--axPanelBorder) !important;
+  box-shadow: var(--axShadow) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  /* 让面板更稳一点 */
+  max-width: min(520px, calc(100vw - 18px));
+}
+
+/* 面板里文字 */
+#ax-imgsize-panel span{
+  color: var(--axPanelFg) !important;
+}
+
+/* 面板按钮统一风格 */
+#ax-imgsize-panel button{
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--axBtnBd) !important;
+  background: var(--axBtnBg) !important;
+  color: var(--axBtnFg) !important;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .06s ease, background .15s ease, border-color .15s ease, opacity .15s ease;
+}
+
+#ax-imgsize-panel button:hover{
+  background: var(--axBtnHoverBg) !important;
+  border-color: rgba(255,255,255,0.28) !important;
+}
+
+#ax-imgsize-panel button:active{
+  transform: scale(0.98);
+  background: var(--axBtnActiveBg) !important;
+}
+
+#ax-imgsize-panel button:focus-visible{
+  outline: 2px solid color-mix(in oklab, var(--axPrimary) 70%, white);
+  outline-offset: 2px;
+}
+
+/* 预设按钮（25/50/70/85/100）可以更像“胶囊标签” */
+#ax-imgsize-panel button[data-preset]{
+  padding: 6px 12px;
+}
+
+/* “重置”按钮稍微明显一点 */
+#ax-imgsize-panel #imgSizeReset{
+  border-radius: 10px !important;
+  border-color: rgba(255,255,255,0.35) !important;
+}
+
+/* 关闭按钮：不要白到看不见 */
+#ax-imgsize-panel #imgSizeClose{
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px !important;
+  border-color: rgba(255,255,255,0.24) !important;
+  background: rgba(255,255,255,0.10) !important;
+  font-size: 16px;
+  line-height: 30px;
+  text-align: center;
+}
+
+#ax-imgsize-panel #imgSizeClose:hover{
+  background: rgba(255, 93, 93, 0.22) !important;
+  border-color: rgba(255, 93, 93, 0.40) !important;
+}
+
+/* 滑条：让它在暗底上可见 */
+#ax-imgsize-panel input[type="range"]{
+  accent-color: var(--axPrimary);
+}
+
+/* Chrome / Edge */
+#ax-imgsize-panel input[type="range"]::-webkit-slider-runnable-track{
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
+}
+#ax-imgsize-panel input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 999px;
+  background: var(--axPrimary);
+  border: 2px solid rgba(255,255,255,0.55);
+}
+
+/* Firefox */
+#ax-imgsize-panel input[type="range"]::-moz-range-track{
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
+}
+#ax-imgsize-panel input[type="range"]::-moz-range-thumb{
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--axPrimary);
+  border: 2px solid rgba(255,255,255,0.55);
+}
+
+/* 编辑器里图片：提示可点、避免太突兀 */
+#editor .ql-editor img{
+  cursor: pointer;
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  transition: box-shadow .15s ease, transform .08s ease;
+}
+
+#editor .ql-editor img:hover{
+  box-shadow: 0 8px 20px rgba(0,0,0,0.16);
+}
+
+/* （可选）有 data-width 的图片给一个更明显的“已可缩放”观感 */
+#editor .ql-editor img[data-width]{
+  outline: 1px dashed rgba(74,163,255,0.55);
+  outline-offset: 4px;
+}
+
+/* =========================
+   ✅ 精准：仅作用于作品标签弹窗（#tag-modal-backdrop）
+   目标：按钮/输入框/标签chip上色 + hover/active
+   ========================= */
+
+:root{
+  --tagBlue: #0d6efd;
+  --tagBlueHover: #0b5ed7;
+  --tagGreen: #16a34a;
+  --tagGreenHover: #12813c;
+  --tagRed: #dc3545;
+  --tagBorder: rgba(0,0,0,0.14);
+  --tagShadow: 0 8px 22px rgba(0,0,0,0.14);
+}
+
+/* 弹窗主体统一质感（覆盖 inline 白底/阴影） */
+#tag-modal-backdrop > div{
+  border-radius: 14px !important;
+  box-shadow: var(--tagShadow) !important;
+}
+
+/* “✕” 关闭按钮 */
+#tag-modal-x{
+  background: #f1f3f5 !important;
+  color: #444 !important;
+  border: 1px solid var(--tagBorder) !important;
+  border-radius: 10px !important;
+}
+#tag-modal-x:hover{
+  background: #ffecec !important;
+  border-color: rgba(220,53,69,0.35) !important;
+  color: var(--tagRed) !important;
+}
+
+/* 输入框：更清晰 */
+#tag-input{
+  border: 1px solid rgba(0,0,0,0.16) !important;
+  background: #fff !important;
+  color: #222 !important;
+  box-shadow: none !important;
+}
+#tag-input:focus{
+  border-color: rgba(13,110,253,0.55) !important;
+  box-shadow: 0 0 0 3px rgba(13,110,253,0.15) !important;
+}
+
+/* 主操作按钮：添加 / 保存 / 关闭 */
+#tag-add-btn{
+  background: var(--tagBlue) !important;
+  color: #fff !important;
+  border: 1px solid var(--tagBlue) !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+#tag-add-btn:hover{
+  background: var(--tagBlueHover) !important;
+  border-color: var(--tagBlueHover) !important;
+}
+
+#tag-save-btn{
+  background: var(--tagGreen) !important;
+  color: #fff !important;
+  border: 1px solid var(--tagGreen) !important;
+  border-radius: 10px !important;
+  font-weight: 800 !important;
+}
+#tag-save-btn:hover{
+  background: var(--tagGreenHover) !important;
+  border-color: var(--tagGreenHover) !important;
+}
+
+#tag-cancel-btn{
+  background: #fff !important;
+  color: #222 !important;
+  border: 1px solid rgba(0,0,0,0.18) !important;
+  border-radius: 10px !important;
+}
+#tag-cancel-btn:hover{
+  background: #f3f4f6 !important;
+  border-color: rgba(0,0,0,0.22) !important;
+}
+
+/* “一键添加”按钮（tag-add-workname） */
+#tag-add-workname{
+  background: #e7f1ff !important;
+  color: #0b5ed7 !important;
+  border: 1px solid rgba(13,110,253,0.35) !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+#tag-add-workname:hover{
+  background: #d8e9ff !important;
+  border-color: rgba(13,110,253,0.55) !important;
+}
+
+/* 前缀按钮（题材/世界观/风格/警告/CP） */
+#tag-modal-backdrop .tag-pref-btn{
+  background: #fff !important;
+  color: #333 !important;
+  border: 1px solid rgba(0,0,0,0.16) !important;
+  border-radius: 999px !important;
+  padding: 6px 10px !important;
+}
+#tag-modal-backdrop .tag-pref-btn:hover{
+  background: #f0f7ff !important;
+  border-color: rgba(13,110,253,0.35) !important;
+  color: #0b5ed7 !important;
+}
+#tag-modal-backdrop .tag-pref-btn:active{
+  transform: scale(0.98);
+}
+
+/* 当前标签 chip（JS 往 #tag-chip-list 里塞的项）
+   你没给 chip 的 class，所以我们“只在 chip-list 的直接子元素”上色 */
+#tag-chip-list > *{
+  background: #f1f3f5 !important;
+  border: 1px solid rgba(0,0,0,0.10) !important;
+  color: #333 !important;
+  border-radius: 999px !important;
+  padding: 6px 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+/* chip 的 X（通常是 button/span）做成红色 hover */
+#tag-chip-list > * button,
+#tag-chip-list > * .chip-x,
+#tag-chip-list > * .tag-x{
+  background: transparent !important;
+  border: none !important;
+  color: rgba(220,53,69,0.85) !important;
+  cursor: pointer !important;
+  font-weight: 900 !important;
+}
+#tag-chip-list > * button:hover,
+#tag-chip-list > * .chip-x:hover,
+#tag-chip-list > * .tag-x:hover{
+  color: var(--tagRed) !important;
+}
+
+/* 弹窗内 code 更好看一点 */
+#tag-modal-backdrop code{
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  color: #0b3d91 !important;
+}
+  
 </style>
   
 <body>
@@ -2161,6 +2463,61 @@ class HiddenTextBlot extends Inline {
 // 注册自定义 Blot
 Quill.register(HiddenTextBlot);
 
+      /* =========================
+   ✅ 可缩放图片：覆盖默认 image blot，让 Delta 能保存 width
+   ========================= */
+const BaseImage = Quill.import('formats/image');
+
+class ResizableImage extends BaseImage {
+  static create(value) {
+    // 兼容旧数据：value 可能是 string（纯 src）
+    const src = (typeof value === 'string')
+      ? value
+      : (value && typeof value === 'object' ? (value.src || value.url || '') : '');
+
+    const node = super.create(src);
+
+    // 基础展示（防止超出编辑器）
+    node.setAttribute('loading', 'lazy');
+    node.style.maxWidth = '100%';
+    node.style.height = 'auto';
+    node.style.display = 'block';
+    node.style.margin = '8px auto';
+
+    // 读取/应用 width（新数据）
+    if (value && typeof value === 'object') {
+      if (value.alt) node.setAttribute('alt', value.alt);
+
+      if (value.width) {
+        node.style.width = value.width;           // 例如 '70%' / '420px'
+        node.setAttribute('data-width', value.width);
+      } else {
+        node.removeAttribute('data-width');
+      }
+    } else {
+      // 兼容：如果 DOM 上已有 data-width，也应用
+      const w = node.getAttribute('data-width');
+      if (w) node.style.width = w;
+    }
+
+    return node;
+  }
+
+  static value(node) {
+    const src = node.getAttribute('src') || '';
+    const width = node.getAttribute('data-width') || node.style.width || '';
+    const alt = node.getAttribute('alt') || '';
+
+    // 兼容旧格式：如果没有 width/alt，就还原成 string，避免影响老内容
+    if (!width && !alt) return src;
+
+    return { src, width, alt };
+  }
+}
+
+// 覆盖默认 image blot
+Quill.register(ResizableImage, true);
+
       /* ---------- 初始化 Quill ---------- */
     const quill = new Quill('#editor', {
         modules: {
@@ -2175,6 +2532,127 @@ Quill.register(HiddenTextBlot);
 // 例如：formats: ['bold', ..., 'hiddenText']
       
       quill.on('text-change', markAsChanged); 
+
+      /* =========================
+   ✅ 图片缩放 UI：点击图片弹出缩放条（%）
+   ========================= */
+(function setupImageResizeUI(quill) {
+  let selectedImg = null;
+
+  // 创建面板
+  const panel = document.createElement('div');
+  panel.id = 'ax-imgsize-panel';
+  panel.style.cssText = `
+    position: fixed;
+    z-index: 99999;
+    display: none;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.96);
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+    font-size: 12px;
+    color: #222;
+    user-select: none;
+  `;
+
+  panel.innerHTML = `
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-weight:700;">图片大小</span>
+      <input id="imgSizeRange" type="range" min="20" max="100" step="1" style="width:180px;">
+      <span id="imgSizeLabel" style="width:44px; text-align:right;">70%</span>
+      <button id="imgSizeReset" type="button" style="border:1px solid #ccc;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer;">重置</button>
+      <button id="imgSizeClose" type="button" style="border:0;background:transparent;cursor:pointer;font-size:16px;line-height:1;">×</button>
+    </div>
+    <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+      ${[25,50,70,85,100].map(v=>`<button data-preset="${v}" type="button"
+        style="border:1px solid #ddd;background:#fff;border-radius:999px;padding:4px 10px;cursor:pointer;">${v}%</button>`).join('')}
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  const range = panel.querySelector('#imgSizeRange');
+  const label = panel.querySelector('#imgSizeLabel');
+  const btnReset = panel.querySelector('#imgSizeReset');
+  const btnClose = panel.querySelector('#imgSizeClose');
+
+  function markChangedSafe() {
+    if (typeof window.markAsChanged === 'function') window.markAsChanged();
+  }
+
+  function applyWidth(percent) {
+    if (!selectedImg) return;
+    const w = String(percent) + '%';
+    selectedImg.style.width = w;
+    selectedImg.setAttribute('data-width', w);
+    quill.update('user');         // 让 Quill 感知 DOM 改动（用于导出/保存）
+    markChangedSafe();
+  }
+
+  function showNear(node) {
+    const r = node.getBoundingClientRect();
+    const x = Math.min(window.innerWidth - 20, Math.max(10, r.left));
+    const y = Math.min(window.innerHeight - 20, Math.max(10, r.top - 70));
+    panel.style.left = x + 'px';
+    panel.style.top = y + 'px';
+    panel.style.display = 'block';
+  }
+
+  function hide() {
+    panel.style.display = 'none';
+    selectedImg = null;
+  }
+
+  // 面板交互
+  range.addEventListener('input', () => {
+    label.textContent = range.value + '%';
+    applyWidth(range.value);
+  });
+
+  panel.addEventListener('click', (e) => {
+    const preset = e.target && e.target.getAttribute && e.target.getAttribute('data-preset');
+    if (preset) {
+      range.value = preset;
+      label.textContent = preset + '%';
+      applyWidth(preset);
+    }
+  });
+
+  btnReset.addEventListener('click', () => {
+    if (!selectedImg) return;
+    selectedImg.style.width = '';
+    selectedImg.removeAttribute('data-width');
+    quill.update('user');
+    markChangedSafe();
+    range.value = 100;
+    label.textContent = '100%';
+  });
+
+  btnClose.addEventListener('click', hide);
+
+  // 点击图片选中
+  quill.root.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t && t.tagName === 'IMG') {
+      selectedImg = t;
+
+      // 读取当前宽度（默认 70%）
+      const w = (t.getAttribute('data-width') || t.style.width || '70%').trim();
+      const num = parseInt(w.replace('%',''), 10);
+      const val = (!isNaN(num) ? num : 70);
+
+      range.value = val;
+      label.textContent = val + '%';
+      showNear(t);
+      return;
+    }
+    hide();
+  });
+
+  // 滚动/缩放时隐藏，避免漂移
+  window.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
+})(quill);
 
 
         // 撤销/重做按钮（toolbar里）
@@ -2229,7 +2707,7 @@ uploadImageInput.addEventListener('change', async () => {
         const imageUrl = await uploadFileToImgBB(file);
        const range = quill.getSelection(); // [cite: 528]
         if (range) {
-            quill.insertEmbed(range.index, 'image', imageUrl);
+            quill.insertEmbed(range.index, 'image', { src: imageUrl, width: '70%' });
         } else {
             quill.insertEmbed(quill.getLength(), 'image', imageUrl);// [cite: 529]
         }
@@ -2244,6 +2722,211 @@ uploadImageInput.addEventListener('change', async () => {
 });
         }
 
+/* ---------- 作品标签（弹窗 + PATCH to backend）---------- */
+
+// 前端也做一次轻量清洗，体验更好（最终以后端为准）
+function normalizeTagsClient(input) {
+  const arr = Array.isArray(input) ? input : [];
+  const out = [];
+  const seen = new Set();
+  for (var i = 0; i < arr.length; i++) {
+    var t = String(arr[i] == null ? '' : arr[i]).replace(/\s+/g, ' ').trim();
+    if (!t) continue;
+    if (t.length > 32) t = t.slice(0, 32);
+    var n = t.toLowerCase();
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(t);
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
+async function fetchWorkTagsForEdit(workId) {
+  // 用 meta 且 noView=1，避免编辑端浏览量被刷
+  const res = await fetch(`${API_BASE_URL}/${workId}/meta?noView=1`, {
+    method: 'GET',
+    headers: authHeaders(false)
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.message || ('获取 tags 失败 ' + res.status));
+  return Array.isArray(j.tags) ? j.tags : [];
+}
+
+async function saveWorkTags(workId, tags) {
+  const res = await fetch(`${API_BASE_URL}/${workId}/tags`, {
+    method: 'PATCH',
+    headers: authHeaders(true),
+    body: JSON.stringify({ tags: tags })
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.message || ('保存 tags 失败 ' + res.status));
+  return Array.isArray(j.tags) ? j.tags : [];
+}
+
+function showTagEditModal(workId, workTitle) {
+  const modalHtml = `
+    <div id="tag-modal-backdrop" style="position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+         display:flex; justify-content:center; align-items:center; z-index:10000;">
+      <div style="background:#fff; width:520px; max-width: calc(100vw - 24px);
+           border-radius:12px; padding:16px 16px 14px; box-shadow:0 10px 30px rgba(0,0,0,0.22);">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+          <div>
+            <div style="font-weight:800; font-size:1.1rem;">作品标签</div>
+            <div style="margin-top:4px; color:#666; font-size:0.92rem;">
+              当前作品：<span style="color:#222; font-weight:700;">《${String(workTitle || '未命名').replace(/[<>]/g,'')}》</span>
+            </div>
+          </div>
+          <button id="tag-modal-x" style="border:none; background:#f2f2f2; border-radius:10px; padding:6px 10px; cursor:pointer;">✕</button>
+        </div>
+
+        <div style="margin-top:10px; padding:10px 12px; background:#f7fbff; border:1px solid #d9ecff; border-radius:10px; color:#245; font-size:0.9rem; line-height:1.45;">
+          建议：至少加一个“作品名标签”，方便你未来做独立筛选。示例：<code style="background:#fff; padding:2px 6px; border-radius:6px;">作品:${String(workTitle || '').replace(/[<>]/g,'')}</code>
+          <button id="tag-add-workname" style="margin-left:8px; border:1px solid #b8dcff; background:#fff; color:#0366d6; border-radius:8px; padding:4px 8px; cursor:pointer;">一键添加</button>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div style="color:#555; font-size:0.9rem; margin-bottom:6px;">当前标签（点击 ✕ 删除）：</div>
+          <div id="tag-chip-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+        </div>
+
+        <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+          <input id="tag-input" placeholder="输入标签，回车添加（例如：题材:悬疑 / 世界观:幻想乡）"
+                 style="flex:1; border:1px solid #ddd; border-radius:10px; padding:10px 12px; outline:none;">
+          <button id="tag-add-btn" style="border:none; background:#0077cc; color:#fff; border-radius:10px; padding:10px 12px; cursor:pointer;">添加</button>
+        </div>
+
+        <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+          <button class="tag-pref-btn" data-pref="题材:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">题材:</button>
+          <button class="tag-pref-btn" data-pref="世界观:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">世界观:</button>
+          <button class="tag-pref-btn" data-pref="风格:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">风格:</button>
+          <button class="tag-pref-btn" data-pref="警告:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">警告:</button>
+          <button class="tag-pref-btn" data-pref="CP:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">CP:</button>
+        </div>
+
+        <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:10px;">
+          <button id="tag-cancel-btn" style="border:1px solid #ddd; background:#fff; border-radius:10px; padding:10px 12px; cursor:pointer;">关闭</button>
+          <button id="tag-save-btn" style="border:none; background:#16a34a; color:#fff; border-radius:10px; padding:10px 12px; cursor:pointer;">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const backdrop = document.getElementById('tag-modal-backdrop');
+  const chipList = document.getElementById('tag-chip-list');
+  const input = document.getElementById('tag-input');
+  const addBtn = document.getElementById('tag-add-btn');
+  const saveBtn = document.getElementById('tag-save-btn');
+  const cancelBtn = document.getElementById('tag-cancel-btn');
+  const closeX = document.getElementById('tag-modal-x');
+  const addWorkNameBtn = document.getElementById('tag-add-workname');
+
+  let tags = [];
+
+  function renderChips() {
+    chipList.innerHTML = '';
+    if (!tags.length) {
+      chipList.innerHTML = '<div style="color:#999; font-size:0.9rem;">（暂无标签）</div>';
+      return;
+    }
+    tags.forEach((t) => {
+      const safe = String(t).replace(/[<>]/g,'');
+      const el = document.createElement('div');
+      el.style.cssText = 'display:inline-flex; align-items:center; gap:6px; background:#f3f4f6; border-radius:999px; padding:6px 10px; font-size:0.88rem;';
+      el.innerHTML = `<span>${safe}</span><span style="cursor:pointer; color:#666; font-weight:900;" data-del="${encodeURIComponent(t)}">✕</span>`;
+      chipList.appendChild(el);
+    });
+  }
+
+  function addTag(t) {
+    if (!t) return;
+    const merged = normalizeTagsClient(tags.concat([t]));
+    tags = merged;
+    renderChips();
+  }
+
+  // 加载现有 tags
+  (async () => {
+    try {
+      const existing = await fetchWorkTagsForEdit(workId);
+      tags = normalizeTagsClient(existing);
+      renderChips();
+    } catch (err) {
+      console.error(err);
+      alert('加载标签失败：' + err.message);
+      tags = [];
+      renderChips();
+    }
+  })();
+
+  // 删除 chip
+  chipList.addEventListener('click', (e) => {
+    const del = e.target && e.target.getAttribute && e.target.getAttribute('data-del');
+    if (!del) return;
+    const val = decodeURIComponent(del);
+    const lower = val.toLowerCase();
+    tags = tags.filter(x => String(x).toLowerCase() !== lower);
+    renderChips();
+  });
+
+  // 前缀按钮
+  backdrop.querySelectorAll('.tag-pref-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pref = btn.getAttribute('data-pref') || '';
+      input.value = (pref + (input.value || ''));
+      input.focus();
+    });
+  });
+
+  // 一键添加作品名标签
+  if (addWorkNameBtn) {
+    addWorkNameBtn.addEventListener('click', () => {
+      const t = '作品:' + String(workTitle || '').replace(/\s+/g,' ').trim();
+      if (t === '作品:') return;
+      addTag(t);
+    });
+  }
+
+  // 添加按钮 / 回车添加
+  addBtn.addEventListener('click', () => {
+    const v = String(input.value || '').trim();
+    input.value = '';
+    addTag(v);
+    input.focus();
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addBtn.click();
+    }
+  });
+
+  function close() { backdrop && backdrop.remove(); }
+  cancelBtn.addEventListener('click', close);
+  closeX.addEventListener('click', close);
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) close();
+  });
+
+  // 保存
+  saveBtn.addEventListener('click', async () => {
+    try {
+      const cleaned = normalizeTagsClient(tags);
+      const saved = await saveWorkTags(workId, cleaned);
+      tags = normalizeTagsClient(saved);
+      alert('标签已保存！');
+      close();
+      // 刷新作品列表，让按钮上的 (N) 更新
+      loadWorks();
+    } catch (err) {
+      console.error(err);
+      alert('保存失败：' + err.message);
+    }
+  });
+}
+      
         /* ---------- 封面上传（弹窗 + PATCH to backend）---------- */
         function showCoverUploadModal(workId) {
             const modalHtml = `
@@ -2485,10 +3168,15 @@ function renderDiceHistory(history) {
                                     <span class="work-title">${work.title}</span>
                                 </div>
                             </div>
-                            <div class="work-actions-buttons">
-                                <button class="cover-settings-btn" data-work-id="${work._id}">封面设置</button>
-                                <button class="menu-button" data-action="toggle-menu">⋯</button>
-                            </div>
+   <div class="work-actions-buttons">
+  <button class="cover-settings-btn" data-work-id="${work._id}">封面设置</button>
+  <button class="tag-settings-btn"
+          data-work-id="${work._id}"
+          data-work-title="${encodeURIComponent(work.title || '')}">
+    作品标签${Array.isArray(work.tags) && work.tags.length ? `(${work.tags.length})` : ''}
+  </button>
+  <button class="menu-button" data-action="toggle-menu">⋯</button>
+</div>
                         </div>
                         <div class="menu-container hidden">
                             <div class="menu-item" data-action="delete-single">刪除</div>
@@ -2522,6 +3210,14 @@ function renderDiceHistory(history) {
                 showCoverUploadModal(workId);
                 return;
             }
+
+          // 点击作品标签
+if (e.target.closest('.tag-settings-btn')) {
+  const btn = e.target.closest('.tag-settings-btn');
+  const title = btn && btn.dataset.workTitle ? decodeURIComponent(btn.dataset.workTitle) : '';
+  showTagEditModal(workId, title);
+  return;
+}
 
             // 点击菜单里的刪除
             if (e.target.closest('[data-action="delete-single"]')) {
