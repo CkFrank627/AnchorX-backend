@@ -474,6 +474,55 @@ if (req.body.pages !== undefined || req.body.content !== undefined) {
         res.status(500).json({ message: '更新发布状态失败', error: error.message });
     }
 });
+
+// ------------------------------------------------------------------
+// ✅ 新增：获取“全站已发布作品”的标签统计（用于筛选器，不依赖懒加载）
+// GET /api/works/public-tags
+// 返回：{ ok: true, tags: [{ tag, tagNorm, count }...] }
+// ------------------------------------------------------------------
+router.get('/public-tags', async (req, res) => {
+  try {
+    const rows = await Work.aggregate([
+      { $match: { isPublished: true } },
+
+      // 保护：确保 tagsNorm/tags 是数组
+      {
+        $project: {
+          z: {
+            $zip: {
+              inputs: [
+                { $ifNull: ['$tagsNorm', []] },
+                { $ifNull: ['$tags', []] }
+              ]
+            }
+          }
+        }
+      },
+      { $unwind: '$z' },
+      {
+        $project: {
+          tagNorm: { $arrayElemAt: ['$z', 0] },
+          tag: { $arrayElemAt: ['$z', 1] }
+        }
+      },
+      { $match: { tagNorm: { $ne: null }, tag: { $ne: null } } },
+
+      { $group: { _id: '$tagNorm', tag: { $first: '$tag' }, count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } }
+    ]);
+
+    const tags = rows.map(r => ({
+      tag: r.tag,
+      tagNorm: r._id,
+      count: r.count
+    }));
+
+    return res.json({ ok: true, tags });
+  } catch (e) {
+    return res.status(500).json({ message: '获取标签统计失败', error: e.message });
+  }
+});
+
 // ------------------------------------------------------------------
 
 // ------------------------------------------------------------------
@@ -488,7 +537,40 @@ router.get('/public', async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
     const skip = (page - 1) * limit;
 
-    const filter = { isPublished: true };
+// ✅ tag/tags 过滤（用 tagsNorm 做不区分大小写）
+// include: tags / tag
+// exclude: notTags / notTag
+// match: any|all（默认 any）
+let rawInclude = req.query.tag || req.query.tags;
+let rawExclude = req.query.notTag || req.query.notTags;
+
+let includeList = [];
+if (Array.isArray(rawInclude)) includeList = rawInclude;
+else if (typeof rawInclude === 'string' && rawInclude.trim()) includeList = rawInclude.split(',');
+
+let excludeList = [];
+if (Array.isArray(rawExclude)) excludeList = rawExclude;
+else if (typeof rawExclude === 'string' && rawExclude.trim()) excludeList = rawExclude.split(',');
+
+const include = includeList.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+const exclude = excludeList.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+
+// match=all 才用 $all；默认 any 用 $in（更符合“只看：命中任意一个标签”）
+const match = (String(req.query.match || '').toLowerCase() === 'all') ? 'all' : 'any';
+
+const and = [{ isPublished: true }];
+
+if (include.length) {
+  and.push(match === 'all'
+    ? { tagsNorm: { $all: include } }
+    : { tagsNorm: { $in: include } }
+  );
+}
+if (exclude.length) {
+  and.push({ tagsNorm: { $nin: exclude } });
+}
+
+const filter = (and.length === 1) ? and[0] : { $and: and };
 
     // ✅ tag/tags 过滤（用 tagsNorm 做不区分大小写）
     let rawTags = req.query.tag || req.query.tags;
