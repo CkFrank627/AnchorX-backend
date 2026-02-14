@@ -9,6 +9,9 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User'); // ✅ 你漏掉了这个！
 const mongoose = require('mongoose'); // ✅ 你后面用到了 mongoose.Types.ObjectId
 
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) return res.status(500).json({ message: 'JWT_SECRET 未配置' });
+
 // 认证中间件
 const auth = (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -16,7 +19,7 @@ const auth = (req, res, next) => {
         return res.status(401).json({ message: '请先登录' });
     }
     try {
-        const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
+        const decoded = jwt.verify(token, JWT_SECRET);
         req.userId = decoded.userId;
         next();
     } catch (error) {
@@ -55,7 +58,7 @@ router.post('/work/by-sentence-ids/:workId', async (req, res) => {
       const token = String(tokenHeader).replace('Bearer ', '');
       if (token) {
         try {
-          const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
+          const decoded = jwt.verify(token, JWT_SECRET);
           currentUserId = decoded.userId;
         } catch (e) {
           currentUserId = null;
@@ -123,7 +126,7 @@ router.get('/work/:workId', async (req, res) => {
 
     if (token) {
       try {
-        const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
+        const decoded = jwt.verify(token, JWT_SECRET);
         currentUserId = decoded.userId;
       } catch {
         currentUserId = null;
@@ -174,7 +177,7 @@ router.get('/:workId/:sentenceId', async (req, res) => {
 
         if (token) {
             try {
-                const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
+                const decoded = jwt.verify(token, JWT_SECRET);
                 currentUserId = decoded.userId;
             } catch (error) {
                 currentUserId = null;
@@ -350,6 +353,5 @@ router.get('/work/commented-sentences/:workId', async (req, res) => {
     res.status(500).json({ message: '获取有评论的句子ID失败', error: error.message });
   }
 });
-
 
 module.exports = router;
