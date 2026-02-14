@@ -10,6 +10,21 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+// 管理员白名单：环境变量里配置 ObjectId 字符串，逗号分隔
+// 例：ADMIN_USER_IDS=65a....,65b....
+const ADMIN_USER_IDS = new Set(
+  String(process.env.ADMIN_USER_IDS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+);
+
+function requireAdmin(req, res, next) {
+  const uid = String(req.userId || '');
+  if (ADMIN_USER_IDS.has(uid)) return next();
+  return res.status(403).json({ message: '需要管理员权限' });
+}
+
 // 定义文件存储的目标文件夹
 const uploadDir = 'public/uploads';
 // 确保目录存在
@@ -310,6 +325,112 @@ router.patch('/:id/tags', auth, async (req, res) => {
     });
   } catch (e) {
     return res.status(500).json({ message: '更新标签失败', error: e.message });
+  }
+});
+
+// ------------------------------------------------------------------
+// ✅ 新增：管理员补标签（用于旧作品/作者不活跃）
+// PATCH /api/works/:id/tags-admin?touch=0
+// body: { tags: ["题材:悬疑", "世界观:幻想乡"] }
+// touch=1 才会更新 updatedAt（默认不更新，避免把旧作品顶到最新）
+// ------------------------------------------------------------------
+router.patch('/:id/tags-admin', auth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    let tags = req.body.tags;
+    if (typeof tags === 'string') {
+      try { tags = JSON.parse(tags); } catch (e) {}
+    }
+    if (!Array.isArray(tags)) {
+      return res.status(400).json({ message: 'tags 必须是数组' });
+    }
+
+    const normalized = normalizeTagsInput(tags);
+
+    const touch = (req.query.touch === '1') || (req.body.touch === true);
+
+    const update = {
+      $set: {
+        tags: normalized.tags,
+        tagsNorm: normalized.tagsNorm,
+      }
+    };
+
+    // 默认不动 updatedAt；只有 touch 才更新
+    if (touch) update.$currentDate = { updatedAt: true };
+
+    const work = await Work.findByIdAndUpdate(
+      id,
+      update,
+      { new: true, timestamps: false } // ✅ 关键：不自动更新时间戳
+    );
+
+    if (!work) return res.status(404).json({ message: '作品不存在' });
+
+    return res.json({ ok: true, tags: work.tags });
+  } catch (e) {
+    return res.status(500).json({ message: '管理员更新标签失败', error: e.message });
+  }
+});
+
+// ------------------------------------------------------------------
+// ✅ 新增：管理员批量补标签
+// POST /api/works/admin/bulk-tags
+// body: { items: [{ id: "...", tags: [...] }, ...], touch: false }
+// touch=true 才更新 updatedAt（默认 false）
+// ------------------------------------------------------------------
+router.post('/admin/bulk-tags', auth, requireAdmin, async (req, res) => {
+  try {
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    const touch = (req.body.touch === true);
+
+    if (!items.length) {
+      return res.status(400).json({ message: 'items 不能为空' });
+    }
+    if (items.length > 500) {
+      return res.status(400).json({ message: '一次最多 500 条，避免把库打爆' });
+    }
+
+    const ops = [];
+    const skipped = [];
+
+    for (const it of items) {
+      const id = it && it.id;
+      let tags = it && it.tags;
+
+      if (!id) { skipped.push({ id, reason: 'missing id' }); continue; }
+
+      if (typeof tags === 'string') {
+        try { tags = JSON.parse(tags); } catch (e) {}
+      }
+      if (!Array.isArray(tags)) { skipped.push({ id, reason: 'tags not array' }); continue; }
+
+      const normalized = normalizeTagsInput(tags);
+
+      const update = { $set: { tags: normalized.tags, tagsNorm: normalized.tagsNorm } };
+      if (touch) update.$currentDate = { updatedAt: true };
+
+      ops.push({
+        updateOne: {
+          filter: { _id: id },
+          update
+        }
+      });
+    }
+
+    if (!ops.length) {
+      return res.status(400).json({ message: '没有可执行的更新项', skipped });
+    }
+
+    const result = await Work.bulkWrite(ops, { ordered: false });
+    return res.json({
+      ok: true,
+      bulk: result,
+      skipped
+    });
+  } catch (e) {
+    return res.status(500).json({ message: '批量补标签失败', error: e.message });
   }
 });
 
