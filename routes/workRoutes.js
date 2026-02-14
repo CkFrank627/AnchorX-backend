@@ -572,15 +572,6 @@ if (exclude.length) {
 
 const filter = (and.length === 1) ? and[0] : { $and: and };
 
-    // ✅ tag/tags 过滤（用 tagsNorm 做不区分大小写）
-    let rawTags = req.query.tag || req.query.tags;
-    let list = [];
-    if (Array.isArray(rawTags)) list = rawTags;
-    else if (typeof rawTags === 'string' && rawTags.trim()) list = rawTags.split(',');
-
-    const want = list.map(s => String(s).trim().toLowerCase()).filter(Boolean);
-    if (want.length) filter.tagsNorm = { $all: want }; // 必须同时包含全部标签
-
     const [works, total] = await Promise.all([
       Work.find(filter)
         .sort({ updatedAt: -1, _id: -1 })
