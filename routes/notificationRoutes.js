@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const Notification = require('../models/Notification');
-const auth = require('./authMiddleware'); // 确保你有这个认证中间件
+const auth = require('../authMiddleware'); // 确保你有这个认证中间件
 
 // GET: 获取当前用户的所有通知
 router.get('/', auth, async (req, res) => {
