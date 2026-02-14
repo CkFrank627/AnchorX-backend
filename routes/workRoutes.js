@@ -9,19 +9,12 @@ const WorkPage = require('../models/WorkPage');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const auth = require('../authMiddleware'); // 路径按你项目实际调整
 
 // 管理员白名单：环境变量里配置 ObjectId 字符串，逗号分隔
 // 例：ADMIN_USER_IDS=65a....,65b....
-const ADMIN_USER_IDS = new Set(
-  String(process.env.ADMIN_USER_IDS || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
-);
-
 function requireAdmin(req, res, next) {
-  const uid = String(req.userId || '');
-  if (ADMIN_USER_IDS.has(uid)) return next();
+  if (req.isAdmin) return next();
   return res.status(403).json({ message: '需要管理员权限' });
 }
 
@@ -62,36 +55,21 @@ router.post('/upload', upload.single('image'), (req, res) => {
 });
 
 // 认证中间件
-const auth = (req, res, next) => {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-        return res.status(401).json({ message: '请先登录' });
-    }
-    try {
-        const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
-        req.userId = decoded.userId;
-        next();
-    } catch (error) {
-        res.status(401).json({ message: '令牌无效' });
-    }
-};
-
-// **新增：可选认证中间件**
-// 如果有 token，解析并设置 req.userId，没有则继续
 const optionalAuth = (req, res, next) => {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, 'YOUR_SECRET_KEY');
-            req.userId = decoded.userId;
-        } catch (error) {
-            // 令牌无效，但我们不中断请求，只把 userId 设为 null
-            req.userId = null; 
-        }
-    } else {
-        req.userId = null;
-    }
-    next();
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  const JWT_SECRET = process.env.JWT_SECRET;
+
+  if (token && JWT_SECRET) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.userId = decoded.userId;
+    } catch (error) {
+      req.userId = null;
+    }
+  } else {
+    req.userId = null;
+  }
+  next();
 };
 
 // **新增：计算字数的辅助函数**

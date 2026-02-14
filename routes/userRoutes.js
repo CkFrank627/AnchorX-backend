@@ -42,21 +42,22 @@ router.post('/login', async (req, res) => {
         await user.save({ validateBeforeSave: false });
 
         // 生成 JWT
-        const token = jwt.sign(
-            { userId: user._id },
-            'YOUR_SECRET_KEY',
-            { expiresIn: '7d' }
-        );
+        // userRoutes.js（登录处）
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) return res.status(500).json({ message: 'JWT_SECRET 未配置' });
+
+const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '7d' });
 
         // 也可以顺便把 lastActiveAt 返回给前端用
-        res.json({
+            res.json({
             message: '登录成功',
             token,
             user: {
-                id: user._id,
-                username: user.username,
-                lastActiveAt: user.lastActiveAt
-            }
+            id: user._id,
+            username: user.username,
+            lastActiveAt: user.lastActiveAt,
+            roles: user.roles || [],
+        }
         });
     } catch (error) {
         res.status(500).json({ message: '登录失败', error: error.message });

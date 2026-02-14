@@ -5,13 +5,12 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
 
-  // 最近活跃时间（用于前端显示在线状态）
   lastActiveAt: { type: Date, default: null },
+  avatarUrl: { type: String, default: '' },
 
-  // ✅ 新增：头像 URL
-  avatarUrl: { type: String, default: '' }
+  // ✅ 新增：角色/权限
+  roles: { type: [String], default: [] }, // 例如 ['admin']
 });
-
 
 // 在保存之前对密码进行哈希加密
 userSchema.pre('save', async function(next) {
