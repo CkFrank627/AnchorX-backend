@@ -13,8 +13,26 @@ const auth = require('../authMiddleware'); // 路径按你项目实际调整
 
 // 管理员白名单：环境变量里配置 ObjectId 字符串，逗号分隔
 // 例：ADMIN_USER_IDS=65a....,65b....
+// 注意：不要加引号，不要留空格
+function isAdminRequest(req) {
+  const adminIds = (process.env.ADMIN_USER_IDS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  // 兼容不同 authMiddleware 写法
+  const uid = String(
+    req.userId ||
+    req.user?._id ||
+    req.user?.id ||
+    ''
+  );
+
+  return uid && adminIds.includes(uid);
+}
+
 function requireAdmin(req, res, next) {
-  if (req.isAdmin) return next();
+  if (isAdminRequest(req)) return next();
   return res.status(403).json({ message: '需要管理员权限' });
 }
 
