@@ -1,3 +1,5 @@
+//server.js
+
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -124,18 +126,31 @@ app.get('/', (req, res) => res.send('你的网站正在运行!'));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// 繁简转换接口
-app.post('/api/convert-text', async (req, res) => {
+// 繁简转换接口（稳定版：支持数组，避免前端靠 \n 对齐）
+app.post('/api/convert-text', (req, res) => {
   try {
-    const { text, direction } = req.body;
-    if (!text || !direction) return res.status(400).json({ error: '缺少 text 或 direction 参数' });
+    const { direction } = req.body;
+    if (!direction) return res.status(400).json({ error: '缺少 direction 参数' });
 
-    let convertedText;
-    if (direction === 't2s') convertedText = t2sConverter(text);
-    else if (direction === 's2t') convertedText = s2tConverter(text);
-    else return res.status(400).json({ error: '无效的 direction 参数' });
+    let convertFn = null;
+    if (direction === 't2s') convertFn = t2sConverter;
+    if (direction === 's2t') convertFn = s2tConverter;
+    if (!convertFn) return res.status(400).json({ error: '无效的 direction 参数' });
 
-    res.json({ convertedText });
+    // ✅ 新版：数组输入
+    if (Array.isArray(req.body.texts)) {
+      const texts = req.body.texts.map(v => (typeof v === 'string' ? v : ''));
+      const convertedTexts = texts.map(t => convertFn(t));
+      return res.json({ convertedTexts });
+    }
+
+    // ✅ 兼容旧版：单字符串输入
+    const { text } = req.body;
+    if (typeof text !== 'string') {
+      return res.status(400).json({ error: '缺少 text 或 texts 参数' });
+    }
+    const convertedText = convertFn(text);
+    return res.json({ convertedText });
   } catch (err) {
     console.error('繁简转换失败:', err);
     res.status(500).json({ error: '繁简转换失败' });
