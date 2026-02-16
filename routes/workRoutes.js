@@ -258,7 +258,46 @@ router.patch('/:id/cover', auth, async (req, res) => {
     }
 });
 
+// ✅ 统一标签：把全角冒号、冒号两侧空格、多空格全部规范化
+function canonicalizeTag(raw) {
+  if (raw === null || raw === undefined) return '';
+  let s = String(raw).replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  s = s.replace(/：/g, ':');        // 全角冒号 -> 半角
+  s = s.replace(/\s*:\s*/g, ':');   // 冒号两侧不留空格
+  return s;
+}
+function tagNormKey(raw) {
+  const s = canonicalizeTag(raw);
+  return s ? s.toLowerCase() : '';
+}
 
+// ✅ 兼容旧库：生成“可能存在于旧 tagsNorm 中的变体”
+// 这样你即使还没跑迁移脚本，筛选也能命中两边
+function expandTagNormVariants(raw) {
+  const base = canonicalizeTag(raw);
+  const lower = base.toLowerCase();
+  if (!lower) return [];
+
+  const out = new Set();
+  out.add(lower);
+
+  // 旧 normalize 只做了 collapse space + trim + lower，所以这些可能存在
+  out.add(String(raw).replace(/\s+/g, ' ').trim().toLowerCase());
+
+  // 冒号空格变体（历史可能有人手输）
+  out.add(lower.replace(/:/g, ': '));
+  out.add(lower.replace(/:/g, ' : '));
+
+  // 全角冒号变体
+  out.add(lower.replace(/:/g, '：'));
+  out.add(lower.replace(/:/g, '： '));
+  out.add(lower.replace(/:/g, ' ： '));
+
+  return Array.from(out).filter(Boolean);
+}
+
+// ✅ 替换你原来的 normalizeTagsInput（用于保存 tags / tagsNorm）
 const normalizeTagsInput = (input) => {
   const arr = Array.isArray(input) ? input : [];
   const out = [];
@@ -266,18 +305,19 @@ const normalizeTagsInput = (input) => {
   const seen = new Set();
 
   for (let raw of arr) {
-    if (raw === null || raw === undefined) continue;
-    let t = String(raw).replace(/\s+/g, ' ').trim();
+    let t = canonicalizeTag(raw);
     if (!t) continue;
-    if (t.length === 0) continue;
+
     if (t.length > 32) t = t.slice(0, 32);
 
-    const n = t.toLowerCase();
+    const n = tagNormKey(t); // 用 canonical 后再 lower
+    if (!n) continue;
     if (seen.has(n)) continue;
 
     seen.add(n);
-    out.push(t);
-    outNorm.push(n);
+    out.push(t);       // 展示用：统一后的文本（避免一堆奇怪空格）
+    outNorm.push(n);   // 检索用：稳定 key
+
     if (out.length >= 30) break;
   }
 
@@ -367,6 +407,55 @@ router.patch('/:id/tags-admin', auth, requireAdmin, async (req, res) => {
     return res.json({ ok: true, tags: work.tags });
   } catch (e) {
     return res.status(500).json({ message: '管理员更新标签失败', error: e.message });
+  }
+});
+
+// ------------------------------------------------------------------
+// ✅ 管理员：全库修复 tags / tagsNorm（把旧的空格/全角冒号等统一）
+// POST /api/works/admin/normalize-tags?published=1&touch=0&dry=0
+//  - published=1 只修已发布（建议）
+//  - touch=1 才更新 updatedAt（默认 0）
+//  - dry=1 只统计不写库
+// ------------------------------------------------------------------
+router.post('/admin/normalize-tags', auth, requireAdmin, async (req, res) => {
+  try {
+    const onlyPublished = String(req.query.published || '1') === '1';
+    const touch = String(req.query.touch || '0') === '1';
+    const dry = String(req.query.dry || '0') === '1';
+
+    const filter = onlyPublished ? { isPublished: true } : {};
+    const cursor = Work.find(filter).select('_id tags tagsNorm').cursor();
+
+    let scanned = 0;
+    let changed = 0;
+
+    for await (const w of cursor) {
+      scanned += 1;
+
+      const beforeTags = Array.isArray(w.tags) ? w.tags : [];
+      const normalized = normalizeTagsInput(beforeTags);
+
+      const sameTags = JSON.stringify(normalized.tags) === JSON.stringify(w.tags || []);
+      const sameNorm = JSON.stringify(normalized.tagsNorm) === JSON.stringify(w.tagsNorm || []);
+
+      if (sameTags && sameNorm) continue;
+
+      changed += 1;
+      if (dry) continue;
+
+      const update = { $set: { tags: normalized.tags, tagsNorm: normalized.tagsNorm } };
+      if (touch) update.$currentDate = { updatedAt: true };
+
+      await Work.updateOne(
+        { _id: w._id },
+        update,
+        { timestamps: false } // ✅ 默认不动 updatedAt
+      );
+    }
+
+    return res.json({ ok: true, scanned, changed, dry, onlyPublished, touch });
+  } catch (e) {
+    return res.status(500).json({ message: 'normalize-tags 失败', error: e.message });
   }
 });
 
@@ -552,20 +641,34 @@ let excludeList = [];
 if (Array.isArray(rawExclude)) excludeList = rawExclude;
 else if (typeof rawExclude === 'string' && rawExclude.trim()) excludeList = rawExclude.split(',');
 
-const include = includeList.map(s => String(s).trim().toLowerCase()).filter(Boolean);
-const exclude = excludeList.map(s => String(s).trim().toLowerCase()).filter(Boolean);
-
-// match=all 才用 $all；默认 any 用 $in（更符合“只看：命中任意一个标签”）
-const match = (String(req.query.match || '').toLowerCase() === 'all') ? 'all' : 'any';
-
-const and = [{ isPublished: true }];
-
-if (include.length) {
-  and.push(match === 'all'
-    ? { tagsNorm: { $all: include } }
-    : { tagsNorm: { $in: include } }
-  );
+// ✅ include/exclude 统一规范 + 兼容旧库 variants
+const includeSets = [];
+for (const s of includeList) {
+  const vs = expandTagNormVariants(s);
+  if (vs.length) includeSets.push(vs);
 }
+
+const excludeAll = new Set();
+for (const s of excludeList) {
+  const vs = expandTagNormVariants(s);
+  for (const v of vs) excludeAll.add(v);
+}
+const exclude = Array.from(excludeAll);
+
+// match=all：每个“标签条件”都要命中（但每个条件允许命中其任意历史变体）
+if (includeSets.length) {
+  if (match === 'all') {
+    for (const vs of includeSets) {
+      and.push({ tagsNorm: { $in: vs } });
+    }
+  } else {
+    // match=any：任意一个标签条件命中即可（把所有变体 union 起来）
+    const includeAny = new Set();
+    for (const vs of includeSets) for (const v of vs) includeAny.add(v);
+    and.push({ tagsNorm: { $in: Array.from(includeAny) } });
+  }
+}
+
 if (exclude.length) {
   and.push({ tagsNorm: { $nin: exclude } });
 }
