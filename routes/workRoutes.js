@@ -630,6 +630,16 @@ router.get('/public', async (req, res) => {
 // include: tags / tag
 // exclude: notTags / notTag
 // match: any|all（默认 any）
+// ✅ tag/tags 过滤（用 tagsNorm 做不区分大小写）
+// include: tags / tag
+// exclude: notTags / notTag
+// match: any|all（默认 any）
+const matchRaw = String(req.query.match || 'any').toLowerCase();
+const match = (matchRaw === 'all') ? 'all' : 'any';
+
+// ✅ 基础条件：public 列表只返回已发布
+const and = [{ isPublished: true }];
+
 let rawInclude = req.query.tag || req.query.tags;
 let rawExclude = req.query.notTag || req.query.notTags;
 
@@ -637,9 +647,14 @@ let includeList = [];
 if (Array.isArray(rawInclude)) includeList = rawInclude;
 else if (typeof rawInclude === 'string' && rawInclude.trim()) includeList = rawInclude.split(',');
 
+// ✅ 重要：split 后 trim，避免 "题材:悬疑, 世界观:幻想乡" 第二个前面有空格导致匹配不到
+includeList = includeList.map(s => String(s).trim()).filter(Boolean);
+
 let excludeList = [];
 if (Array.isArray(rawExclude)) excludeList = rawExclude;
 else if (typeof rawExclude === 'string' && rawExclude.trim()) excludeList = rawExclude.split(',');
+
+excludeList = excludeList.map(s => String(s).trim()).filter(Boolean);
 
 // ✅ include/exclude 统一规范 + 兼容旧库 variants
 const includeSets = [];
@@ -676,11 +691,12 @@ if (exclude.length) {
 const filter = (and.length === 1) ? and[0] : { $and: and };
 
     const [works, total] = await Promise.all([
-      Work.find(filter)
-        .sort({ updatedAt: -1, _id: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate('author', 'username'),
+Work.find(filter)
+  .select('-content -pages -likedBy -diceLog -effectsDraft -effectsPublished -backgroundDraft -backgroundPublished')
+  .sort({ updatedAt: -1, _id: -1 })
+  .skip(skip)
+  .limit(limit)
+  .populate('author', 'username'),
       Work.countDocuments(filter)
     ]);
 
