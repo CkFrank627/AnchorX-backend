@@ -52,6 +52,50 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+// PUT /api/galleries/:id - 更新图库（必须登录且只能改自己的）
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const userId = req.userData.userId;
+    const { id } = req.params;
+
+    const g = await Gallery.findById(id);
+    if (!g) return res.status(404).json({ error: 'Gallery not found' });
+
+    // 只有 owner 才能编辑
+    if (!g.owner || String(g.owner) !== String(userId)) {
+      return res.status(403).json({ error: 'Forbidden: only owner can edit this gallery' });
+    }
+
+    const { title, images, coverUrl } = req.body;
+
+    // 允许只改部分字段
+    if (typeof title === 'string') {
+      const t = title.trim();
+      if (!t) return res.status(400).json({ error: 'title cannot be empty' });
+      g.title = t;
+    }
+
+    if (images !== undefined) {
+      const formattedImages = normalizeImages(images);
+      if (formattedImages.length === 0) {
+        return res.status(400).json({ error: 'images must be a non-empty array' });
+      }
+      g.images = formattedImages;
+    }
+
+    // 如果你 Gallery schema 里有 coverUrl 字段就写入；没有就忽略（不报错）
+    if (typeof coverUrl === 'string' && coverUrl.trim()) {
+      g.coverUrl = coverUrl.trim();
+    }
+
+    const saved = await g.save();
+    res.status(200).json(saved);
+  } catch (err) {
+    console.error('更新图库失败:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/galleries - 获取所有图库（公开）
 router.get('/', async (req, res) => {
   try {
@@ -70,7 +114,9 @@ router.get('/', async (req, res) => {
         author,
         ownerId: g.owner ? (g.owner._id || g.owner) : null,
         image_count: Array.isArray(g.images) ? g.images.length : 0,
-        cover_url: g.images && g.images[0] ? g.images[0].url : '',
+        cover_url: (g.coverUrl && String(g.coverUrl).trim())
+  ? g.coverUrl
+  : (g.images && g.images[0] ? g.images[0].url : ''),
         createdAt: g.createdAt,
       };
     });
@@ -101,6 +147,7 @@ router.get('/:id', async (req, res) => {
       images: g.images || [],
       createdAt: g.createdAt,
       updatedAt: g.updatedAt,
+      coverUrl: (g.coverUrl || (g.images && g.images[0] ? g.images[0].url : '')),
     });
   } catch (err) {
     console.error('获取图库详情失败:', err);
