@@ -1459,13 +1459,16 @@
   border-radius: 4px;
   border: 1px solid #ced4da;
   background-color: #fff;
+  color: #343a40;
   cursor: pointer;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .effect-bg-btn:hover {
   background-color: #e6f7ff;
   border-color: #0077cc;
+  color: #005fa3;
 }
 
 .bg-panel {
@@ -1486,6 +1489,15 @@
 .bg-panel .back-button {
   width: 100%;
   justify-content: center;
+  color: #343a40;
+  background-color: #fff;
+  border: 1px solid #adb5bd;
+}
+
+.bg-panel .back-button:hover {
+  color: #005fa3;
+  background-color: #e6f7ff;
+  border-color: #0077cc;
 }
 
 .bg-danger-btn {
@@ -1550,6 +1562,75 @@
   margin-top: 6px;
   font-size: 0.8rem;
   color: #666;
+}
+
+.bg-binding-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.bg-binding-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-bottom: 1px solid #f1f3f5;
+  color: #343a40;
+}
+
+.bg-binding-item:last-child {
+  border-bottom: 0;
+}
+
+.bg-binding-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bg-binding-remove {
+  flex: 0 0 auto;
+  border: 1px solid #dc3545;
+  border-radius: 4px;
+  padding: 3px 7px;
+  background: #fff;
+  color: #b02a37;
+  cursor: pointer;
+}
+
+.bg-binding-remove:hover {
+  background: #dc3545;
+  color: #fff;
+}
+
+.bg-binding-empty {
+  padding: 8px;
+  color: #6c757d;
+}
+
+.effect-autosave-status {
+  min-width: 88px;
+  color: #6c757d;
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.effect-autosave-status.is-saving {
+  color: #9a6700;
+}
+
+.effect-autosave-status.is-saved {
+  color: #146c43;
+}
+
+.effect-autosave-status.is-error {
+  color: #b02a37;
 }
 
 /* 行里的起始/结束标签 + 转场行 */
@@ -1900,6 +1981,8 @@ function applyEffect(targetEl) {
             </div>
           </div>
           <div class="header-right">
+            <span id="effect-autosave-status" class="effect-autosave-status hidden"></span>
+            <button id="effect-bg-undo-btn" class="back-button hidden" type="button" disabled>撤回上一步</button>
             <button id="effect-preview-btn" class="back-button">预览特效</button>
             <button id="effect-save-draft-btn" class="create-button">保存特效草稿</button>
             <button id="effect-publish-btn" class="create-button">发布特效</button>
@@ -1990,6 +2073,16 @@ function applyEffect(targetEl) {
     <p class="bg-panel-tip">
       点击上方图片条目来选择要应用的背景。
     </p>
+
+    <h4>已设置的背景区间</h4>
+    <ul id="bg-binding-list" class="bg-binding-list">
+      <li class="bg-binding-empty">暂无背景区间。</li>
+    </ul>
+
+    <h4>背景变化特效</h4>
+    <ul id="bg-transition-list" class="bg-binding-list">
+      <li class="bg-binding-empty">暂无背景变化特效。</li>
+    </ul>
   </div>
 
   <h4>当前特效配置（调试用）</h4>
@@ -2035,12 +2128,15 @@ function applyEffect(targetEl) {
     }
 
     .effect-editor-layout {
-      display:flex;
+      display:grid;
+      grid-template-columns:minmax(420px, 1fr) minmax(300px, 380px);
       gap:20px;
       margin-top:10px;
+      width:100%;
+      min-width:0;
     }
     .effect-line-panel {
-      flex:3;
+      min-width:0;
       background:#fff;
       border-radius:8px;
       padding:10px 0;
@@ -2049,7 +2145,7 @@ function applyEffect(targetEl) {
       overflow-y:auto;
     }
     .effect-preview-panel {
-      flex:2;
+      min-width:0;
       background:#fff;
       border-radius:8px;
       padding:15px;
@@ -2071,6 +2167,7 @@ function applyEffect(targetEl) {
       border-bottom:1px solid #f0f0f0;
       cursor:pointer;
       transition:background-color .15s;
+      min-width:0;
     }
     .effect-line-item:hover {
       background:#f5f9ff;
@@ -2088,16 +2185,20 @@ function applyEffect(targetEl) {
     }
     .effect-line-text {
       flex:1;
+      min-width:0;
       white-space:pre-wrap;
+      overflow-wrap:anywhere;
       word-break:break-word;
       font-size:0.95rem;
+      color:#212529;
     }
     .effect-line-tags {
       flex-shrink:0;
-      min-width:80px;
+      max-width:42%;
       text-align:right;
       font-size:0.8rem;
       color:#666;
+      overflow-wrap:anywhere;
     }
     .effect-tag {
       display:inline-block;
@@ -2153,8 +2254,8 @@ function applyEffect(targetEl) {
     }
 
     /* 手机端简单适配 */
-    @media (max-width: 768px) {
-      .effect-editor-layout { flex-direction:column; }
+    @media (max-width: 1050px) {
+      .effect-editor-layout { grid-template-columns:minmax(0, 1fr); }
       .effect-preview-panel { order:-1; }
     }
 
@@ -2199,6 +2300,23 @@ function applyEffect(targetEl) {
       return text;
     }
 
+    function normalizeSentenceAnchorText(value) {
+      return String(value || '')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 1000);
+    }
+
+    function cloneSentenceAnchor(anchor) {
+      if (!anchor || typeof anchor !== 'object') return undefined;
+      return {
+        text: normalizeSentenceAnchorText(anchor.text),
+        before: normalizeSentenceAnchorText(anchor.before),
+        after: normalizeSentenceAnchorText(anchor.after),
+      };
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       const listPage = document.getElementById('effect-list-page');
       const editorPage = document.getElementById('effect-editor-page');
@@ -2216,6 +2334,8 @@ function applyEffect(targetEl) {
       const saveDraftBtn = document.getElementById('effect-save-draft-btn');
       const publishBtn = document.getElementById('effect-publish-btn');
       const removeEffectBtn = document.getElementById('effect-remove-btn');
+      const bgUndoBtn = document.getElementById('effect-bg-undo-btn');
+      const autosaveStatusEl = document.getElementById('effect-autosave-status');
 
       // ====== 模式 / 背景图库相关 ======
 let currentEffectMode = 'text'; // 'text' | 'background'
@@ -2247,6 +2367,152 @@ let currentBgImageName = '';
 let bgTempStartLine    = null;
 let currentTransitionEffectType = null;
 let bgImageAutoId = 1;
+let bgUndoStack = [];
+let bgAutosaveTimer = null;
+let bgAutosaveInFlight = false;
+let bgAutosavePending = false;
+let bgAutosavePromise = null;
+
+function cloneBackgroundValue(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function captureBackgroundEditorState() {
+  return {
+    images: cloneBackgroundValue(bgImages),
+    bindings: cloneBackgroundValue(bgBindings),
+    transitions: cloneBackgroundValue(bgTransitions),
+    selectionPhase: bgSelectionPhase,
+    imageId: currentBgImageId,
+    imageName: currentBgImageName,
+    tempStartLine: bgTempStartLine,
+    transitionEffectType: currentTransitionEffectType,
+    imageAutoId: bgImageAutoId,
+  };
+}
+
+function backgroundDataFingerprint(state) {
+  const source = state || captureBackgroundEditorState();
+  return JSON.stringify({
+    images: source.images,
+    bindings: source.bindings,
+    transitions: source.transitions,
+  });
+}
+
+function updateBackgroundUndoButton() {
+  if (!bgUndoBtn) return;
+  bgUndoBtn.disabled = bgUndoStack.length === 0;
+  bgUndoBtn.title = bgUndoStack.length
+    ? `可撤回 ${bgUndoStack.length} 步背景编辑`
+    : '暂无可撤回的背景编辑';
+}
+
+function pushBackgroundUndoState() {
+  bgUndoStack.push(captureBackgroundEditorState());
+  if (bgUndoStack.length > 50) bgUndoStack.shift();
+  updateBackgroundUndoButton();
+}
+
+function setBackgroundAutosaveStatus(text, state) {
+  if (!autosaveStatusEl) return;
+  autosaveStatusEl.textContent = text || '';
+  autosaveStatusEl.classList.remove('is-saving', 'is-saved', 'is-error');
+  if (state) autosaveStatusEl.classList.add(state);
+}
+
+function updateBackgroundSelectionPrompt(message) {
+  if (message) {
+    selectedLineLabel.textContent = message;
+    return;
+  }
+  if (bgSelectionPhase === 'chooseEnd' && bgTempStartLine != null) {
+    selectedLineLabel.textContent =
+      `请选中背景结束应用的句子（当前起始：第 ${bgTempStartLine + 1} 句）`;
+    return;
+  }
+  if (bgSelectionPhase === 'chooseStart' && currentBgImageId) {
+    selectedLineLabel.textContent = '请选中背景开始应用的句子';
+    return;
+  }
+  if (bgSelectionPhase === 'chooseTransitionEnd') {
+    selectedLineLabel.textContent = '请选择对应结束句（上一段背景的结束行）';
+    return;
+  }
+  selectedLineLabel.textContent = bgImages.length
+    ? '请选择一个背景图片'
+    : '请先上传一张背景图片';
+}
+
+function restoreBackgroundEditorState(state) {
+  bgImages = cloneBackgroundValue(state.images);
+  bgBindings = cloneBackgroundValue(state.bindings);
+  bgTransitions = cloneBackgroundValue(state.transitions);
+  bgSelectionPhase = state.selectionPhase;
+  currentBgImageId = state.imageId;
+  currentBgImageName = state.imageName;
+  bgTempStartLine = state.tempStartLine;
+  currentTransitionEffectType = state.transitionEffectType;
+  bgImageAutoId = state.imageAutoId;
+
+  renderBgImageList();
+  renderBgBindingList();
+  renderBgTransitionList();
+  renderLineList();
+  updateDebugJson();
+  updateBackgroundSelectionPrompt('已撤回上一步。' + (
+    bgSelectionPhase === 'chooseEnd' && bgTempStartLine != null
+      ? ` 当前起始：第 ${bgTempStartLine + 1} 句，请选择结束句。`
+      : bgSelectionPhase === 'chooseStart'
+        ? ' 请重新选择起始句。'
+        : ''
+  ));
+}
+
+function scheduleBackgroundAutosave() {
+  if (currentEffectMode !== 'background' || !currentWorkId) return;
+  bgAutosavePending = true;
+  clearTimeout(bgAutosaveTimer);
+  setBackgroundAutosaveStatus('等待自动保存…', 'is-saving');
+  bgAutosaveTimer = setTimeout(flushBackgroundAutosave, 700);
+}
+
+async function flushBackgroundAutosave() {
+  clearTimeout(bgAutosaveTimer);
+  bgAutosaveTimer = null;
+  if (bgAutosaveInFlight) return bgAutosavePromise;
+  if (!bgAutosavePending || currentEffectMode !== 'background' || !currentWorkId) return;
+
+  bgAutosavePending = false;
+  bgAutosaveInFlight = true;
+  setBackgroundAutosaveStatus('正在自动保存…', 'is-saving');
+  bgAutosavePromise = saveEffectsDraft(false, { silent: true, reload: false });
+  const saved = await bgAutosavePromise;
+  bgAutosaveInFlight = false;
+  bgAutosavePromise = null;
+
+  if (saved) {
+    setBackgroundAutosaveStatus('已自动保存', 'is-saved');
+  } else {
+    setBackgroundAutosaveStatus('自动保存失败', 'is-error');
+  }
+  if (bgAutosavePending) {
+    bgAutosaveTimer = setTimeout(flushBackgroundAutosave, 200);
+  }
+}
+
+if (bgUndoBtn) {
+  bgUndoBtn.addEventListener('click', function () {
+    if (!bgUndoStack.length) return;
+    const beforeFingerprint = backgroundDataFingerprint();
+    const previousState = bgUndoStack.pop();
+    restoreBackgroundEditorState(previousState);
+    updateBackgroundUndoButton();
+    if (backgroundDataFingerprint() !== beforeFingerprint) {
+      scheduleBackgroundAutosave();
+    }
+  });
+}
 
       // ⭐ 新增：自定义特效管理页 DOM
       const customEffectPage = document.getElementById('custom-effect-page');
@@ -2276,6 +2542,20 @@ let bgImageAutoId = 1;
       let selectedLineIndex = null;  // 当前选中行（按“有效句子编号”计数）
       let effectsDraft = [];         // [{ lineIndex, effectType }]，lineIndex 存的是“有效句子编号”
       let isPreviewing = false;
+
+      function buildSentenceAnchor(lineIndex) {
+        const effectiveLines = currentLines
+          .map(normalizeSentenceAnchorText)
+          .filter(Boolean);
+        if (!Number.isInteger(lineIndex) || lineIndex < 0 || lineIndex >= effectiveLines.length) {
+          return undefined;
+        }
+        return {
+          text: effectiveLines[lineIndex],
+          before: lineIndex > 0 ? effectiveLines[lineIndex - 1] : '',
+          after: lineIndex + 1 < effectiveLines.length ? effectiveLines[lineIndex + 1] : '',
+        };
+      }
 
 
        // ⭐ 新增：自定义特效状态
@@ -2400,12 +2680,14 @@ function applyEffect(targetEl) {
 if (Array.isArray(work.effectsDraft)) {
     effectsDraft = work.effectsDraft.map(e => ({
         lineIndex: e.lineIndex,
-        effectType: e.effectType
+        effectType: e.effectType,
+        anchor: cloneSentenceAnchor(e.anchor)
     }));
 } else if (Array.isArray(work.effectsPublished)) {
     effectsDraft = work.effectsPublished.map(e => ({
         lineIndex: e.lineIndex,
-        effectType: e.effectType
+        effectType: e.effectType,
+        anchor: cloneSentenceAnchor(e.anchor)
     }));
 } else {
     effectsDraft = [];
@@ -2460,12 +2742,14 @@ if (Array.isArray(bgCfg.images) && bgCfg.images.length > 0) {
   });
   bgImageAutoId = maxNum + 1;
 
-  // 默认选中第一张，方便后面绑定
-  currentBgImageId = bgImages[0] ? bgImages[0].id : null;
+  // 进入编辑器后要求用户明确选择图片，避免沿用上一次未完成的起止句状态。
+  currentBgImageId = null;
+  currentBgImageName = '';
 } else {
   bgImages = [];
   bgImageAutoId = 1;
   currentBgImageId = null;
+  currentBgImageName = '';
 }
 
 // 2）绑定区间
@@ -2476,6 +2760,8 @@ bgBindings = Array.isArray(bgCfg.bindings)
         imageName: b.imageName || '',
         startLine: Number(b.startLine),
         endLine: Number(b.endLine),
+        startAnchor: cloneSentenceAnchor(b.startAnchor),
+        endAnchor: cloneSentenceAnchor(b.endAnchor),
       };
     })
   : [];
@@ -2487,6 +2773,8 @@ bgTransitions = Array.isArray(bgCfg.transitions)
         fromLine: Number(t.fromLine),
         toLine: Number(t.toLine),
         effectType: t.effectType || 'crossfade',
+        fromAnchor: cloneSentenceAnchor(t.fromAnchor),
+        toAnchor: cloneSentenceAnchor(t.toAnchor),
       };
     })
   : [];
@@ -2495,6 +2783,15 @@ bgTransitions = Array.isArray(bgCfg.transitions)
 renderBgImageList();
 renderBgBindingList();
 renderBgTransitionList();
+bgSelectionPhase = 'idle';
+bgTempStartLine = null;
+currentTransitionEffectType = null;
+bgUndoStack = [];
+updateBackgroundUndoButton();
+bgAutosavePending = false;
+clearTimeout(bgAutosaveTimer);
+bgAutosaveTimer = null;
+setBackgroundAutosaveStatus('', '');
 
 
         // 合并所有页面文本
@@ -2516,7 +2813,11 @@ renderBgTransitionList();
         editorPage.classList.remove('hidden');
       }
 
-      backBtn.addEventListener('click', () => {
+      backBtn.addEventListener('click', async () => {
+        if (currentEffectMode === 'background' && bgAutosavePending) {
+          await flushBackgroundAutosave();
+          if (bgAutosavePending) await flushBackgroundAutosave();
+        }
         editorPage.classList.add('hidden');
         listPage.classList.remove('hidden');
         currentWorkId = null;
@@ -2692,6 +2993,8 @@ function renderLineList() {
   currentEffectMode = mode === 'background' ? 'background' : 'text';
 
   if (currentEffectMode === 'text') {
+    if (bgUndoBtn) bgUndoBtn.classList.add('hidden');
+    if (autosaveStatusEl) autosaveStatusEl.classList.add('hidden');
     effectToolbarTipPrefix.textContent = '当前选中行：';
     selectedLineLabel.textContent = selectedLineIndex == null
       ? '无'
@@ -2703,6 +3006,8 @@ function renderLineList() {
     bgPanel.classList.add('hidden');
 
   } else {
+    if (bgUndoBtn) bgUndoBtn.classList.remove('hidden');
+    if (autosaveStatusEl) autosaveStatusEl.classList.remove('hidden');
     // 背景模式：提示行完全由 selectedLineLabel 文本负责
     effectToolbarTipPrefix.textContent = '';
     selectedLineLabel.textContent = '请选择一个背景图片';
@@ -2880,6 +3185,31 @@ async function uploadBgImageToImgbb(file, name) {
         }
       }
 
+      function validateCustomEffectSource(code, key) {
+        try {
+          new Function(
+            'targetEl',
+            '"use strict";\n' + code + '\n' +
+            'if (typeof applyEffect !== "function") {' +
+            'throw new Error("Custom effect must define applyEffect(targetEl)");' +
+            '}\n'
+          );
+          return null;
+        } catch (strictError) {
+          try {
+            new Function(
+              'targetEl',
+              code + '\nif (typeof applyEffect !== "function") {' +
+              'throw new Error("Custom effect must define applyEffect(targetEl)");' +
+              '}\n'
+            );
+            return null;
+          } catch (err) {
+            return `自定义特效「${key || '未命名'}」代码无法编译：${err.message}`;
+          }
+        }
+      }
+
 
       function renderCustomEffectManageList() {
         customEffectListEl.innerHTML = '';
@@ -2991,6 +3321,12 @@ async function uploadBgImageToImgbb(file, name) {
 
           if (!name || !key || !code.trim()) {
             alert('名称、key 和代码都不能为空');
+            return;
+          }
+
+          const syntaxError = validateCustomEffectSource(code, key);
+          if (syntaxError) {
+            alert(syntaxError + '\n请检查未闭合的引号、括号或复制进来的 Markdown 标记。');
             return;
           }
 
@@ -3214,8 +3550,10 @@ if (customEffectDropdownList) {
 
   if (bgSelectionPhase === 'chooseStart') {
     // 选择起始句
+    pushBackgroundUndoState();
     bgTempStartLine = effIdx;
     bgSelectionPhase = 'chooseEnd';
+    item.classList.add('bg-pending-start');
     selectedLineLabel.textContent = `请选中背景结束应用的句子（当前起始：第 ${effIdx + 1} 句）`;
     return;
   }
@@ -3227,8 +3565,8 @@ if (customEffectDropdownList) {
       resetBgSelectionState();
       return;
     }
-    if (effIdx < bgTempStartLine) {
-      alert('结束句必须在起始句之后。');
+    if (effIdx <= bgTempStartLine) {
+      alert('结束句必须在起始句之后，不能与起始句相同。');
       return;
     }
 
@@ -3243,6 +3581,7 @@ if (customEffectDropdownList) {
       return;
     }
 
+    pushBackgroundUndoState();
     bgBindings.push({
       imageId:   currentBgImageId,
       imageName: currentBgImageName,
@@ -3251,8 +3590,10 @@ if (customEffectDropdownList) {
     });
 
     renderLineList();
+    renderBgBindingList();
     updateDebugJson();
-    resetBgSelectionState();
+    scheduleBackgroundAutosave();
+    resetBgSelectionState(`背景区间已设置：第 ${newStart + 1} 句至第 ${newEnd + 1} 句。若要继续设置，请重新选择背景图片。`);
     return;
   }
 
@@ -3274,6 +3615,7 @@ if (customEffectDropdownList) {
       return;
     }
 
+    pushBackgroundUndoState();
     bgTransitions.push({
       fromLine: effIdx,
       toLine:   nextBinding.startLine,
@@ -3281,7 +3623,9 @@ if (customEffectDropdownList) {
     });
 
     renderLineList();
+    renderBgTransitionList();
     updateDebugJson();
+    scheduleBackgroundAutosave();
     resetBgSelectionState();
     return;
   }
@@ -3294,7 +3638,7 @@ if (customEffectDropdownList) {
   }
 });
 
-function resetBgSelectionState() {
+function resetBgSelectionState(message) {
   bgSelectionPhase = 'idle';
   currentBgImageId = null;
   currentBgImageName = '';
@@ -3309,9 +3653,9 @@ function resetBgSelectionState() {
   });
 
   if (currentEffectMode === 'background') {
-    selectedLineLabel.textContent = bgImages.length
+    selectedLineLabel.textContent = message || (bgImages.length
       ? '请选择一个背景图片'
-      : '请先上传一张背景图片';
+      : '请先上传一张背景图片');
   }
 }
 
@@ -3371,8 +3715,43 @@ function renderBgBindingList() {
       (Number(b.endLine) + 1) +
       ' 句';
 
-    li.textContent = label;
+    const labelEl = document.createElement('span');
+    labelEl.className = 'bg-binding-label';
+    labelEl.textContent = label;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'bg-binding-remove';
+    removeBtn.dataset.bindingIndex = String(bgBindings.indexOf(b));
+    removeBtn.textContent = '删除';
+
+    li.appendChild(labelEl);
+    li.appendChild(removeBtn);
     bgBindingListEl.appendChild(li);
+  });
+}
+
+if (bgBindingListEl) {
+  bgBindingListEl.addEventListener('click', function (e) {
+    const removeBtn = e.target.closest('.bg-binding-remove');
+    if (!removeBtn) return;
+
+    const bindingIndex = Number(removeBtn.dataset.bindingIndex);
+    const binding = bgBindings[bindingIndex];
+    if (!binding) return;
+
+    pushBackgroundUndoState();
+    bgBindings.splice(bindingIndex, 1);
+    bgTransitions = bgTransitions.filter(function (transition) {
+      return Number(transition.fromLine) !== Number(binding.endLine) &&
+        Number(transition.toLine) !== Number(binding.startLine);
+    });
+    renderBgBindingList();
+    renderBgTransitionList();
+    renderLineList();
+    updateDebugJson();
+    scheduleBackgroundAutosave();
+    resetBgSelectionState('背景区间已删除。请选择背景图片以重新设置。');
   });
 }
 
@@ -3444,6 +3823,7 @@ if (bgUploadLocalBtn && bgUploadInput) {
       const finalName = result.name || name;
 
       // 在本地背景图库中登记一条记录
+      pushBackgroundUndoState();
       const id = 'bg-' + (bgImageAutoId++);
       bgImages.push({
         id: id,
@@ -3464,6 +3844,7 @@ if (bgUploadLocalBtn && bgUploadInput) {
 
       // 更新调试 JSON
       updateDebugJson();
+      scheduleBackgroundAutosave();
     } catch (err) {
       console.error('上传背景图片失败:', err);
       alert('上传背景图片失败：' + (err.message || '网络错误'));
@@ -3485,6 +3866,17 @@ if (bgImageListEl) {
     const img = bgImages.find(x => x.id === id);
     if (!img) return;
 
+    if (
+      bgSelectionPhase === 'chooseEnd' &&
+      currentBgImageId === img.id &&
+      bgTempStartLine != null
+    ) {
+      selectedLineLabel.textContent =
+        `请继续选择结束句（当前起始：第 ${bgTempStartLine + 1} 句）`;
+      return;
+    }
+
+    pushBackgroundUndoState();
     currentBgImageId = img.id;
     currentBgImageName = img.name;
     bgSelectionPhase = 'chooseStart';
@@ -3513,6 +3905,7 @@ if (bgRemoveImageBtn) {
       return;
     }
 
+    pushBackgroundUndoState();
     // 移除图片
     bgImages = bgImages.filter(x => x.id !== currentBgImageId);
 
@@ -3527,6 +3920,7 @@ if (bgRemoveImageBtn) {
     renderBgImageList();
     renderLineList();
     updateDebugJson();
+    scheduleBackgroundAutosave();
     resetBgSelectionState();
   });
 }
@@ -3547,8 +3941,13 @@ if (bgAddFromSharedBtn) {
         } else {
           if (existingIndex >= 0) {
             effectsDraft[existingIndex].effectType = effectType;
+            effectsDraft[existingIndex].anchor = buildSentenceAnchor(lineIndex);
           } else {
-            effectsDraft.push({ lineIndex, effectType });
+            effectsDraft.push({
+              lineIndex,
+              effectType,
+              anchor: buildSentenceAnchor(lineIndex),
+            });
           }
         }
         updateDebugJson();
@@ -3582,6 +3981,7 @@ document.querySelectorAll('.effect-bg-btn').forEach(btn => {
       return;
     }
 
+    pushBackgroundUndoState();
     currentTransitionEffectType = btn.dataset.bgEffect || 'crossfade';
     bgSelectionPhase = 'chooseTransitionEnd';
     selectedLineLabel.textContent = '请选择对应结束句（上一段背景的结束行）';
@@ -3679,15 +4079,26 @@ document.querySelectorAll('.effect-bg-btn').forEach(btn => {
 
 
       // ⭐ 修改后：发布时同时更新 effectsDraft 和 effectsPublished
-async function saveEffectsDraft(isPublish) {
+async function saveEffectsDraft(isPublish, options) {
+  const saveOptions = options || {};
+  const silent = Boolean(saveOptions.silent);
+  const shouldReload = saveOptions.reload !== false;
   if (!currentWorkId) {
-    alert('未选择作品');
-    return;
+    if (!silent) alert('未选择作品');
+    return false;
   }
 
   // ⬇️ 这里改成根据 isPublish 构造不同的 payload
 // 组装背景配置
 // 组装背景配置（带 imageId）
+const anchoredEffects = effectsDraft.map(function (effect) {
+  return {
+    lineIndex: Number(effect.lineIndex),
+    effectType: effect.effectType,
+    anchor: buildSentenceAnchor(Number(effect.lineIndex)) || cloneSentenceAnchor(effect.anchor),
+  };
+});
+
 const backgroundPayload = {
   images: bgImages.map(function (img, idx) {
     var imageId = img.id;
@@ -3706,6 +4117,8 @@ const backgroundPayload = {
       imageName: b.imageName || '',
       startLine: Number(b.startLine),
       endLine: Number(b.endLine),
+      startAnchor: buildSentenceAnchor(Number(b.startLine)) || cloneSentenceAnchor(b.startAnchor),
+      endAnchor: buildSentenceAnchor(Number(b.endLine)) || cloneSentenceAnchor(b.endAnchor),
     };
   }),
   transitions: bgTransitions.map(function (t) {
@@ -3713,6 +4126,8 @@ const backgroundPayload = {
       fromLine: Number(t.fromLine),
       toLine: Number(t.toLine),
       effectType: t.effectType || 'fade',
+      fromAnchor: buildSentenceAnchor(Number(t.fromLine)) || cloneSentenceAnchor(t.fromAnchor),
+      toAnchor: buildSentenceAnchor(Number(t.toLine)) || cloneSentenceAnchor(t.toAnchor),
     };
   }),
 };
@@ -3721,14 +4136,14 @@ const backgroundPayload = {
 const payload = isPublish
   ? {
       // 发布：文字 + 背景 都同步草稿 & 已发布
-      effectsDraft: effectsDraft,
-      effectsPublished: effectsDraft,
+      effectsDraft: anchoredEffects,
+      effectsPublished: anchoredEffects,
       backgroundDraft: backgroundPayload,
       backgroundPublished: backgroundPayload,
     }
   : {
       // 只保存草稿：只更新草稿
-      effectsDraft: effectsDraft,
+      effectsDraft: anchoredEffects,
       backgroundDraft: backgroundPayload,
     };
 
@@ -3742,28 +4157,38 @@ const payload = isPublish
 
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert((isPublish ? '发布' : '保存草稿') + '失败：' + (j.message || res.status));
-      return;
+      if (!silent) {
+        alert((isPublish ? '发布' : '保存草稿') + '失败：' + (j.message || res.status));
+      }
+      return false;
     }
 
-    alert(
-      isPublish
-        ? '特效已发布，并已同步保存为草稿！'
-        : '草稿已保存！'
-    );
+    if (!silent) {
+      alert(
+        isPublish
+          ? '特效已发布，并已同步保存为草稿！'
+          : '草稿已保存！'
+      );
+    }
 
     // 🔥 自动刷新数据，回填 UI
     // 自动刷新数据，回填 UI（保持当前模式）
-enterEffectEditor(currentWorkId, currentEffectMode);
+if (shouldReload) {
+  await enterEffectEditor(currentWorkId, currentEffectMode);
+}
 
 // 若在背景模式，重置提示行
-if (currentEffectMode === 'background') {
+if (shouldReload && currentEffectMode === 'background') {
   resetBgSelectionState();
 }
+    return true;
 
   } catch (e) {
     console.error(e);
-    alert((isPublish ? '发布' : '保存') + '失败，请检查网络');
+    if (!silent) {
+      alert((isPublish ? '发布' : '保存') + '失败，请检查网络');
+    }
+    return false;
   }
 }
 

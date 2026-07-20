@@ -3,13 +3,62 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../authMiddleware');
 const Effect = require('../models/Effect');
+const Work = require('../models/Work');
+
+function getCustomEffectSyntaxError(code) {
+  const source = String(code || '');
+  try {
+    new Function(
+      'targetEl',
+      '"use strict";\n' + source +
+        '\nif (typeof applyEffect === "function") { return applyEffect(targetEl); }\n'
+    );
+    return null;
+  } catch (strictError) {
+    try {
+      new Function(
+        'targetEl',
+        source +
+          '\nif (typeof applyEffect === "function") { return applyEffect(targetEl); }\n'
+      );
+      return null;
+    } catch (looseError) {
+      return looseError;
+    }
+  }
+}
 
 // ⭐ 公开获取自定义特效列表（供阅读端使用，无需登录）
 // 注意：一定要写在 router.get('/:id', ...) 之前
 router.get('/public', async (req, res) => {
   try {
-    // 只返回必要字段，避免把所有内部字段都暴露出去
-    const list = await Effect.find({}, 'name key code').lean();
+    const workId = String(req.query.workId || '').trim();
+    if (!workId) {
+      return res.status(400).json({ message: '缺少 workId' });
+    }
+
+    const work = await Work.findById(workId)
+      .select('author effectsPublished')
+      .lean();
+    if (!work) {
+      return res.status(404).json({ message: '作品不存在' });
+    }
+
+    const keys = Array.from(new Set(
+      (Array.isArray(work.effectsPublished) ? work.effectsPublished : [])
+        .map((effect) => String(effect?.effectType || ''))
+        .filter((type) => type.startsWith('custom:'))
+        .map((type) => type.slice('custom:'.length).trim())
+        .filter(Boolean)
+    ));
+
+    if (!keys.length) return res.json([]);
+
+    // Custom keys are author-scoped, so only load implementations owned by this work's author.
+    const list = await Effect.find(
+      { createdBy: work.author, key: { $in: keys } },
+      'name key code'
+    ).lean();
     res.json(list);
   } catch (err) {
     console.error('读取公开自定义特效失败:', err);
@@ -61,6 +110,12 @@ router.post('/', auth, async (req, res) => {
     if (!name || !key || !code) {
       return res.status(400).json({ message: 'name、key、code 均不能为空' });
     }
+    const syntaxError = getCustomEffectSyntaxError(code);
+    if (syntaxError) {
+      return res.status(400).json({
+        message: `自定义特效代码存在语法错误：${syntaxError.message}`,
+      });
+    }
 
     const effect = await Effect.create({
       name,
@@ -94,6 +149,15 @@ router.patch('/:id', auth, async (req, res) => {
 
     if (!effect) {
       return res.status(404).json({ message: '自定义特效不存在' });
+    }
+
+    if (code !== undefined) {
+      const syntaxError = getCustomEffectSyntaxError(code);
+      if (syntaxError) {
+        return res.status(400).json({
+          message: `自定义特效代码存在语法错误：${syntaxError.message}`,
+        });
+      }
     }
 
     if (name !== undefined) effect.name = name;

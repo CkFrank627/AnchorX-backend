@@ -19,6 +19,15 @@ const pageSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now } // ✅ 新增
 });
 
+const sentenceAnchorSchema = new mongoose.Schema(
+  {
+    text: { type: String, default: '' },
+    before: { type: String, default: '' },
+    after: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
 // 背景图片信息（仅用于特效配置，不是图库 Model）
 const bgImageSchema = new mongoose.Schema(
   {
@@ -35,6 +44,8 @@ const bgBindingSchema = new mongoose.Schema(
     imageName: { type: String, required: true }, // 为了前端渲染方便，冗余一份名字
     startLine: { type: Number, required: true }, // 起始句（按阅读端有效句子编号）
     endLine:   { type: Number, required: true }, // 结束句
+    startAnchor: { type: sentenceAnchorSchema, default: undefined },
+    endAnchor: { type: sentenceAnchorSchema, default: undefined },
   },
   { _id: false }
 );
@@ -44,6 +55,8 @@ const bgTransitionSchema = new mongoose.Schema(
     fromLine:  { type: Number, required: true }, // 前一段背景的结束句
     toLine:    { type: Number, required: true }, // 下一段背景的起始句
     effectType:{ type: String, required: true }, // 'crossfade' | 'matrix' | 'ink' ...
+    fromAnchor: { type: sentenceAnchorSchema, default: undefined },
+    toAnchor: { type: sentenceAnchorSchema, default: undefined },
   },
   { _id: false }
 );
@@ -117,7 +130,8 @@ isPublished: {
 effectsDraft: [
     {
         lineIndex: { type: Number, required: true },
-        effectType: { type: String, required: true }
+        effectType: { type: String, required: true },
+        anchor: { type: sentenceAnchorSchema, default: undefined }
     }
 ],
 
@@ -125,7 +139,8 @@ effectsDraft: [
 effectsPublished: [
     {
         lineIndex: { type: Number, required: true },
-        effectType: { type: String, required: true }
+        effectType: { type: String, required: true },
+        anchor: { type: sentenceAnchorSchema, default: undefined }
     }
 ],
 

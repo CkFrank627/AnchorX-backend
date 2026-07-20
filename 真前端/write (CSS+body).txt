@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>创作页面</title>
     <link href="https://api.anchorx.ca/vendor_assets/quill.snow.css" rel="stylesheet">
-  
+
 <style> /* 隐藏类 */ .hidden {
   display:none !important;
 }
@@ -81,6 +81,27 @@
   padding:0 40px;
   /* 核心修改：添加右边距，数值需与工具栏宽度一致 */ margin-right:250px;
 }
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+}
+
+/* `overflow-x: hidden` on the root creates an extra scroll container and
+   prevents descendants from sticking to the viewport in several browsers. */
+html {
+  overflow-x: clip;
+}
+
+body {
+  overflow-x: clip;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 .content-header {
   display:flex;
   justify-content:space-between;
@@ -315,12 +336,45 @@
   align-items:center;
   flex-wrap:wrap;
 }
+.editor-title-group {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .editor-title {
-  flex-grow:1;
-  font-size:1.2rem;
-  color:#333;
-  font-weight:bold;
-  margin-right:20px;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 1.2rem;
+  color: #333;
+  font-weight: bold;
+  margin-right: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editor-word-counts {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.editor-word-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f8f9fa;
+  line-height: 1.2;
 }
 .back-button {
   padding:8px 12px;
@@ -802,18 +856,7 @@
   /* 将主内容区域（包含编辑器主体）放在中间，但我们需要调整子元素的排列 */ /* 新增：在手机端，将 main-content 内部的元素也垂直排列，以支持工具栏和编辑器主体的顺序控制 */ display:flex;
   flex-direction:column;
 }
-/* 编辑器工具栏容器：改为全宽，并置顶 */ .editor-toolbar-container {
-  /* 核心调整：使用 fixed 定位实现完全置顶 */ position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  /* 全宽 */ z-index:1000;
-  /* 确保在最上层 */ order:1;
-  /* 工具栏在最顶部 (对于 flex-direction:column 的父元素) */ padding:10px 15px;
-  box-shadow:0 2px 4px rgba(0,0,0,0.1);
-  background-color:#fff;
-  /* 确保有背景色盖住下面的内容 */
-}
+
 /* 编辑器主区域：调整顺序和内边距 */ /* .editor-main 包含 Quill 编辑器本体，它应该紧跟在 fixed 的工具栏下方 */ .editor-main {
   flex-grow:1;
   padding:15px;
@@ -975,24 +1018,43 @@
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
 }
-}/* ============ 新版右侧浮窗（取代原固定右栏） ============ */ /* 浮动按钮 */ .floating-sidebar-btn {
-  position:fixed;
-  bottom:20px;
-  right:20px;
-  width:52px;
-  height:52px;
-  border-radius:50%;
-  background-color:#0077cc;
-  color:white;
-  border:none;
-  box-shadow:0 4px 8px rgba(0,0,0,0.2);
-  cursor:pointer;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  z-index:9999;
-  transition:all 0.3s ease;
+}/* ============ 新版右侧浮窗（取代原固定右栏） ============ */ /* 浮动按钮 */ /* 默认（PC）隐藏按钮，只在手机端显示 */
+.floating-sidebar-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;          /* 小圆角方块 */
+  background-color: #0077cc;
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  cursor: pointer;
+  display: none;                /* PC 端隐藏，在手机端用 @media 打开 */
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;       /* 图标在上、文字在下 */
+  gap: 4px;
+  z-index: 9999;
+  transition: transform 0.2s ease, background-color 0.2s ease;
 }
+
+.floating-sidebar-btn:hover {
+  background-color: #005fa3;
+  transform: translateY(-2px);
+}
+
+.floating-sidebar-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.floating-sidebar-label {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
 .floating-sidebar-btn:hover {
   background-color:#005fa3;
   transform:scale(1.05);
@@ -1130,101 +1192,80 @@
 
   /* ============ 新版右侧浮窗（取代原固定右栏） ============ */
 
-/* 默认（PC/网页版）：隐藏浮窗按钮 */
+/* 默认（PC）隐藏按钮，只在手机端显示 */
 .floating-sidebar-btn {
-    display: none; 
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;          /* 小圆角方块 */
+  background-color: #0077cc;
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  cursor: pointer;
+  display: none;                /* PC 端隐藏，在手机端用 @media 打开 */
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;       /* 图标在上、文字在下 */
+  gap: 4px;
+  z-index: 9999;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.floating-sidebar-btn:hover {
+  background-color: #005fa3;
+  transform: translateY(-2px);
+}
+
+.floating-sidebar-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.floating-sidebar-label {
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 
-/* 手机端模式（最大宽度 768px）：覆盖默认样式，实现右侧垂直居中 */
 @media (max-width: 768px) {
-    /* 隐藏原右侧固定工具栏 (保留，确保不会互相干扰) */
-    .right-sidebar {
-      display: none !important;
-    }
+  .floating-sidebar-btn {
+    display: flex;          /* 手机上显示 */
+    right: 16px;
+    bottom: 16px;
+    top: auto;              /* 避免以前写的 top:50% 之类继续生效 */
+    transform: none;        /* 清理旧的 translateY(-50%) */
+  }
 
-    /* 浮窗按钮的定位 */
-    .floating-sidebar-btn {
-        position: fixed;
-        
-        /* 1. 实现右侧对齐 */
-        right: 20px; /* 距离右侧边缘 20px */
-        
-        /* 2. 实现垂直居中 */
-        top: 50%; /* 定位到屏幕垂直 50% 的位置 */
-        transform: translateY(-50%); /* 向上平移自身高度的一半，实现精确居中 */
-        
-        /* 保持原有尺寸和颜色，并确保显示 */
-        width: 55px;
-        height: 55px;
-        border-radius: 50%;
-        background-color: #0077cc;
-        color: white;
-        border: none;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-        cursor: pointer;
-        display: flex; /* 确保显示 */
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-        font-size: 24px;
-        transition: all 0.3s ease;
-    }
+  /* 浮窗本体也可以保持你现在的设置，略微调整尺寸即可 */
+  .floating-sidebar {
+    position: fixed;
+    right: 16px;
+    bottom: 104px;          /* 按钮上方留一点空间 */
+    width: 80vw;
+    max-width: 320px;
+    height: 60vh;
+    border-radius: 12px;
+    background-color: #fff;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    padding: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+    z-index: 1000;
+  }
 
-    .floating-sidebar-btn:hover {
-        background-color: #005fa3;
-        transform: translateY(-50%) scale(1.05); /* 垂直居中状态下的悬停放大 */
-    }
-    
-    /* 浮窗面板的尺寸调整 */
-    .floating-sidebar {
-        position: fixed;
-        bottom: auto; 
-        
-        /* 调整宽度 */
-        width: 70vw;       /* 将宽度从 85vw 调小到 70vw */
-        max-width: 280px;  /* 将最大宽度从 360px 调小到 280px */
-        
-        /* 调整高度 */
-        height: 50vh;      /* 将高度从 70vh 调小到 50vh */
-        
-        right: 85px;       /* 距离按钮稍微左侧一点的位置 */
-        top: 50%;          /* 与按钮同步，定位到垂直 50% */
-        transform: translateY(-50%); /* 垂直居中 */
-        
-        background-color: #fff;
-        border-radius: 12px;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        z-index: 1000;
-        opacity:0; 
-        pointer-events:none;
-        transition:all 0.3s ease;
-        padding: 16px; /* 确保内边距适中 */
-    }
-    
-    /* 浮窗面板打开时的状态 */
-    .floating-sidebar.open {
-        transform: translateY(-50%); /* 保持垂直居中 */
-        opacity: 1;
-        pointer-events: all;
-    }
-
-  /* 核心修改：在手机端，增加“加粗”按钮组与“隐藏文本”按钮组之间的间距 */
-    #toolbar-quill .ql-formats:first-child {
-        /* 移除 PC 端的 30px 左边距，手机端通常不需要整体偏移 */
-        margin-left: 20px; 
-        
-        /* 增加右边距以隔开“隐藏文本”按钮。
-           例如：使用 20px 间距代替默认的 8px 或 0px */
-        margin-right: 10px; 
-    }
-    
-    /* 确保工具栏按钮容器本身能正常排列 */
-    #toolbar-quill {
-        gap: 10px; /* 保持按钮组之间的默认间距 */
-        justify-content: flex-start;
-    }
+  .floating-sidebar.open {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0);
+  }
 }
+
+
 
   #autoSaveToggleBtn {
     margin-left: 10px;
@@ -1397,9 +1438,984 @@
   line-height: 28px;
 }
 
-  
+  @media (max-width: 768px) {
+  /* 工具栏整体上下排布，避免一行挤爆 */
+  .editor-toolbar {
+    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+.editor-title-group {
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.editor-title {
+  width: 100%;
+  margin-right: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.editor-word-counts {
+  width: 100%;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+  .page-controls {
+    margin-right: 0;
+    margin-top: 4px;
+  }
+
+  .editor-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .editor-toolbar-actions button,
+  .editor-toolbar-actions #autoSaveToggleBtn {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 0.9rem;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+
+  /* 自动保存按钮原本有 margin-left: 10px; 手机端去掉更整齐 */
+  #autoSaveToggleBtn {
+    margin-left: 0;
+  }
+
+  /* 编辑正文在手机端上下留白稍微收紧一点 */
+  .editor-main {
+    padding: 16px 10px 20px;
+    margin: 0;
+  }
+}
+
+/* =========================
+   AnchorX 创作端：图片缩放面板 UI（可读性增强）
+   依赖：panel.id = 'ax-imgsize-panel'
+   ========================= */
+
+/* 主题变量：你可以只改这里就整体换风格 */
+:root{
+  --axPanelBg: rgba(22, 22, 22, 0.92);
+  --axPanelFg: #ffffff;
+  --axPanelBorder: rgba(255,255,255,0.14);
+  --axShadow: 0 10px 26px rgba(0,0,0,0.28);
+
+  --axBtnBg: rgba(255,255,255,0.12);
+  --axBtnBd: rgba(255,255,255,0.18);
+  --axBtnFg: #ffffff;
+
+  --axBtnHoverBg: rgba(255,255,255,0.18);
+  --axBtnActiveBg: rgba(255,255,255,0.26);
+
+  --axPrimary: #4aa3ff;
+  --axDanger: #ff5d5d;
+}
+
+/* 面板整体（覆盖你 JS 里 inline 的白底） */
+#ax-imgsize-panel{
+  background: var(--axPanelBg) !important;
+  color: var(--axPanelFg) !important;
+  border: 1px solid var(--axPanelBorder) !important;
+  box-shadow: var(--axShadow) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  /* 让面板更稳一点 */
+  max-width: min(520px, calc(100vw - 18px));
+}
+
+/* 面板里文字 */
+#ax-imgsize-panel span{
+  color: var(--axPanelFg) !important;
+}
+
+/* 面板按钮统一风格 */
+#ax-imgsize-panel button{
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--axBtnBd) !important;
+  background: var(--axBtnBg) !important;
+  color: var(--axBtnFg) !important;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .06s ease, background .15s ease, border-color .15s ease, opacity .15s ease;
+}
+
+#ax-imgsize-panel button:hover{
+  background: var(--axBtnHoverBg) !important;
+  border-color: rgba(255,255,255,0.28) !important;
+}
+
+#ax-imgsize-panel button:active{
+  transform: scale(0.98);
+  background: var(--axBtnActiveBg) !important;
+}
+
+#ax-imgsize-panel button:focus-visible{
+  outline: 2px solid color-mix(in oklab, var(--axPrimary) 70%, white);
+  outline-offset: 2px;
+}
+
+/* 预设按钮（25/50/70/85/100）可以更像“胶囊标签” */
+#ax-imgsize-panel button[data-preset]{
+  padding: 6px 12px;
+}
+
+/* “重置”按钮稍微明显一点 */
+#ax-imgsize-panel #imgSizeReset{
+  border-radius: 10px !important;
+  border-color: rgba(255,255,255,0.35) !important;
+}
+
+/* 关闭按钮：不要白到看不见 */
+#ax-imgsize-panel #imgSizeClose{
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px !important;
+  border-color: rgba(255,255,255,0.24) !important;
+  background: rgba(255,255,255,0.10) !important;
+  font-size: 16px;
+  line-height: 30px;
+  text-align: center;
+}
+
+#ax-imgsize-panel #imgSizeClose:hover{
+  background: rgba(255, 93, 93, 0.22) !important;
+  border-color: rgba(255, 93, 93, 0.40) !important;
+}
+
+/* 滑条：让它在暗底上可见 */
+#ax-imgsize-panel input[type="range"]{
+  accent-color: var(--axPrimary);
+}
+
+/* Chrome / Edge */
+#ax-imgsize-panel input[type="range"]::-webkit-slider-runnable-track{
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
+}
+#ax-imgsize-panel input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 999px;
+  background: var(--axPrimary);
+  border: 2px solid rgba(255,255,255,0.55);
+}
+
+/* Firefox */
+#ax-imgsize-panel input[type="range"]::-moz-range-track{
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
+}
+#ax-imgsize-panel input[type="range"]::-moz-range-thumb{
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--axPrimary);
+  border: 2px solid rgba(255,255,255,0.55);
+}
+
+/* 编辑器里图片：提示可点、避免太突兀 */
+#editor .ql-editor img{
+  cursor: pointer;
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  transition: box-shadow .15s ease, transform .08s ease;
+}
+
+#editor .ql-editor img:hover{
+  box-shadow: 0 8px 20px rgba(0,0,0,0.16);
+}
+
+/* （可选）有 data-width 的图片给一个更明显的“已可缩放”观感 */
+#editor .ql-editor img[data-width]{
+  outline: 1px dashed rgba(74,163,255,0.55);
+  outline-offset: 4px;
+}
+
+/* =========================
+   ✅ 精准：仅作用于作品标签弹窗（#tag-modal-backdrop）
+   目标：按钮/输入框/标签chip上色 + hover/active
+   ========================= */
+
+:root{
+  --tagBlue: #0d6efd;
+  --tagBlueHover: #0b5ed7;
+  --tagGreen: #16a34a;
+  --tagGreenHover: #12813c;
+  --tagRed: #dc3545;
+  --tagBorder: rgba(0,0,0,0.14);
+  --tagShadow: 0 8px 22px rgba(0,0,0,0.14);
+}
+
+/* 弹窗主体统一质感（覆盖 inline 白底/阴影） */
+#tag-modal-backdrop > div{
+  border-radius: 14px !important;
+  box-shadow: var(--tagShadow) !important;
+}
+
+/* “✕” 关闭按钮 */
+#tag-modal-x{
+  background: #f1f3f5 !important;
+  color: #444 !important;
+  border: 1px solid var(--tagBorder) !important;
+  border-radius: 10px !important;
+}
+#tag-modal-x:hover{
+  background: #ffecec !important;
+  border-color: rgba(220,53,69,0.35) !important;
+  color: var(--tagRed) !important;
+}
+
+/* 输入框：更清晰 */
+#tag-input{
+  border: 1px solid rgba(0,0,0,0.16) !important;
+  background: #fff !important;
+  color: #222 !important;
+  box-shadow: none !important;
+}
+#tag-input:focus{
+  border-color: rgba(13,110,253,0.55) !important;
+  box-shadow: 0 0 0 3px rgba(13,110,253,0.15) !important;
+}
+
+/* 主操作按钮：添加 / 保存 / 关闭 */
+#tag-add-btn{
+  background: var(--tagBlue) !important;
+  color: #fff !important;
+  border: 1px solid var(--tagBlue) !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+#tag-add-btn:hover{
+  background: var(--tagBlueHover) !important;
+  border-color: var(--tagBlueHover) !important;
+}
+
+#tag-save-btn{
+  background: var(--tagGreen) !important;
+  color: #fff !important;
+  border: 1px solid var(--tagGreen) !important;
+  border-radius: 10px !important;
+  font-weight: 800 !important;
+}
+#tag-save-btn:hover{
+  background: var(--tagGreenHover) !important;
+  border-color: var(--tagGreenHover) !important;
+}
+
+#tag-cancel-btn{
+  background: #fff !important;
+  color: #222 !important;
+  border: 1px solid rgba(0,0,0,0.18) !important;
+  border-radius: 10px !important;
+}
+#tag-cancel-btn:hover{
+  background: #f3f4f6 !important;
+  border-color: rgba(0,0,0,0.22) !important;
+}
+
+/* “一键添加”按钮（tag-add-workname） */
+#tag-add-workname{
+  background: #e7f1ff !important;
+  color: #0b5ed7 !important;
+  border: 1px solid rgba(13,110,253,0.35) !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+#tag-add-workname:hover{
+  background: #d8e9ff !important;
+  border-color: rgba(13,110,253,0.55) !important;
+}
+
+/* 前缀按钮（题材/世界观/风格/警告/CP） */
+#tag-modal-backdrop .tag-pref-btn{
+  background: #fff !important;
+  color: #333 !important;
+  border: 1px solid rgba(0,0,0,0.16) !important;
+  border-radius: 999px !important;
+  padding: 6px 10px !important;
+}
+#tag-modal-backdrop .tag-pref-btn:hover{
+  background: #f0f7ff !important;
+  border-color: rgba(13,110,253,0.35) !important;
+  color: #0b5ed7 !important;
+}
+#tag-modal-backdrop .tag-pref-btn:active{
+  transform: scale(0.98);
+}
+
+/* 当前标签 chip（JS 往 #tag-chip-list 里塞的项）
+   你没给 chip 的 class，所以我们“只在 chip-list 的直接子元素”上色 */
+#tag-chip-list > *{
+  background: #f1f3f5 !important;
+  border: 1px solid rgba(0,0,0,0.10) !important;
+  color: #333 !important;
+  border-radius: 999px !important;
+  padding: 6px 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+/* chip 的 X（通常是 button/span）做成红色 hover */
+#tag-chip-list > * button,
+#tag-chip-list > * .chip-x,
+#tag-chip-list > * .tag-x{
+  background: transparent !important;
+  border: none !important;
+  color: rgba(220,53,69,0.85) !important;
+  cursor: pointer !important;
+  font-weight: 900 !important;
+}
+#tag-chip-list > * button:hover,
+#tag-chip-list > * .chip-x:hover,
+#tag-chip-list > * .tag-x:hover{
+  color: var(--tagRed) !important;
+}
+
+/* 弹窗内 code 更好看一点 */
+#tag-modal-backdrop code{
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  color: #0b3d91 !important;
+}
+
+/* ==========================================================
+   AnchorX editor shell v2
+   The editor UI is intentionally scoped to #editor-page so it
+   does not leak into the work list, dialogs, or other pages.
+   ========================================================== */
+:root {
+  --ax-blue: #185abd;
+  --ax-blue-dark: #0f4c9a;
+  --ax-blue-soft: #eaf2ff;
+  --ax-border: #d9dee8;
+  --ax-muted: #687386;
+  --ax-surface: #ffffff;
+  --ax-workspace: #eef1f5;
+  --ax-left-sidebar-w: 240px;
+  --ax-left-sidebar-collapsed-w: 72px;
+  --ax-right-sidebar-w: clamp(260px, 22vw, 360px);
+  --ax-toolbar-height: 156px;
+  --ax-sticky-top: env(safe-area-inset-top, 0px);
+  --ax-toolbar-fixed-left: 0px;
+  --ax-toolbar-fixed-width: 100vw;
+}
+
+body.ax-editor-fullscreen {
+  background: var(--ax-workspace);
+}
+
+.page-container {
+  align-items: stretch;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.sidebar-nav {
+  width: var(--ax-left-sidebar-w);
+  min-height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  z-index: 1200;
+}
+
+.sidebar-nav.sidebar-collapsed {
+  width: var(--ax-left-sidebar-collapsed-w);
+}
+
+.sidebar-nav.sidebar-collapsed .nav-text {
+  display: none;
+}
+
+#editor-page.main-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  background: var(--ax-workspace);
+}
+
+#editor-page .editor-toolbar-container {
+  position: -webkit-sticky;
+  position: sticky;
+  top: var(--ax-sticky-top);
+  z-index: 1400;
+  width: 100%;
+  max-width: 100%;
+  align-self: stretch;
+  overflow: visible;
+  transform: none;
+  contain: none;
+  background: var(--ax-surface);
+  border-bottom: 1px solid var(--ax-border);
+  box-shadow: 0 4px 14px rgba(28, 39, 60, 0.08);
+}
+
+/* Runtime fallback for browsers/layouts where an ancestor scroll container
+   defeats sticky. The placeholder preserves document flow while fixed. */
+#editor-page .editor-toolbar-placeholder {
+  display: block;
+  width: 100%;
+  height: 0;
+  flex: 0 0 0;
+  pointer-events: none;
+}
+
+#editor-page .editor-toolbar-placeholder.is-active {
+  height: var(--ax-toolbar-height);
+  flex-basis: var(--ax-toolbar-height);
+}
+
+#editor-page .editor-toolbar-container.is-fixed-fallback {
+  position: fixed !important;
+  top: var(--ax-sticky-top) !important;
+  left: var(--ax-toolbar-fixed-left);
+  width: var(--ax-toolbar-fixed-width);
+  max-width: var(--ax-toolbar-fixed-width);
+  margin: 0;
+  z-index: 1800;
+}
+
+#editor-page .editor-toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 16px;
+  border: 0;
+  box-shadow: none;
+}
+
+#editor-page .editor-title-group {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#editor-page .editor-title {
+  min-width: 120px;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+#editor-page .editor-word-counts {
+  gap: 6px;
+  font-size: 0.78rem;
+}
+
+#editor-page .editor-word-count {
+  padding: 3px 8px;
+  background: #f7f8fa;
+}
+
+#editor-page .page-controls {
+  margin: 0;
+}
+
+#editor-page .page-current,
+#editor-page .editor-toolbar-actions button,
+#editor-page .back-button {
+  min-height: 34px;
+  border: 1px solid #c8cfda;
+  border-radius: 5px;
+  background: #fff;
+  color: #263244;
+}
+
+#editor-page .editor-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#editor-page .editor-toolbar-actions button,
+#editor-page #autoSaveToggleBtn {
+  width: auto;
+  margin: 0;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+#editor-page #saveBtn,
+#editor-page #publishBtn {
+  border-color: var(--ax-blue);
+  color: var(--ax-blue);
+}
+
+#editor-page #publishBtn {
+  background: var(--ax-blue);
+  color: #fff;
+}
+
+#editor-page .ax-ribbon {
+  border-top: 1px solid #edf0f4;
+  background: #fbfcfe;
+}
+
+#editor-page .ax-ribbon-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-height: 34px;
+  padding: 0 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--ax-border);
+  scrollbar-width: thin;
+}
+
+#editor-page .ax-ribbon-tab {
+  flex: 0 0 auto;
+  min-width: 64px;
+  min-height: 34px;
+  padding: 7px 12px 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #344054;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+#editor-page .ax-ribbon-tab:hover {
+  background: #f1f5fb;
+}
+
+#editor-page .ax-ribbon-tab.is-active {
+  border-bottom-color: var(--ax-blue);
+  color: var(--ax-blue);
+  font-weight: 700;
+}
+
+#editor-page .ax-ribbon-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding-left: 12px;
+}
+
+#editor-page .ax-chrome-button {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #42526a;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#editor-page .ax-chrome-button:hover,
+#editor-page .ax-chrome-button[aria-pressed="true"] {
+  border-color: #b9c9e2;
+  background: var(--ax-blue-soft);
+  color: var(--ax-blue-dark);
+}
+
+#editor-page #toolbar-quill.ax-ribbon-panels {
+  display: block;
+  min-height: 82px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: var(--ax-surface);
+}
+
+#editor-page .ax-ribbon-panel {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 0;
+  min-height: 82px;
+  padding: 7px 12px 5px;
+  overflow: visible;
+}
+
+#editor-page .ax-ribbon-panel[hidden] {
+  display: none !important;
+}
+
+#editor-page .ax-ribbon-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 64px;
+  padding: 5px 12px 19px;
+  border-right: 1px solid #e2e6ec;
+}
+
+#editor-page .ax-ribbon-group:last-child {
+  border-right: 0;
+}
+
+#editor-page .ax-ribbon-group-label {
+  position: absolute;
+  right: 8px;
+  bottom: 2px;
+  left: 8px;
+  overflow: hidden;
+  color: var(--ax-muted);
+  font-size: 0.67rem;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+#editor-page #toolbar-quill button,
+#editor-page #toolbar-quill select,
+#editor-page #toolbar-quill .ql-picker-label {
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: 4px;
+}
+
+#editor-page #toolbar-quill button:hover,
+#editor-page #toolbar-quill button:focus-visible,
+#editor-page #toolbar-quill .ql-picker-label:hover,
+#editor-page #toolbar-quill .ql-picker.ql-expanded .ql-picker-label {
+  background: var(--ax-blue-soft);
+  color: var(--ax-blue-dark);
+}
+
+#editor-page #toolbar-quill .ax-text-tool {
+  width: auto;
+  padding: 0 9px;
+  border: 1px solid #d4d9e2;
+  color: #263244;
+  font-size: 0.78rem;
+}
+
+#editor-page #toolbar-quill .ql-picker {
+  position: relative;
+}
+
+#editor-page #toolbar-quill .ql-picker.ql-expanded {
+  z-index: 1700;
+}
+
+#editor-page #toolbar-quill .ql-picker-options {
+  top: calc(100% + 3px);
+  z-index: 1750;
+  max-height: min(320px, 60vh);
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #cbd3df;
+  box-shadow: 0 10px 28px rgba(35, 48, 70, 0.18);
+}
+
+#editor-page .editor-workspace {
+  min-width: 0;
+  padding: 24px;
+  background: var(--ax-workspace);
+}
+
+#editor-page .editor-container {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 20px;
+  width: 100%;
+  max-width: none;
+}
+
+#editor-page .editor-document-stage {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+#editor-page #editor {
+  width: min(100%, 920px);
+  min-height: max(640px, calc(100vh - var(--ax-toolbar-height) - 64px));
+  margin: 0 auto;
+  padding: 0;
+  overflow: visible;
+  border: 1px solid #cfd5df;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 5px 20px rgba(30, 42, 60, 0.1);
+}
+
+#editor-page #editor .ql-editor {
+  min-height: inherit;
+  padding: clamp(36px, 6vw, 72px) clamp(30px, 8vw, 86px);
+  overflow: visible;
+  color: #202733;
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.72;
+}
+
+#editor-page .right-sidebar {
+  position: sticky;
+  top: calc(var(--ax-toolbar-height) + 16px);
+  width: var(--ax-right-sidebar-w) !important;
+  max-height: calc(100vh - var(--ax-toolbar-height) - 32px);
+  padding: 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--ax-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(30, 42, 60, 0.07);
+  transition: width 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+#editor-page .right-sidebar.collapsed {
+  display: none;
+}
+
+#editor-page .ax-side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+#editor-page .ax-side-panel-header h3 {
+  margin: 0;
+  color: #263244;
+  font-size: 1rem;
+}
+
+#editor-page .right-sidebar-toggle {
+  min-width: 30px;
+  min-height: 30px;
+  border: 1px solid #ccd3df;
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #42526a;
+  cursor: pointer;
+}
+
+#editor-page .right-sidebar-toggle:hover {
+  background: var(--ax-blue-soft);
+  color: var(--ax-blue-dark);
+}
+
+body.ax-editor-fullscreen .page-container {
+  min-height: 100vh;
+}
+
+body.ax-editor-fullscreen-fallback {
+  overflow: hidden;
+}
+
+body.ax-editor-fullscreen-fallback .page-container {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  min-height: 0;
+  overflow: auto;
+  background: var(--ax-workspace);
+}
+
+body.ax-editor-fullscreen #main-page {
+  display: none !important;
+}
+
+@media (max-width: 1180px) {
+  #editor-page .editor-toolbar {
+    grid-template-columns: auto minmax(160px, 1fr) auto;
+  }
+
+  #editor-page .editor-toolbar-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  #editor-page .editor-title-group {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 900px) {
+  .page-container {
+    flex-direction: column;
+  }
+
+  .sidebar-nav,
+  .sidebar-nav.sidebar-collapsed {
+    position: relative;
+    width: 100%;
+    min-height: 0;
+    padding: 8px;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--ax-border);
+  }
+
+  .sidebar-nav.sidebar-collapsed {
+    height: 0;
+    padding-block: 0;
+    border-bottom: 0;
+  }
+
+  .sidebar-nav .nav-link {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  .sidebar-nav.sidebar-collapsed .nav-link {
+    display: none;
+  }
+
+  #editor-page .editor-toolbar {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  #editor-page .page-controls,
+  #editor-page .editor-toolbar-actions {
+    grid-column: 1 / -1;
+  }
+
+  #editor-page .editor-toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  #editor-page .ax-ribbon-tabs {
+    padding-inline: 6px;
+  }
+
+  #editor-page .ax-ribbon-tab {
+    min-width: 58px;
+    padding-inline: 8px;
+  }
+
+  #editor-page .ax-ribbon-quick-actions {
+    position: sticky;
+    right: 0;
+    background: #fbfcfe;
+  }
+
+  #editor-page .ax-ribbon-panel {
+    padding-inline: 6px;
+  }
+
+  #editor-page .ax-ribbon-group {
+    padding-inline: 8px;
+  }
+
+  #editor-page .editor-workspace {
+    padding: 12px 8px 28px;
+  }
+
+  #editor-page .editor-container {
+    display: block;
+  }
+
+  #editor-page #editor {
+    min-height: 70vh;
+  }
+
+  #editor-page #editor .ql-editor {
+    padding: 28px 22px;
+  }
+
+  #editor-page .right-sidebar {
+    display: none !important;
+  }
+
+  #editor-page .right-sidebar.mobile-open {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 1900;
+    display: block !important;
+    width: min(360px, calc(100vw - 24px)) !important;
+    max-height: none;
+    overflow-y: auto;
+    box-shadow: 0 18px 50px rgba(22, 34, 52, 0.28);
+  }
+
+  .floating-sidebar {
+    display: none !important;
+  }
+}
+
+@media (max-width: 560px) {
+  #editor-page .editor-toolbar {
+    padding: 7px 8px;
+  }
+
+  #editor-page .editor-title-group {
+    display: block;
+  }
+
+  #editor-page .editor-word-counts {
+    margin-top: 4px;
+  }
+
+  #editor-page .editor-toolbar-actions button,
+  #editor-page #autoSaveToggleBtn {
+    padding: 6px 8px;
+    font-size: 0.78rem;
+  }
+
+  #editor-page .ax-ribbon-quick-actions .ax-action-label {
+    display: none;
+  }
+
+  #editor-page .ax-ribbon-group {
+    flex: 1 1 100%;
+    border-right: 0;
+    border-bottom: 1px solid #edf0f4;
+  }
+}
+
 </style>
-  
+</head>
+
 <body>
     <div class="page-container">
 
@@ -1551,10 +2567,16 @@
         </main>
 
         <main id="editor-page" class="main-content hidden">
-            <div class="editor-toolbar-container">
+            <div class="editor-toolbar-container" id="editorToolbarContainer">
                 <div class="editor-toolbar">
-                    <button class="back-button" id="backBtn">返回</button>
-                    <div class="editor-title" id="editorTitle"></div>
+                    <button class="back-button" id="backBtn" type="button">返回</button>
+                    <div class="editor-title-group">
+                        <div class="editor-title" id="editorTitle"></div>
+                        <div class="editor-word-counts">
+                            <span class="editor-word-count" id="pageWordCount">本页字数：0</span>
+                            <span class="editor-word-count" id="totalWordCount">全文字数：0</span>
+                        </div>
+                    </div>
                     <div class="page-controls">
                         <div class="page-current" id="pageCurrentDisplay">
                             第 <span id="currentPage">1</span> 页（展开）
@@ -1565,80 +2587,197 @@
                             <button class="add-page-btn" id="addPageBtn">新增页面</button>
                             <button class="delete-page-btn" id="deletePageBtn">刪除页面</button> </div>
                     </div>
-                    <div style="display: flex; gap: 10px;">
-    <!-- 新增：本地备份按钮 -->
-    <button class="back-button" id="localSaveBtn">保存到本地</button>
-
-    <!-- 原有按钮保持不变 -->
-    <button class="back-button" id="saveBtn">保存草稿</button>
-    <button id="autoSaveToggleBtn" class="autosave-on">自动保存：开</button>
-    <button class="back-button" id="publishBtn">发布</button>
-</div>
-
+                    <div class="editor-toolbar-actions">
+                        <button class="back-button" id="localSaveBtn" type="button">保存到本地</button>
+                        <button class="back-button" id="saveBtn" type="button">保存草稿</button>
+                        <button id="autoSaveToggleBtn" class="autosave-on" type="button">自动保存：开</button>
+                        <button class="back-button" id="publishBtn" type="button">发布</button>
+                    </div>
                 </div>
 
-                <div id="toolbar-quill" class="ql-toolbar ql-snow">
-    <span class="ql-formats">
-        <button class="ql-undo">
-            <svg viewBox="0 0 18 18">
-                <path d="M6 10l-4-4 4-4v3h7v2H6v3z"></path>
-            </svg>
-        </button>
-        <button class="ql-redo">
-            <svg viewBox="0 0 18 18">
-                <path d="M12 10v-3H5V5h7V2l4 4-4 4z"></path>
-            </svg>
-        </button>
-    </span>
+                <div class="ax-ribbon" aria-label="文档编辑工具栏">
+                    <div class="ax-ribbon-tabs" role="tablist" aria-label="工具栏菜单">
+                        <button class="ax-ribbon-tab is-active" type="button" role="tab"
+                            aria-selected="true" data-ribbon-tab="home">Home</button>
+                        <button class="ax-ribbon-tab" type="button" role="tab"
+                            aria-selected="false" data-ribbon-tab="insert">Insert</button>
+                        <button class="ax-ribbon-tab" type="button" role="tab"
+                            aria-selected="false" data-ribbon-tab="design">Design</button>
+                        <button class="ax-ribbon-tab" type="button" role="tab"
+                            aria-selected="false" data-ribbon-tab="review">Review</button>
+                        <button class="ax-ribbon-tab" type="button" role="tab"
+                            aria-selected="false" data-ribbon-tab="view">View</button>
 
-    <span class="ql-formats">
-        <button id="hiddenTextBtn" title="隐藏文本设置（剧透/暗骰）">隐藏文本</button>
-    </span>
-    
-    <button class="ql-bold back-button">B</button>
-    <button class="ql-italic back-button">I</button>
-    <button class="ql-underline back-button">U</button>
-    <button class="ql-strike"></button>
-    <select class="ql-color"></select>
-    <select class="ql-background"></select>
-    
-    <span class="ql-formats">
-        <select class="ql-header">
-            <option value="1"></option>
-            <option value="2"></option>
-            <option selected></option>
-        </select>
-        <button id="diceBtn">🎲</button>
-        <button class="ql-list" value="ordered"></button>
-        <button class="ql-list" value="bullet"></button>
-    </span>
-    <button class="back-button" id="listBtn">L10</button>
-    <button id="insertThemeTriggerBtn" title="插入主题切换标记">🎨</button>
-    
-    <span class="ql-formats">
-        <button id="uploadImageBtn">🖼️</button>
-        <input type="file" id="uploadImageInput" accept="image/*" style="display:none;">
-    </span>
-</div>
-            <div class="editor-main full-screen">
+                        <div class="ax-ribbon-quick-actions" aria-label="视图快捷操作">
+                            <button class="ax-chrome-button" id="leftSidebarToggleBtn" type="button"
+                                data-ui-action="toggle-left" aria-pressed="true" title="展开或收起左侧栏">
+                                <span class="ax-action-label">左栏</span>
+                            </button>
+                            <button class="ax-chrome-button" id="rightSidebarRibbonToggleBtn" type="button"
+                                data-ui-action="toggle-right" aria-pressed="true" title="展开或收起右侧栏">
+                                <span class="ax-action-label">右栏</span>
+                            </button>
+                            <button class="ax-chrome-button" id="fullscreenBtn" type="button"
+                                data-ui-action="toggle-fullscreen" aria-pressed="false" title="进入或退出全屏">
+                                <span class="ax-action-label">全屏</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="toolbar-quill" class="ql-toolbar ql-snow ax-ribbon-panels">
+                        <div class="ax-ribbon-panel" data-ribbon-panel="home" role="tabpanel">
+                            <div class="ax-ribbon-group">
+                                <button class="ql-undo" type="button" title="撤销">
+                                    <svg viewBox="0 0 18 18" aria-hidden="true">
+                                        <path d="M6 10l-4-4 4-4v3h7v2H6v3z"></path>
+                                    </svg>
+                                </button>
+                                <button class="ql-redo" type="button" title="重做">
+                                    <svg viewBox="0 0 18 18" aria-hidden="true">
+                                        <path d="M12 10v-3H5V5h7V2l4 4-4 4z"></path>
+                                    </svg>
+                                </button>
+                                <span class="ax-ribbon-group-label">History</span>
+                            </div>
+
+                            <div class="ax-ribbon-group">
+                                <select class="ql-header" title="段落样式">
+                                    <option value="1">标题 1</option>
+                                    <option value="2">标题 2</option>
+                                    <option value="3">标题 3</option>
+                                    <option selected>正文</option>
+                                </select>
+                                <select class="ql-font" title="字体">
+                                    <option selected>默认字体</option>
+                                    <option value="serif">衬线字体</option>
+                                    <option value="monospace">等宽字体</option>
+                                </select>
+                                <select class="ql-size" title="字体大小">
+                                    <option value="small">小</option>
+                                    <option selected>正文</option>
+                                    <option value="large">大</option>
+                                    <option value="huge">特大</option>
+                                </select>
+                                <span class="ax-ribbon-group-label">Font</span>
+                            </div>
+
+                            <div class="ax-ribbon-group">
+                                <button class="ql-bold" type="button" title="粗体"></button>
+                                <button class="ql-italic" type="button" title="斜体"></button>
+                                <button class="ql-underline" type="button" title="下划线"></button>
+                                <button class="ql-strike" type="button" title="删除线"></button>
+                                <select class="ql-color" title="文字颜色"></select>
+                                <select class="ql-background" title="高亮颜色"></select>
+                                <span class="ax-ribbon-group-label">Format</span>
+                            </div>
+
+                            <div class="ax-ribbon-group">
+                                <button class="ql-list" value="ordered" type="button" title="编号列表"></button>
+                                <button class="ql-list" value="bullet" type="button" title="项目列表"></button>
+                                <button class="ql-indent" value="-1" type="button" title="减少缩进"></button>
+                                <button class="ql-indent" value="+1" type="button" title="增加缩进"></button>
+                                <select class="ql-align" title="对齐方式"></select>
+                                <span class="ax-ribbon-group-label">Paragraph</span>
+                            </div>
+                        </div>
+
+                        <div class="ax-ribbon-panel" data-ribbon-panel="insert" role="tabpanel" hidden>
+                            <div class="ax-ribbon-group">
+                                <button class="ax-text-tool" id="uploadImageBtn" type="button" title="上传图片">图片</button>
+                                <input type="file" id="uploadImageInput" accept="image/*" hidden>
+                                <button class="ql-link" type="button" title="插入链接"></button>
+                                <span class="ax-ribbon-group-label">Media</span>
+                            </div>
+                            <div class="ax-ribbon-group">
+                                <button class="ql-blockquote" type="button" title="引用"></button>
+                                <button class="ql-code-block" type="button" title="代码块"></button>
+                                <button class="ax-text-tool" id="listBtn" type="button" title="插入 1 至 10 列表">L10</button>
+                                <span class="ax-ribbon-group-label">Blocks</span>
+                            </div>
+                            <div class="ax-ribbon-group">
+                                <button class="ax-text-tool" id="diceBtn" type="button" title="掷骰子">骰子</button>
+                                <button class="ax-text-tool" id="insertThemeTriggerBtn" type="button"
+                                    title="插入主题切换标记">主题标记</button>
+                                <span class="ax-ribbon-group-label">Story Tools</span>
+                            </div>
+                        </div>
+
+                        <div class="ax-ribbon-panel" data-ribbon-panel="design" role="tabpanel" hidden>
+                            <div class="ax-ribbon-group">
+                                <select class="ql-font" title="文档字体">
+                                    <option selected>默认字体</option>
+                                    <option value="serif">衬线字体</option>
+                                    <option value="monospace">等宽字体</option>
+                                </select>
+                                <select class="ql-size" title="文档字号">
+                                    <option value="small">小</option>
+                                    <option selected>正文</option>
+                                    <option value="large">大</option>
+                                    <option value="huge">特大</option>
+                                </select>
+                                <span class="ax-ribbon-group-label">Typography</span>
+                            </div>
+                            <div class="ax-ribbon-group">
+                                <select class="ql-color" title="主题文字颜色"></select>
+                                <select class="ql-background" title="主题背景颜色"></select>
+                                <button class="ql-direction" value="rtl" type="button" title="从右向左"></button>
+                                <span class="ax-ribbon-group-label">Theme</span>
+                            </div>
+                        </div>
+
+                        <div class="ax-ribbon-panel" data-ribbon-panel="review" role="tabpanel" hidden>
+                            <div class="ax-ribbon-group">
+                                <button class="ax-text-tool" id="hiddenTextBtn" type="button"
+                                    title="隐藏文本设置（剧透或暗骰）">隐藏文本</button>
+                                <button class="ql-clean" type="button" title="清除格式"></button>
+                                <span class="ax-ribbon-group-label">Review</span>
+                            </div>
+                            <div class="ax-ribbon-group">
+                                <button class="ax-text-tool" id="openHistoryBtn" type="button">历史记录</button>
+                                <button class="ax-text-tool" id="openDiceLogBtn" type="button">骰子记录</button>
+                                <span class="ax-ribbon-group-label">Logs</span>
+                            </div>
+                        </div>
+
+                        <div class="ax-ribbon-panel" data-ribbon-panel="view" role="tabpanel" hidden>
+                            <div class="ax-ribbon-group">
+                                <button class="ax-text-tool" type="button" data-ui-action="toggle-left">切换左栏</button>
+                                <button class="ax-text-tool" type="button" data-ui-action="toggle-right">切换右栏</button>
+                                <span class="ax-ribbon-group-label">Sidebars</span>
+                            </div>
+                            <div class="ax-ribbon-group">
+                                <button class="ax-text-tool" type="button" data-ui-action="toggle-fullscreen">切换全屏</button>
+                                <span class="ax-ribbon-group-label">Window</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="editor-workspace">
                 <div class="editor-container">
-                    <div class="editor-main">
+                    <div class="editor-document-stage">
                         <div id="editor"></div>
                         <textarea id="plainEditor" class="hidden"></textarea>
                     </div>
                     <aside id="rightSidebar" class="right-sidebar">
                         <div class="tool-section">
-                            <h3>工具</h3>
+                            <div class="ax-side-panel-header">
+                                <h3>创作工具</h3>
+                                <button id="rightSidebarToggle" class="right-sidebar-toggle" type="button"
+                                    aria-label="收起右侧栏" title="收起右侧栏">×</button>
+                            </div>
 
                             <div class="dropdown-container">
                                 <div class="dropdown-header" id="roleDropdownHeader">
-                                    <span>角色</span>
+                                    <span>角色差分图集</span>
                                     <span class="arrow">&gt;</span>
                                 </div>
                                 <div class="dropdown-content" id="roleDropdownContent">
                                     <ul class="role-list" id="roleList">
                                     </ul>
                                     <button class="add-role-btn" id="addRoleBtn">添加角色</button>
+
                                 </div>
                             </div>
 
@@ -1666,7 +2805,6 @@
 
                         </div>
                     </aside>
-                    <div id="rightSidebarToggle" class="right-sidebar-toggle"></div>
                 </div>
             </div>
         </main>
@@ -1734,51 +2872,17 @@
     </div>
 
 <button class="floating-sidebar-btn" id="toggleSidebarBtn">
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 7h-3a3 3 0 0 0-3-3V1M4 7h3a3 3 0 0 1 3-3V1M7 7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-3M7 16v4a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-4"/>
-    </svg>
+  <svg class="floating-sidebar-icon" xmlns="http://www.w3.org/2000/svg"
+       viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 简单的工具箱图标 -->
+    <rect x="3" y="8" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+    <path d="M3 12h18"></path>
+    <path d="M10 12v3"></path>
+    <path d="M14 12v3"></path>
+  </svg>
+  <span class="floating-sidebar-label">创作工具</span>
 </button>
-
-<div class="floating-sidebar" id="floatingSidebar">
-  <button class="close-btn" id="closeSidebarBtn">✕</button>
-  <h3>工具栏</h3>
-  <hr>
-
-  <div class="dropdown-container">
-    <div class="dropdown-header" id="roleDropdownHeader">
-      角色
-      <span class="arrow">▶</span>
-    </div>
-    <div class="dropdown-content" id="roleDropdownContent">
-      <ul class="role-list" id="roleList">
-        </ul>
-      <div class="add-role-btn" id="addRoleBtn">+ 新增角色</div>
-    </div>
-  </div>
-
-  <div class="dropdown-container" style="margin-top: 15px;">
-    <div class="dropdown-header" id="diceLogDropdownHeader">
-      骰子日志
-      <span class="arrow">▶</span>
-    </div>
-    <div class="dropdown-content" id="diceLogDropdownContent">
-      <ul class="role-list" id="diceLogList">
-        </ul>
-    </div>
-  </div>
-
-  <div class="dropdown-container" style="margin-top: 15px;">
-    <div class="dropdown-header" id="historyDropdownHeader">
-      编辑历史
-      <span class="arrow">▶</span>
-    </div>
-    <div class="dropdown-content" id="historyDropdownContent">
-      <ul class="role-list" id="historyList">
-        </ul>
-    </div>
-  </div>
-  
-  </div>
-
-  
-    </body>
+</body>
+</html>

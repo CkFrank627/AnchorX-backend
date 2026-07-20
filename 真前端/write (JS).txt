@@ -25,6 +25,9 @@ let isSaving = false; // 防止多重保存请求
         const workList = document.querySelector('.work-list');
         const workCountSpan = document.getElementById('work-count');
 
+      const pageWordCount = document.getElementById('pageWordCount');
+const totalWordCount = document.getElementById('totalWordCount');
+
         // 新建弹窗元素
         const createBtn = document.getElementById('create-btn');
         const createModal = document.getElementById('create-modal');
@@ -68,7 +71,6 @@ let isSaving = false; // 防止多重保存请求
 
         // 右侧与角色
         const rightSidebar = document.getElementById('rightSidebar');
-        const rightSidebarToggle = document.getElementById('rightSidebarToggle');
         const roleDropdownHeader = document.getElementById('roleDropdownHeader');
         const roleDropdownContent = document.getElementById('roleDropdownContent');
         const roleList = document.getElementById('roleList');
@@ -108,69 +110,252 @@ const hiddenTextSecretOption = document.getElementById('hiddenTextSecretOption')
 const hiddenTextBtn = document.getElementById('hiddenTextBtn');
 
 const toggleBtn2 = document.getElementById('toggleSidebarBtn');
-const sidebar2 = document.getElementById('floatingSidebar');
-const closeBtn2 = document.getElementById('closeSidebarBtn');
-const desktopSidebar = document.getElementById('rightSidebar');
-const floatingBody = document.getElementById('floatingSidebarBody');
 
-// --------- 📱 手机端：把右侧工具栏内容搬进浮窗（不再克隆） ---------
-if (window.innerWidth <= 768) {
-  if (floatingBody) {
-    if (desktopSidebar) {
-      if (!floatingBody.dataset.moved) {
-        // 把 rightSidebar 里的所有子节点挪到浮窗 body
-        while (desktopSidebar.firstChild) {
-          floatingBody.appendChild(desktopSidebar.firstChild);
-        }
-        floatingBody.dataset.moved = '1';
-      }
-    }
+/* ---------- Editor chrome: ribbon, sidebars, sticky offset, fullscreen ---------- */
+(function initEditorChrome() {
+  const toolbarContainer = document.getElementById('editorToolbarContainer');
+  const ribbonTabs = Array.from(document.querySelectorAll('[data-ribbon-tab]'));
+  const ribbonPanels = Array.from(document.querySelectorAll('[data-ribbon-panel]'));
+  const mobileQuery = window.matchMedia('(max-width: 900px)');
+  const rightCloseBtn = document.getElementById('rightSidebarToggle');
+  const openHistoryBtn = document.getElementById('openHistoryBtn');
+  const openDiceLogBtn = document.getElementById('openDiceLogBtn');
+  const pageContainer = document.querySelector('.page-container');
+  const stickyPlaceholder = document.createElement('div');
+  let stickyFrame = 0;
+
+  stickyPlaceholder.className = 'editor-toolbar-placeholder';
+  stickyPlaceholder.setAttribute('aria-hidden', 'true');
+  toolbarContainer?.before(stickyPlaceholder);
+
+  function activateRibbon(tabName, focusTab) {
+    ribbonTabs.forEach((tab) => {
+      const active = tab.dataset.ribbonTab === tabName;
+      tab.classList.toggle('is-active', active);
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      if (active && focusTab) tab.focus();
+    });
+
+    ribbonPanels.forEach((panel) => {
+      panel.hidden = panel.dataset.ribbonPanel !== tabName;
+    });
+
+    scheduleStickySync();
   }
-}
 
-// --------- 浮窗开关逻辑（和之前类似，只保留这一份） ---------
-if (toggleBtn2) {
-  if (sidebar2) {
-    const openSidebar = function () {
-      sidebar2.classList.add('open');
-    };
+  ribbonTabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => activateRibbon(tab.dataset.ribbonTab, false));
+    tab.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      const direction = event.key === 'ArrowRight' ? 1 : -1;
+      const nextIndex = (index + direction + ribbonTabs.length) % ribbonTabs.length;
+      activateRibbon(ribbonTabs[nextIndex].dataset.ribbonTab, true);
+    });
+  });
 
-    const closeSidebarFn = function () {
-      sidebar2.classList.remove('open');
-    };
+  function setPressed(action, pressed) {
+    document.querySelectorAll(`[data-ui-action="${action}"]`).forEach((button) => {
+      button.setAttribute('aria-pressed', String(pressed));
+    });
+  }
 
-    // 点击右下角蓝色按钮：开 / 关
-    toggleBtn2.addEventListener('click', function (e) {
-      e.stopPropagation();
-      if (sidebar2.classList.contains('open')) {
-        closeSidebarFn();
+  function syncSidebarButtons() {
+    setPressed('toggle-left', !sidebar.classList.contains('sidebar-collapsed'));
+    const rightOpen = mobileQuery.matches
+      ? rightSidebar.classList.contains('mobile-open')
+      : !rightSidebar.classList.contains('collapsed');
+    setPressed('toggle-right', rightOpen);
+  }
+
+  function setLeftSidebar(open) {
+    sidebar.classList.toggle('sidebar-collapsed', !open);
+    syncSidebarButtons();
+  }
+
+  function setRightSidebar(open) {
+    if (mobileQuery.matches) {
+      rightSidebar.classList.remove('collapsed');
+      rightSidebar.classList.toggle('mobile-open', open);
+    } else {
+      rightSidebar.classList.remove('mobile-open');
+      rightSidebar.classList.toggle('collapsed', !open);
+    }
+    syncSidebarButtons();
+  }
+
+  async function toggleFullscreen() {
+    const usingFallback = document.body.classList.contains('ax-editor-fullscreen-fallback');
+
+    if (!document.fullscreenEnabled) {
+      document.body.classList.toggle('ax-editor-fullscreen-fallback', !usingFallback);
+      document.body.classList.toggle('ax-editor-fullscreen', !usingFallback);
+      setPressed('toggle-fullscreen', !usingFallback);
+      return;
+    }
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
       } else {
-        openSidebar();
+        await document.documentElement.requestFullscreen();
       }
-    });
-
-    // 关闭按钮
-    if (closeBtn2) {
-      closeBtn2.addEventListener('click', function () {
-        closeSidebarFn();
-      });
+    } catch (error) {
+      console.warn('Fullscreen request failed', error);
     }
+  }
 
-    // 点击浮窗外收起
-    document.addEventListener('click', function (e) {
-      if (window.innerWidth <= 768) {
-        const insideSidebar = sidebar2.contains(e.target);
-        const onToggleBtn = toggleBtn2.contains(e.target);
+  function syncFullscreenState() {
+    const active = Boolean(document.fullscreenElement);
+    document.body.classList.toggle('ax-editor-fullscreen', active);
+    setPressed('toggle-fullscreen', active);
+  }
 
-        if (!insideSidebar) {
-          if (!onToggleBtn) {
-            closeSidebarFn();
-          }
-        }
-      }
+  function handleUiAction(action) {
+    if (action === 'toggle-left') {
+      setLeftSidebar(sidebar.classList.contains('sidebar-collapsed'));
+    } else if (action === 'toggle-right') {
+      const currentlyOpen = mobileQuery.matches
+        ? rightSidebar.classList.contains('mobile-open')
+        : !rightSidebar.classList.contains('collapsed');
+      setRightSidebar(!currentlyOpen);
+    } else if (action === 'toggle-fullscreen') {
+      toggleFullscreen();
+    }
+  }
+
+  editorPage.addEventListener('click', (event) => {
+    const actionButton = event.target.closest('[data-ui-action]');
+    if (!actionButton) return;
+    handleUiAction(actionButton.dataset.uiAction);
+  });
+
+  if (rightCloseBtn) {
+    rightCloseBtn.addEventListener('click', () => setRightSidebar(false));
+  }
+
+  if (toggleBtn2) {
+    toggleBtn2.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const open = rightSidebar.classList.contains('mobile-open');
+      setRightSidebar(!open);
     });
   }
-}
+
+  function openSidebarSection(header, content) {
+    setRightSidebar(true);
+    header?.classList.add('open');
+    content?.classList.add('open');
+  }
+
+  openHistoryBtn?.addEventListener('click', () => {
+    openSidebarSection(historyDropdownHeader, historyDropdownContent);
+  });
+
+  openDiceLogBtn?.addEventListener('click', () => {
+    openSidebarSection(diceLogDropdownHeader, diceLogDropdownContent);
+  });
+
+  function updateStickyOffset() {
+    if (!toolbarContainer || !isEditorVisible()) return;
+    const height = Math.ceil(toolbarContainer.getBoundingClientRect().height);
+    if (height > 0) editorPage.style.setProperty('--ax-toolbar-height', `${height}px`);
+  }
+
+  function isEditorVisible() {
+    return !editorPage.classList.contains('hidden')
+      && editorPage.getClientRects().length > 0
+      && !document.body.classList.contains('modal-active');
+  }
+
+  function readStickyTop() {
+    if (!toolbarContainer) return 0;
+    const top = Number.parseFloat(getComputedStyle(toolbarContainer).top);
+    return Number.isFinite(top) ? top : 0;
+  }
+
+  function updateFixedBounds() {
+    if (!toolbarContainer || !isEditorVisible()) return;
+    const editorRect = editorPage.getBoundingClientRect();
+    const viewportWidth = document.documentElement.clientWidth;
+    const left = Math.max(0, Math.min(editorRect.left, viewportWidth));
+    const right = Math.max(left, Math.min(editorRect.right, viewportWidth));
+    editorPage.style.setProperty('--ax-toolbar-fixed-left', `${Math.round(left)}px`);
+    editorPage.style.setProperty('--ax-toolbar-fixed-width', `${Math.round(right - left)}px`);
+  }
+
+  function setFallbackFixed(fixed) {
+    toolbarContainer?.classList.toggle('is-fixed-fallback', fixed);
+    stickyPlaceholder.classList.toggle('is-active', fixed);
+  }
+
+  function syncStickyState() {
+    stickyFrame = 0;
+
+    if (!toolbarContainer || !isEditorVisible()) {
+      setFallbackFixed(false);
+      return;
+    }
+
+    updateStickyOffset();
+    updateFixedBounds();
+
+    const stickyTop = readStickyTop();
+    const placeholderTop = stickyPlaceholder.getBoundingClientRect().top;
+    setFallbackFixed(placeholderTop <= stickyTop + 0.5);
+  }
+
+  function scheduleStickySync() {
+    if (stickyFrame) return;
+    stickyFrame = requestAnimationFrame(syncStickyState);
+  }
+
+  if (toolbarContainer && 'ResizeObserver' in window) {
+    const layoutObserver = new ResizeObserver(scheduleStickySync);
+    layoutObserver.observe(toolbarContainer);
+    layoutObserver.observe(editorPage);
+    layoutObserver.observe(sidebar);
+  }
+
+  const sidebarObserver = new MutationObserver(() => {
+    syncSidebarButtons();
+    scheduleStickySync();
+  });
+  sidebarObserver.observe(sidebar, { attributes: true, attributeFilter: ['class'] });
+  sidebarObserver.observe(rightSidebar, { attributes: true, attributeFilter: ['class'] });
+
+  const visibilityObserver = new MutationObserver(scheduleStickySync);
+  visibilityObserver.observe(editorPage, { attributes: true, attributeFilter: ['class'] });
+  visibilityObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+  mobileQuery.addEventListener('change', () => {
+    rightSidebar.classList.remove('mobile-open');
+    syncSidebarButtons();
+    scheduleStickySync();
+  });
+  document.addEventListener('scroll', scheduleStickySync, { passive: true, capture: true });
+  window.addEventListener('resize', scheduleStickySync, { passive: true });
+  window.addEventListener('orientationchange', scheduleStickySync, { passive: true });
+  window.visualViewport?.addEventListener('resize', scheduleStickySync, { passive: true });
+  window.visualViewport?.addEventListener('scroll', scheduleStickySync, { passive: true });
+  pageContainer?.addEventListener('transitionend', scheduleStickySync);
+  sidebar.addEventListener('transitionend', scheduleStickySync);
+  document.addEventListener('fullscreenchange', () => {
+    syncFullscreenState();
+    scheduleStickySync();
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!mobileQuery.matches || !rightSidebar.classList.contains('mobile-open')) return;
+    if (rightSidebar.contains(event.target) || toggleBtn2?.contains(event.target)) return;
+    setRightSidebar(false);
+  });
+
+  activateRibbon('home', false);
+  syncSidebarButtons();
+  scheduleStickySync();
+})();
 
 // 原来的 currentSelectionRange 可以接在后面
 let currentSelectionRange = null;
@@ -195,15 +380,58 @@ function startAutoSave() {
     }, 5000); // 5000 毫秒 = 5 秒
 }
 
-// 
+function getPlainTextFromDelta(delta) {
+  if (!delta || !Array.isArray(delta.ops)) return '';
+  return delta.ops
+    .map(op => typeof op.insert === 'string' ? op.insert : '')
+    .join('');
+}
+
+function countVisibleChars(text) {
+  return (text || '').replace(/\s/g, '').length;
+}
+
+function getCurrentEditorText() {
+  if (isQuillActive && quill) {
+    return quill.getText() || '';
+  }
+  return plainEditor?.value || '';
+}
+
+function updateWordCounts() {
+  const currentText = getCurrentEditorText();
+  const currentPageCount = countVisibleChars(currentText);
+
+  let totalCount = 0;
+
+  if (Array.isArray(pages)) {
+    pages.forEach((page, idx) => {
+      const text = (idx === currentPageIndex)
+        ? currentText
+        : getPlainTextFromDelta(page?.content);
+      totalCount += countVisibleChars(text);
+    });
+  }
+
+  if (pageWordCount) {
+    pageWordCount.textContent = `本页字数：${currentPageCount}`;
+  }
+
+  if (totalWordCount) {
+    totalWordCount.textContent = `全文字数：${totalCount}`;
+  }
+}
+
+//
 /* ---------- 标记内容有变动 ---------- */
 // ⚠️ 此函数在所有内容变动（Quill/Plain Text）的事件监听器中被调用
 function markAsChanged() {
+    updateWordCounts();
+
     if (!hasUnsavedChanges) {
         hasUnsavedChanges = true;
-        saveBtn.textContent = '保存*'; // 给用户一个未保存的提示
-        
-        // 【新增：如果作品处于“已发布”状态并被编辑，重新启用按钮并改为“更新*”】
+        saveBtn.textContent = '保存*';
+
         if (publishBtn.disabled === true && publishBtn.textContent === '已发布') {
             publishBtn.textContent = '更新*';
             publishBtn.disabled = false;
@@ -216,29 +444,29 @@ function markAsChanged() {
 // 统一的弹窗关闭函数
 function closeHiddenTextModal() {
     // 修正：将 'hidden' 类加回，以确保弹窗被隐藏
-    hiddenTextModal.classList.add('hidden'); 
-    
+    hiddenTextModal.classList.add('hidden');
+
     // 移除 inline style（可选，但推荐）
-    hiddenTextModal.style.display = ''; 
+    hiddenTextModal.style.display = '';
 
     // 重新显示 Quill 工具栏
     document.body.classList.remove('modal-active');
-    currentSelectionRange = null; 
+    currentSelectionRange = null;
 }
 
 // 1. 绑定工具栏按钮点击事件
 if (hiddenTextBtn) {
     hiddenTextBtn.addEventListener('click', () => {
         // 捕获选区
-        currentSelectionRange = quill.getSelection(true); 
+        currentSelectionRange = quill.getSelection(true);
 
         if (!currentSelectionRange || currentSelectionRange.length === 0) {
             alert('请先选择要设置的文本！');
             return;
         }
-        
+
         // 💥 关键修正：移除 'hidden' 类，才能覆盖 CSS 中的 display: none !important
-        hiddenTextModal.classList.remove('hidden'); 
+        hiddenTextModal.classList.remove('hidden');
 
         // 新增：在显示弹窗前，为 body 添加类以隐藏工具栏（如您所要求）
         document.body.classList.add('modal-active');
@@ -262,7 +490,7 @@ function applyHiddenTextFormat(mode) {
             Quill.sources.USER
         );
         // 确保光标保持在应用格式后的位置
-        quill.setSelection(index + length, 0); 
+        quill.setSelection(index + length, 0);
 
         closeHiddenTextModal();
     }
@@ -318,12 +546,12 @@ const Inline = Quill.import('blots/inline');
 class HiddenTextBlot extends Inline {
     static blotName = 'hiddenText';
     static tagName = 'span';
-    static className = 'spoiler-hidden'; 
+    static className = 'spoiler-hidden';
 
     // 静态方法：从 DOM 节点解析出格式值
     static formats(node) {
         // 默认返回 'spoiler'
-        const mode = node.getAttribute('data-mode') || 'spoiler'; 
+        const mode = node.getAttribute('data-mode') || 'spoiler';
         return { mode };
     }
 
@@ -366,6 +594,61 @@ class HiddenTextBlot extends Inline {
 // 注册自定义 Blot
 Quill.register(HiddenTextBlot);
 
+      /* =========================
+   ✅ 可缩放图片：覆盖默认 image blot，让 Delta 能保存 width
+   ========================= */
+const BaseImage = Quill.import('formats/image');
+
+class ResizableImage extends BaseImage {
+  static create(value) {
+    // 兼容旧数据：value 可能是 string（纯 src）
+    const src = (typeof value === 'string')
+      ? value
+      : (value && typeof value === 'object' ? (value.src || value.url || '') : '');
+
+    const node = super.create(src);
+
+    // 基础展示（防止超出编辑器）
+    node.setAttribute('loading', 'lazy');
+    node.style.maxWidth = '100%';
+    node.style.height = 'auto';
+    node.style.display = 'block';
+    node.style.margin = '8px auto';
+
+    // 读取/应用 width（新数据）
+    if (value && typeof value === 'object') {
+      if (value.alt) node.setAttribute('alt', value.alt);
+
+      if (value.width) {
+        node.style.width = value.width;           // 例如 '70%' / '420px'
+        node.setAttribute('data-width', value.width);
+      } else {
+        node.removeAttribute('data-width');
+      }
+    } else {
+      // 兼容：如果 DOM 上已有 data-width，也应用
+      const w = node.getAttribute('data-width');
+      if (w) node.style.width = w;
+    }
+
+    return node;
+  }
+
+  static value(node) {
+    const src = node.getAttribute('src') || '';
+    const width = node.getAttribute('data-width') || node.style.width || '';
+    const alt = node.getAttribute('alt') || '';
+
+    // 兼容旧格式：如果没有 width/alt，就还原成 string，避免影响老内容
+    if (!width && !alt) return src;
+
+    return { src, width, alt };
+  }
+}
+
+// 覆盖默认 image blot
+Quill.register(ResizableImage, true);
+
       /* ---------- 初始化 Quill ---------- */
     const quill = new Quill('#editor', {
         modules: {
@@ -378,8 +661,183 @@ Quill.register(HiddenTextBlot);
 
 // ⚠️ 注意：Quill 初始化时 formats 列表必须包含 'hiddenText'
 // 例如：formats: ['bold', ..., 'hiddenText']
-      
-      quill.on('text-change', markAsChanged); 
+
+      quill.on('text-change', markAsChanged);
+
+      /* =========================
+   ✅ 图片缩放 UI：点击图片弹出缩放条（%）
+   ========================= */
+(function setupImageResizeUI(quill) {
+  let selectedImg = null;
+
+  // 创建面板
+  const panel = document.createElement('div');
+  panel.id = 'ax-imgsize-panel';
+  panel.style.cssText = `
+    position: fixed;
+    z-index: 99999;
+    display: none;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.96);
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+    font-size: 12px;
+    color: #222;
+    user-select: none;
+  `;
+
+  panel.innerHTML = `
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-weight:700;">图片大小</span>
+      <input id="imgSizeRange" type="range" min="20" max="100" step="1" style="width:180px;">
+      <span id="imgSizeLabel" style="width:44px; text-align:right;">70%</span>
+      <button id="imgSizeReset" type="button" style="border:1px solid #ccc;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer;">重置</button>
+      <button id="imgSizeClose" type="button" style="border:0;background:transparent;cursor:pointer;font-size:16px;line-height:1;">×</button>
+    </div>
+    <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+      ${[25,50,70,85,100].map(v=>`<button data-preset="${v}" type="button"
+        style="border:1px solid #ddd;background:#fff;border-radius:999px;padding:4px 10px;cursor:pointer;">${v}%</button>`).join('')}
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  const range = panel.querySelector('#imgSizeRange');
+  const label = panel.querySelector('#imgSizeLabel');
+  const btnReset = panel.querySelector('#imgSizeReset');
+  const btnClose = panel.querySelector('#imgSizeClose');
+
+  async function uploadImageToServer(file) {
+  const compressedFile = await imageCompression(file, {
+    maxSizeMB: 0.5,
+    maxWidthOrHeight: 1280
+  });
+
+  const formData = new FormData();
+  formData.append('image', compressedFile, file.name || 'pasted-image.png');
+
+  const res = await fetch(`${API_BASE_URL}/upload`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+    },
+    body: formData
+  });
+
+  if (!res.ok) {
+    throw new Error('图片上传失败');
+  }
+
+  const result = await res.json();
+  return result.imageUrl;
+}
+
+async function handleEditorPaste(e) {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items || !items.length) return;
+
+  for (const item of items) {
+    if (item.type && item.type.startsWith('image/')) {
+      e.preventDefault();
+
+      const file = item.getAsFile();
+      if (!file) return;
+
+      try {
+        const imageUrl = await uploadImageToServer(file);
+        const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+        quill.insertEmbed(range.index, 'image', imageUrl, 'user');
+        quill.setSelection(range.index + 1, 0, 'silent');
+        markAsChanged();
+      } catch (err) {
+        console.error('粘贴图片上传失败:', err);
+        alert('粘贴图片失败，请稍后重试。');
+      }
+
+      return;
+    }
+  }
+}
+
+quill.root.addEventListener('paste', handleEditorPaste);
+
+  function markChangedSafe() {
+    if (typeof window.markAsChanged === 'function') window.markAsChanged();
+  }
+
+  function applyWidth(percent) {
+    if (!selectedImg) return;
+    const w = String(percent) + '%';
+    selectedImg.style.width = w;
+    selectedImg.setAttribute('data-width', w);
+    quill.update('user');         // 让 Quill 感知 DOM 改动（用于导出/保存）
+    markChangedSafe();
+  }
+
+  function showNear(node) {
+    const r = node.getBoundingClientRect();
+    const x = Math.min(window.innerWidth - 20, Math.max(10, r.left));
+    const y = Math.min(window.innerHeight - 20, Math.max(10, r.top - 70));
+    panel.style.left = x + 'px';
+    panel.style.top = y + 'px';
+    panel.style.display = 'block';
+  }
+
+  function hide() {
+    panel.style.display = 'none';
+    selectedImg = null;
+  }
+
+  // 面板交互
+  range.addEventListener('input', () => {
+    label.textContent = range.value + '%';
+    applyWidth(range.value);
+  });
+
+  panel.addEventListener('click', (e) => {
+    const preset = e.target && e.target.getAttribute && e.target.getAttribute('data-preset');
+    if (preset) {
+      range.value = preset;
+      label.textContent = preset + '%';
+      applyWidth(preset);
+    }
+  });
+
+  btnReset.addEventListener('click', () => {
+    if (!selectedImg) return;
+    selectedImg.style.width = '';
+    selectedImg.removeAttribute('data-width');
+    quill.update('user');
+    markChangedSafe();
+    range.value = 100;
+    label.textContent = '100%';
+  });
+
+  btnClose.addEventListener('click', hide);
+
+  // 点击图片选中
+  quill.root.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t && t.tagName === 'IMG') {
+      selectedImg = t;
+
+      // 读取当前宽度（默认 70%）
+      const w = (t.getAttribute('data-width') || t.style.width || '70%').trim();
+      const num = parseInt(w.replace('%',''), 10);
+      const val = (!isNaN(num) ? num : 70);
+
+      range.value = val;
+      label.textContent = val + '%';
+      showNear(t);
+      return;
+    }
+    hide();
+  });
+
+  // 滚动/缩放时隐藏，避免漂移
+  window.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
+})(quill);
 
 
         // 撤销/重做按钮（toolbar里）
@@ -434,13 +892,13 @@ uploadImageInput.addEventListener('change', async () => {
         const imageUrl = await uploadFileToImgBB(file);
        const range = quill.getSelection(); // [cite: 528]
         if (range) {
-            quill.insertEmbed(range.index, 'image', imageUrl);
+            quill.insertEmbed(range.index, 'image', { src: imageUrl, width: '70%' });
         } else {
             quill.insertEmbed(quill.getLength(), 'image', imageUrl);// [cite: 529]
         }
-        
+
         // 【新增：插入图片后自动触发保存】
-        await saveWork(); 
+        await saveWork();
 
     } catch (err) {
         console.error('图片上传失败', err);// [cite: 529]
@@ -448,6 +906,211 @@ uploadImageInput.addEventListener('change', async () => {
     }
 });
         }
+
+/* ---------- 作品标签（弹窗 + PATCH to backend）---------- */
+
+// 前端也做一次轻量清洗，体验更好（最终以后端为准）
+function normalizeTagsClient(input) {
+  const arr = Array.isArray(input) ? input : [];
+  const out = [];
+  const seen = new Set();
+  for (var i = 0; i < arr.length; i++) {
+    var t = String(arr[i] == null ? '' : arr[i]).replace(/\s+/g, ' ').trim();
+    if (!t) continue;
+    if (t.length > 32) t = t.slice(0, 32);
+    var n = t.toLowerCase();
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(t);
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
+async function fetchWorkTagsForEdit(workId) {
+  // 用 meta 且 noView=1，避免编辑端浏览量被刷
+  const res = await fetch(`${API_BASE_URL}/${workId}/meta?noView=1`, {
+    method: 'GET',
+    headers: authHeaders(false)
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.message || ('获取 tags 失败 ' + res.status));
+  return Array.isArray(j.tags) ? j.tags : [];
+}
+
+async function saveWorkTags(workId, tags) {
+  const res = await fetch(`${API_BASE_URL}/${workId}/tags`, {
+    method: 'PATCH',
+    headers: authHeaders(true),
+    body: JSON.stringify({ tags: tags })
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.message || ('保存 tags 失败 ' + res.status));
+  return Array.isArray(j.tags) ? j.tags : [];
+}
+
+function showTagEditModal(workId, workTitle) {
+  const modalHtml = `
+    <div id="tag-modal-backdrop" style="position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+         display:flex; justify-content:center; align-items:center; z-index:10000;">
+      <div style="background:#fff; width:520px; max-width: calc(100vw - 24px);
+           border-radius:12px; padding:16px 16px 14px; box-shadow:0 10px 30px rgba(0,0,0,0.22);">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+          <div>
+            <div style="font-weight:800; font-size:1.1rem;">作品标签</div>
+            <div style="margin-top:4px; color:#666; font-size:0.92rem;">
+              当前作品：<span style="color:#222; font-weight:700;">《${String(workTitle || '未命名').replace(/[<>]/g,'')}》</span>
+            </div>
+          </div>
+          <button id="tag-modal-x" style="border:none; background:#f2f2f2; border-radius:10px; padding:6px 10px; cursor:pointer;">✕</button>
+        </div>
+
+        <div style="margin-top:10px; padding:10px 12px; background:#f7fbff; border:1px solid #d9ecff; border-radius:10px; color:#245; font-size:0.9rem; line-height:1.45;">
+          建议：至少加一个“作品名标签”，方便你未来做独立筛选。示例：<code style="background:#fff; padding:2px 6px; border-radius:6px;">作品:${String(workTitle || '').replace(/[<>]/g,'')}</code>
+          <button id="tag-add-workname" style="margin-left:8px; border:1px solid #b8dcff; background:#fff; color:#0366d6; border-radius:8px; padding:4px 8px; cursor:pointer;">一键添加</button>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div style="color:#555; font-size:0.9rem; margin-bottom:6px;">当前标签（点击 ✕ 删除）：</div>
+          <div id="tag-chip-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+        </div>
+
+        <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+          <input id="tag-input" placeholder="输入标签，回车添加（例如：题材:悬疑 / 世界观:幻想乡）"
+                 style="flex:1; border:1px solid #ddd; border-radius:10px; padding:10px 12px; outline:none;">
+          <button id="tag-add-btn" style="border:none; background:#0077cc; color:#fff; border-radius:10px; padding:10px 12px; cursor:pointer;">添加</button>
+        </div>
+
+        <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+          <button class="tag-pref-btn" data-pref="题材:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">题材:</button>
+          <button class="tag-pref-btn" data-pref="世界观:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">世界观:</button>
+          <button class="tag-pref-btn" data-pref="风格:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">风格:</button>
+          <button class="tag-pref-btn" data-pref="警告:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">警告:</button>
+          <button class="tag-pref-btn" data-pref="CP:" style="border:1px solid #ddd; background:#fff; border-radius:999px; padding:6px 10px; cursor:pointer;">CP:</button>
+        </div>
+
+        <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:10px;">
+          <button id="tag-cancel-btn" style="border:1px solid #ddd; background:#fff; border-radius:10px; padding:10px 12px; cursor:pointer;">关闭</button>
+          <button id="tag-save-btn" style="border:none; background:#16a34a; color:#fff; border-radius:10px; padding:10px 12px; cursor:pointer;">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const backdrop = document.getElementById('tag-modal-backdrop');
+  const chipList = document.getElementById('tag-chip-list');
+  const input = document.getElementById('tag-input');
+  const addBtn = document.getElementById('tag-add-btn');
+  const saveBtn = document.getElementById('tag-save-btn');
+  const cancelBtn = document.getElementById('tag-cancel-btn');
+  const closeX = document.getElementById('tag-modal-x');
+  const addWorkNameBtn = document.getElementById('tag-add-workname');
+
+  let tags = [];
+
+  function renderChips() {
+    chipList.innerHTML = '';
+    if (!tags.length) {
+      chipList.innerHTML = '<div style="color:#999; font-size:0.9rem;">（暂无标签）</div>';
+      return;
+    }
+    tags.forEach((t) => {
+      const safe = String(t).replace(/[<>]/g,'');
+      const el = document.createElement('div');
+      el.style.cssText = 'display:inline-flex; align-items:center; gap:6px; background:#f3f4f6; border-radius:999px; padding:6px 10px; font-size:0.88rem;';
+      el.innerHTML = `<span>${safe}</span><span style="cursor:pointer; color:#666; font-weight:900;" data-del="${encodeURIComponent(t)}">✕</span>`;
+      chipList.appendChild(el);
+    });
+  }
+
+  function addTag(t) {
+    if (!t) return;
+    const merged = normalizeTagsClient(tags.concat([t]));
+    tags = merged;
+    renderChips();
+  }
+
+  // 加载现有 tags
+  (async () => {
+    try {
+      const existing = await fetchWorkTagsForEdit(workId);
+      tags = normalizeTagsClient(existing);
+      renderChips();
+    } catch (err) {
+      console.error(err);
+      alert('加载标签失败：' + err.message);
+      tags = [];
+      renderChips();
+    }
+  })();
+
+  // 删除 chip
+  chipList.addEventListener('click', (e) => {
+    const del = e.target && e.target.getAttribute && e.target.getAttribute('data-del');
+    if (!del) return;
+    const val = decodeURIComponent(del);
+    const lower = val.toLowerCase();
+    tags = tags.filter(x => String(x).toLowerCase() !== lower);
+    renderChips();
+  });
+
+  // 前缀按钮
+  backdrop.querySelectorAll('.tag-pref-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pref = btn.getAttribute('data-pref') || '';
+      input.value = (pref + (input.value || ''));
+      input.focus();
+    });
+  });
+
+  // 一键添加作品名标签
+  if (addWorkNameBtn) {
+    addWorkNameBtn.addEventListener('click', () => {
+      const t = '作品:' + String(workTitle || '').replace(/\s+/g,' ').trim();
+      if (t === '作品:') return;
+      addTag(t);
+    });
+  }
+
+  // 添加按钮 / 回车添加
+  addBtn.addEventListener('click', () => {
+    const v = String(input.value || '').trim();
+    input.value = '';
+    addTag(v);
+    input.focus();
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addBtn.click();
+    }
+  });
+
+  function close() { backdrop && backdrop.remove(); }
+  cancelBtn.addEventListener('click', close);
+  closeX.addEventListener('click', close);
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) close();
+  });
+
+  // 保存
+  saveBtn.addEventListener('click', async () => {
+    try {
+      const cleaned = normalizeTagsClient(tags);
+      const saved = await saveWorkTags(workId, cleaned);
+      tags = normalizeTagsClient(saved);
+      alert('标签已保存！');
+      close();
+      // 刷新作品列表，让按钮上的 (N) 更新
+      loadWorks();
+    } catch (err) {
+      console.error(err);
+      alert('保存失败：' + err.message);
+    }
+  });
+}
 
         /* ---------- 封面上传（弹窗 + PATCH to backend）---------- */
         function showCoverUploadModal(workId) {
@@ -690,10 +1353,15 @@ function renderDiceHistory(history) {
                                     <span class="work-title">${work.title}</span>
                                 </div>
                             </div>
-                            <div class="work-actions-buttons">
-                                <button class="cover-settings-btn" data-work-id="${work._id}">封面设置</button>
-                                <button class="menu-button" data-action="toggle-menu">⋯</button>
-                            </div>
+   <div class="work-actions-buttons">
+  <button class="cover-settings-btn" data-work-id="${work._id}">封面设置</button>
+  <button class="tag-settings-btn"
+          data-work-id="${work._id}"
+          data-work-title="${encodeURIComponent(work.title || '')}">
+    作品标签${Array.isArray(work.tags) && work.tags.length ? `(${work.tags.length})` : ''}
+  </button>
+  <button class="menu-button" data-action="toggle-menu">⋯</button>
+</div>
                         </div>
                         <div class="menu-container hidden">
                             <div class="menu-item" data-action="delete-single">刪除</div>
@@ -727,6 +1395,14 @@ function renderDiceHistory(history) {
                 showCoverUploadModal(workId);
                 return;
             }
+
+          // 点击作品标签
+if (e.target.closest('.tag-settings-btn')) {
+  const btn = e.target.closest('.tag-settings-btn');
+  const title = btn && btn.dataset.workTitle ? decodeURIComponent(btn.dataset.workTitle) : '';
+  showTagEditModal(workId, title);
+  return;
+}
 
             // 点击菜单里的刪除
             if (e.target.closest('[data-action="delete-single"]')) {
@@ -844,7 +1520,7 @@ function renderDiceHistory(history) {
             isQuillActive = true;
             quillEditor.classList.remove('hidden');
             plainEditor.classList.add('hidden');
-        
+
             sidebar.classList.add('sidebar-collapsed');
         }
 
@@ -889,8 +1565,9 @@ async function loadWorkById(id) {
     quill.setContents({ ops: [] }, 'silent');
   }
 
-  updatePageDisplay();
-  renderPageList();
+updatePageDisplay();
+renderPageList();
+updateWordCounts();
 
   setTimeout(() => {
     autoSaveEnabled = wasAutoSave;
@@ -1007,11 +1684,96 @@ async function saveWork(isAuto = false) {
   return success;
 }
 
+/* =========================
+   ✅ Word(.docx) 导出：工具函数
+   依赖：html-docx-js（全局 htmlDocx）
+========================= */
+
+// 复用下载逻辑
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// 离屏 Quill：用来把 Delta 渲染成 HTML（尽量保留格式）
+let __exportQuill = null;
+function ensureExportQuill() {
+  if (__exportQuill) return __exportQuill;
+
+  const holder = document.createElement('div');
+  holder.id = '__export_quill_holder__';
+  holder.style.position = 'fixed';
+  holder.style.left = '-100000px';
+  holder.style.top = '-100000px';
+  holder.style.width = '800px';
+  holder.style.height = '1px';
+  holder.style.overflow = 'hidden';
+  holder.style.opacity = '0';
+  document.body.appendChild(holder);
+
+  __exportQuill = new Quill(holder, { readOnly: true, theme: 'snow' });
+  return __exportQuill;
+}
+
+function deltaToHtml(delta) {
+  const q = ensureExportQuill();
+  const safeDelta = delta && delta.ops ? delta : { ops: [{ insert: '\n' }] };
+  q.setContents(safeDelta);
+  return q.root.innerHTML || '';
+}
+
+function buildDocxHtmlFromBackup(backupData) {
+  const title = (backupData?.meta?.title || '未命名作品').toString();
+  const exportedAt = backupData?.meta?.exportedAt || new Date().toISOString();
+  const pages = Array.isArray(backupData?.pages) ? backupData.pages : [];
+
+  // 注意：Word 对 CSS 支持有限，这里只用最基础的结构
+  let body = `
+    <h1>${escapeHtml(title)}</h1>
+    <p>导出时间：${escapeHtml(exportedAt)}</p>
+    <hr/>
+  `;
+
+  pages.forEach((p, idx) => {
+    const delta = p?.content || p; // 兼容你 pages 结构：每项至少有 content（:contentReference[oaicite:10]{index=10}）
+    const pageHtml = deltaToHtml(delta);
+
+    body += `
+      <h2>第 ${idx + 1} 页</h2>
+      ${pageHtml}
+      <br style="page-break-after: always;" />
+    `;
+  });
+
+  return `<!doctype html><html><head><meta charset="utf-8"></head><body>${body}</body></html>`;
+}
+
+function exportBackupAsDocx(backupData, safeTitle) {
+  if (!window.htmlDocx || typeof window.htmlDocx.asBlob !== 'function') {
+    alert('缺少 Word 导出库：请确认已在页面引入 html-docx-js。');
+    return;
+  }
+
+  const html = buildDocxHtmlFromBackup(backupData);
+
+  // README 推荐：htmlDocx.asBlob(html) 生成 Blob :contentReference[oaicite:11]{index=11}
+  const docxBlob = window.htmlDocx.asBlob(html);
+
+  const fname = `${safeTitle}_本地备份_${new Date().toISOString().slice(0,10)}.docx`;
+  downloadBlob(docxBlob, fname);
+}
+
 
 /* ---------- 新增：导出所有楼层到本地 JSON ---------- */
 async function downloadLocalBackup() {
     if (!currentWorkId) {
-        alert('请先保存或创建作品，再导出到本地。');
+        alert('没找到需要保存的对象。请先保存或创建作品，再导出到本地。');
         return;
     }
 
@@ -1074,6 +1836,12 @@ async function downloadLocalBackup() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+  // ✅ 新增：可选同时导出 Word(.docx)
+if (confirm('同时导出 Word(.docx) 吗？')) {
+  exportBackupAsDocx(backupData, safeTitle);
+  addHistoryRecord('导出本地备份（DOCX）');
+}
 
     // 可选：记一条历史记录
     addHistoryRecord('导出本地备份');
@@ -1153,14 +1921,14 @@ function deserializeHistoryStack(saved) {
   });
   return { undo: unpack(saved && saved.undo), redo: unpack(saved && saved.redo) };
 }
-      
+
 /* ---------- 发布（手动保存 + 禁用按钮）---------- */
 publishBtn.addEventListener('click', async () => {
     if (!currentWorkId) {
         alert('请先保存作品。');
         return;
     }
-    
+
     // 记录当前按钮的文本（“发布”或“更新*”或“已发布”）
     const originalText = publishBtn.textContent;
     // 判断当前是否是已发布的作品（即按钮显示“更新*”或“已发布”的情况）
@@ -1168,13 +1936,13 @@ publishBtn.addEventListener('click', async () => {
 
     // 1. 【新增：先将按钮禁用，防止重复点击】
     publishBtn.textContent = '处理中...'; // 统一显示处理中
-    publishBtn.disabled = true; 
+    publishBtn.disabled = true;
 
     // 2. 【保留：先执行手动保存逻辑】
-    const saveSuccess = await saveWork(false); 
+    const saveSuccess = await saveWork(false);
 
     if (saveSuccess) {
-        
+
         // 3. 【新增：调用 PATCH API 将后端发布状态变为 true】
         try {
             const res = await fetch(`${API_BASE_URL}/${currentWorkId}/publish`, {
@@ -1182,33 +1950,33 @@ publishBtn.addEventListener('click', async () => {
   headers: authHeaders(true),
   body: JSON.stringify({ isPublished: true })
 });
-            
+
             if (!res.ok) {
                 const j = await res.json();
                 throw new Error(j.message || '发布状态更新失败');
             }
-            
+
             // 4. 【成功后更新按钮状态为“已发布”并保持禁用】
-            publishBtn.textContent = '已发布'; 
-            publishBtn.disabled = true; 
-            
+            publishBtn.textContent = '已发布';
+            publishBtn.disabled = true;
+
             alert(isCurrentlyPublished ? '作品已更新成功！' : '作品已成功发布！');
             addHistoryRecord(isCurrentlyPublished ? '更新' : '发布');
 
             // 移除页面跳转逻辑
-            // window.location.href = `https://zhidianworld.com/read/?id=${currentWorkId}`; 
+            // window.location.href = `https://zhidianworld.com/read/?id=${currentWorkId}`;
 
         } catch (err) {
             console.error('发布/更新失败', err);
             alert('发布/更新失败：' + (err.message || '网络错误（请在讨论页/贴吧汇报给站长！你将会收获一份诚心诚意土下座大礼包以及修复方案）'));
-            
+
             // 失败时恢复按钮状态
             publishBtn.textContent = isCurrentlyPublished ? '更新失败' : '发布失败';
             // 恢复按钮可用性
-            publishBtn.disabled = false; 
+            publishBtn.disabled = false;
             setTimeout(() => {
                 // 恢复到上次的“更新”或“发布”状态
-                publishBtn.textContent = isCurrentlyPublished ? '更新*' : '发布'; 
+                publishBtn.textContent = isCurrentlyPublished ? '更新*' : '发布';
             }, 2000);
         }
     } else {
@@ -1248,8 +2016,9 @@ async function deleteCurrentPage() {
     quill.setContents(nextContent, 'silent');
 
     // 4) UI
-    renderPageList();
-    updatePageDisplay();
+renderPageList();
+updatePageDisplay();
+updateWordCounts();
 
   } catch (e) {
     console.error('删除页面失败:', e);
@@ -1313,9 +2082,10 @@ addPageBtn.addEventListener('click', async () => {
     pages[newIndex] = { content: { ops: [] } };
     currentPageIndex = newIndex;
 
-    quill.setContents({ ops: [] }, 'silent');
-    renderPageList();
-    updatePageDisplay();
+quill.setContents({ ops: [] }, 'silent');
+renderPageList();
+updatePageDisplay();
+updateWordCounts();
   } catch (e) {
     console.error(e);
     alert('新增页失败：' + (e.message || '网络错误'));
@@ -1366,9 +2136,10 @@ if (pageHistories[currentPageIndex]) {
     }
 
     // 6. 更新 UI
-    updatePageDisplay();
-    renderPageList();
-    pageDropdown.classList.add('hidden'); // 顺手关掉下拉菜单
+updatePageDisplay();
+renderPageList();
+updateWordCounts();
+pageDropdown.classList.add('hidden'); // 顺手关掉下拉菜单
 
     // 7. 恢复自动保存
     setTimeout(() => {
@@ -1377,7 +2148,7 @@ if (pageHistories[currentPageIndex]) {
 }
 
         /* ---------- 骰子（随机）---------- */
-        // 2. 切换骰子记录的显示/隐藏状态 (使用现有下拉菜单的逻辑) 
+        // 2. 切换骰子记录的显示/隐藏状态 (使用现有下拉菜单的逻辑)
         if (diceLogDropdownHeader) {
             diceLogDropdownHeader.addEventListener('click', () => {
                 diceLogDropdownContent.classList.toggle('open');
@@ -1436,7 +2207,7 @@ await fetch(`${API_BASE_URL}/${currentWorkId}/dice-log`, {
     }
 }
 
-// 2. 切换骰子记录的显示/隐藏状态 (使用现有下拉菜单的逻辑) 
+// 2. 切换骰子记录的显示/隐藏状态 (使用现有下拉菜单的逻辑)
 if (diceLogDropdownHeader) {
     diceLogDropdownHeader.addEventListener('click', () => {
         diceLogDropdownContent.classList.toggle('open');
@@ -1491,7 +2262,7 @@ listBtn.addEventListener('click', () => {
     // 插入一个从1到10的有序列表
     const listItems = Array.from({ length: 10 }, (_, i) => `${i + 1}. `).join('\n');
     const range = quill.getSelection();
-    
+
     // 如果有選取範圍，將內容插入到選取位置
     if (range) {
         quill.insertText(range.index, listItems);
@@ -1520,11 +2291,6 @@ if (insertThemeTriggerBtn) {
         }
     });
 }
-
-    /* ---------- 右侧栏切换 ---------- */
-    if (rightSidebarToggle && rightSidebar) {
-        rightSidebarToggle.addEventListener('click', () => rightSidebar.classList.toggle('collapsed'));
-    }
 
     /* ---------- 角色相关：fetch/add/update/delete & render ---------- */
     async function fetchRoles(workId) {
@@ -1711,7 +2477,7 @@ function getImageNameFromUrl(url) {
 function renderGalleryImages() {
     // 清空现有图片，保留上传按钮
     galleryImageList.querySelectorAll('.gallery-image-item').forEach(item => item.remove());
-    
+
     galleryImages.forEach((imageUrl, idx) => {
         const imgItem = document.createElement('div');
         imgItem.className = 'gallery-image-item';
@@ -1739,7 +2505,7 @@ imageUploadInput.addEventListener('change', async (e) => {
     if (files.length === 0) return;
 
     // 为了显示上传状态，可以添加一个加载指示器
-    // showLoadingIndicator(); 
+    // showLoadingIndicator();
 
     for (const file of files) {
         try {
@@ -1754,18 +2520,18 @@ imageUploadInput.addEventListener('change', async (e) => {
             const compressedFile = await imageCompression(file, options);
             console.log('原始文件大小:', (file.size / 1024).toFixed(2), 'KB');
             console.log('压缩后文件大小:', (compressedFile.size / 1024).toFixed(2), 'KB');
-            
+
             // 使用 FormData 来包装压缩后的文件
             const formData = new FormData();
             // 在 append 时提供原始文件名，防止后端存储时丢失文件扩展名
-            formData.append('image', compressedFile, file.name); 
+            formData.append('image', compressedFile, file.name);
 
             // 发送到后端上传接口
             const res = await fetch(`${API_BASE_URL}/upload`, {
                 method: 'POST',
                 headers: {
                     // 注意：上传 FormData 时，不要手动设置 'Content-Type'
-                    'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: formData
             });
@@ -1775,7 +2541,7 @@ imageUploadInput.addEventListener('change', async (e) => {
             }
 
             const result = await res.json();
-            
+
             // 将后端返回的真实 URL 添加到数组
             galleryImages.push(result.imageUrl);
 
@@ -1846,7 +2612,7 @@ galleryImageList.addEventListener('click', (e) => {
         const imageUrl = item.querySelector('img').src;
         galleryImages = galleryImages.filter(img => img !== imageUrl);
         renderGalleryImages();
-    } 
+    }
     // --- 逻辑 2：点击图片本身 → 插入到编辑器 ---
     else if (target.tagName === 'IMG') {
         const range = quill.getSelection(true);
@@ -1886,7 +2652,7 @@ galleryImageList.addEventListener('click', (e) => {
             }
 
             const roleId = currentRoleForGallery._id;
-            const url = `${API_BASE_URL}/${currentWorkId}/roles/${roleId}`; 
+            const url = `${API_BASE_URL}/${currentWorkId}/roles/${roleId}`;
 
           // --- 新增调试代码 ---
     console.log("前端即将发送 PUT 请求:");
@@ -1894,7 +2660,7 @@ galleryImageList.addEventListener('click', (e) => {
     console.log("Role ID:", roleId);
     console.log("Request URL:", url);
     // --- 调试代码结束 ---
-            
+
             // 构建发送到后端的数据，包含 name, notes, color 和 gallery
             const roleData = {
                 name: currentRoleForGallery.name,
@@ -1914,10 +2680,10 @@ galleryImageList.addEventListener('click', (e) => {
 
             if (response.ok) {
                 const updatedRole = await response.json();
-                
+
                 // 将更新后的数据同步到前端的角色对象
                 Object.assign(currentRoleForGallery, updatedRole);
-                
+
                 alert('图库保存成功！');
                 galleryModal.style.display = 'none'; // 关闭弹窗
               // 新增：关闭弹窗时移除类，重新显示工具栏
@@ -2002,7 +2768,7 @@ autoSaveToggleBtn.addEventListener('click', () => {
     roleList.addEventListener('click', (e) => {
         const target = e.target.closest('span'); // 使用 closest 来确保找到正确的元素
         if (!target) return;
-        
+
         // 处理“显示绑定图库”按钮点击
         if (target.classList.contains('role-gallery-btn')) {
             const roleId = target.dataset.roleId;
@@ -2018,7 +2784,6 @@ autoSaveToggleBtn.addEventListener('click', () => {
         }
     });
 
- 
 
 }); // end DOMContentLoaded
 </script>

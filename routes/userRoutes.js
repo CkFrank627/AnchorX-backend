@@ -153,7 +153,7 @@ router.patch('/change-password', auth, async (req, res) => {
 // 存储策略：保存到 /uploads/avatars 目录
 const avatarStorage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const dir = path.join(__dirname, '..', 'uploads', 'avatars');
+        const dir = path.join(__dirname, '..', 'public', 'uploads', 'avatars');
         fs.mkdirSync(dir, { recursive: true });
         cb(null, dir);
     },

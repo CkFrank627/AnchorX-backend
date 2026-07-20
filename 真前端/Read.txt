@@ -1560,6 +1560,7 @@ function registerEffectTrigger(targetEl, cb) {
   // 去 BOM / 零宽字符 / 软连字符
   if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
   s = s.replace(/[\u200B-\u200D\u2060\u00AD]/g, '');
+  s = s.replace(/\u00A0/g, ' ');
 
   // 某些环境会把 U+2028/U+2029 当“非法换行”
   s = s.replace(/\u2028/g, '\n').replace(/\u2029/g, '\n');
@@ -1583,6 +1584,12 @@ function registerEffectTrigger(targetEl, cb) {
     // innerText 比 textContent 更像“复制出来的代码”，会保留换行
     s = div.innerText || div.textContent || s;
   }
+
+  // 兼容从 Markdown 或完整 HTML 示例中复制的代码。
+  var fenced = s.trim().match(/^```(?:javascript|js)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced) s = fenced[1];
+  var scriptWrapped = s.trim().match(/^<script(?:\s[^>]*)?>\s*([\s\S]*?)\s*<\/script>$/i);
+  if (scriptWrapped) s = scriptWrapped[1];
 
   return s;
 }
@@ -1619,7 +1626,9 @@ async function ensureCustomEffectsLoaded() {
     if (customEffectsLoaded) return;
 
     try {
-        const res = await fetch(`${EFFECT_API_BASE_URL}`);
+        const workId = activeWork && (activeWork._id || activeWork.workId);
+        if (!workId) return;
+        const res = await fetch(`${EFFECT_API_BASE_URL}?workId=${encodeURIComponent(workId)}`);
         if (!res.ok) throw new Error('请求失败');
 
         const data = await res.json();
@@ -1666,10 +1675,13 @@ list.forEach(function (item) {
       console.warn('⚠️ [effects] 特效在非 strict 模式下才编译通过:', key);
       return;
     } catch (err2) {
+      delete customEffectFnMap[key];
       var bad = findFirstSuspiciousChar(rawCode);
       console.error('编译自定义特效失败：', key, err2, {
         badChar: bad,
-        preview: rawCode.slice(0, 200)
+        preview: rawCode.slice(0, 200),
+        codeLength: rawCode.length,
+        hint: '该错误只影响这个自定义文字特效，不影响背景特效。请在特效管理中重新保存并修正代码。'
       });
     }
   }
@@ -2264,6 +2276,61 @@ closeCommentBtn.addEventListener('click', () => {
 
 // 只在“阅读端真正显示出来的 DOM 容器”上应用特效
 // ========== 应用特效（内置 + 自定义）【调试版】 ==========
+function normalizeSentenceAnchorText(value) {
+    return String(value || '')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 1000);
+}
+
+function resolveAnchoredSentenceElement(rootEl, rawIndex, anchor) {
+    if (!rootEl) return null;
+
+    const expectedIndex = Number(rawIndex);
+    if (!Number.isInteger(expectedIndex) || expectedIndex < 0) return null;
+
+    const expected = rootEl.querySelector(`[data-sentence-index="${expectedIndex}"]`);
+    const anchorText = normalizeSentenceAnchorText(anchor && anchor.text);
+    if (!anchorText) return expected;
+
+    const textOf = (el) => normalizeSentenceAnchorText(
+        el && el.dataset && el.dataset.sentenceAnchorText
+            ? el.dataset.sentenceAnchorText
+            : el && el.textContent
+    );
+    if (expected && textOf(expected) === anchorText) return expected;
+
+    const beforeText = normalizeSentenceAnchorText(anchor && anchor.before);
+    const afterText = normalizeSentenceAnchorText(anchor && anchor.after);
+    const candidates = Array.from(rootEl.querySelectorAll('[data-sentence-index]'))
+        .filter((el) => textOf(el) === anchorText);
+
+    let best = null;
+    let bestScore = -Infinity;
+    candidates.forEach((candidate) => {
+        const candidateIndex = Number(candidate.dataset.sentenceIndex);
+        if (!Number.isInteger(candidateIndex)) return;
+
+        const previous = rootEl.querySelector(`[data-sentence-index="${candidateIndex - 1}"]`);
+        const next = rootEl.querySelector(`[data-sentence-index="${candidateIndex + 1}"]`);
+        const beforeMatches = beforeText && textOf(previous) === beforeText;
+        const afterMatches = afterText && textOf(next) === afterText;
+        const hasContext = Boolean(beforeText || afterText);
+        if (hasContext && !beforeMatches && !afterMatches) return;
+
+        let score = 10 - Math.min(Math.abs(candidateIndex - expectedIndex), 100) / 100;
+        if (beforeMatches) score += 4;
+        if (afterMatches) score += 4;
+        if (score > bestScore) {
+            best = candidate;
+            bestScore = score;
+        }
+    });
+
+    return best;
+}
+
 // ========== 按 data-sentence-id + workId 应用特效（带调试日志） ==========
 function applyEffectsToBlocks(rootEl, effectsPublished, workId) {
     // 基础防御
@@ -2316,14 +2383,13 @@ function applyEffectsToBlocks(rootEl, effectsPublished, workId) {
         }
         if (!type) return;
 
-        // 统一和 segmentContentAndAddIds 生成规则：
-        // data-sentence-id="s_<workId>_<行号>"
-        const sentenceId = `s_${workId}_${lineIndex}`;
-        const selector = `[data-sentence-id="${sentenceId}"]`;
-        const target = rootEl.querySelector(selector);
+        const target = resolveAnchoredSentenceElement(rootEl, lineIndex, effect.anchor);
+        const sentenceId = target ? target.getAttribute('data-sentence-id') : '';
+        const resolvedLineIndex = target ? Number(target.dataset.sentenceIndex) : null;
 
         console.log('🎯 [effects] 处理特效:', {
             lineIndex,
+            resolvedLineIndex,
             sentenceId,
             type,
             found: !!target
@@ -2337,7 +2403,9 @@ function applyEffectsToBlocks(rootEl, effectsPublished, workId) {
         appliedSet.add(key);
 
         // 调试可视化：画一个淡淡的轮廓，方便你肉眼看到“哪一行被匹配到了”
-        target.style.outline = '1px dashed rgba(255,0,0,0.25)';
+        if (window.READER_DEBUG_VERBOSE) {
+            target.style.outline = '1px dashed rgba(255,0,0,0.25)';
+        }
 
         // --- 实际特效处理 ---
         // 自定义特效：effectType 形如 "custom:xxx"
@@ -2617,28 +2685,55 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
   let counter = startIndex;
 
   // 和 applyEffectsToBlocks 用同一套“行”的定义
-  const blocks = tempDiv.querySelectorAll('p, h1, h2, h3, li, blockquote, pre');
+  const blocks = tempDiv.querySelectorAll(
+    'p, h1, h2, h3, li, blockquote, pre, .ql-code-block'
+  );
+
+  function assignSentenceData(el, text) {
+    const normalizedText = normalizeSentenceAnchorText(text);
+    if (!normalizedText) return;
+
+    if (!el.hasAttribute('data-sentence-id')) {
+      const sentenceId = 's_' + workId + '_' + counter;
+      el.setAttribute('data-sentence-id', sentenceId);
+    }
+    el.dataset.sentenceId = el.getAttribute('data-sentence-id');
+    el.dataset.sentenceIndex = String(counter);
+    el.dataset.sentenceAnchorText = normalizedText;
+    counter = counter + 1;
+  }
 
   blocks.forEach(function (el) {
-    const text = el.textContent.trim();
+    if (!tempDiv.contains(el)) return;
+    if (el.matches('.ql-code-block')) {
+      assignSentenceData(el, el.textContent);
+      return;
+    }
+
+    const rawText = el.textContent || '';
+    if (el.tagName === 'PRE' && /\r?\n/.test(rawText)) {
+      const lines = rawText.split(/\r?\n/);
+      el.textContent = '';
+      lines.forEach(function (line, index) {
+        if (normalizeSentenceAnchorText(line)) {
+          const lineEl = document.createElement('span');
+          lineEl.className = 'reader-code-line';
+          lineEl.textContent = line;
+          assignSentenceData(lineEl, line);
+          el.appendChild(lineEl);
+        }
+        if (index + 1 < lines.length) el.appendChild(document.createTextNode('\n'));
+      });
+      return;
+    }
+
+    const text = rawText.trim();
 
     // 跳过纯空白
     if (text === '') {
       return;
     }
-
-    // 生成 / 保留 data-sentence-id
-    if (!el.hasAttribute('data-sentence-id')) {
-      const sentenceId = 's_' + workId + '_' + counter;
-      el.setAttribute('data-sentence-id', sentenceId);
-    }
-    // 同步到 dataset，方便后面使用
-    el.dataset.sentenceId = el.getAttribute('data-sentence-id');
-
-    // ⭐ 新增：记录“阅读端句子编号”，给背景用
-    el.dataset.sentenceIndex = String(counter);
-
-    counter = counter + 1;
+    assignSentenceData(el, text);
   });
 
   // ⭐ 调试：打印前 30 条句子的 行号 + ID + 文本片段
@@ -3639,14 +3734,52 @@ function initReadingBackgroundSystem() {
     return;
   }
 
+  const availableSentenceEls = Array.from(
+    containerEl.querySelectorAll('[data-sentence-index]')
+  ).sort(function (a, b) {
+    return Number(a.dataset.sentenceIndex) - Number(b.dataset.sentenceIndex);
+  });
+  if (!availableSentenceEls.length) {
+    clearReadingBackground();
+    return;
+  }
+  const minAvailableLine = Number(availableSentenceEls[0].dataset.sentenceIndex);
+  const maxAvailableLine = Number(
+    availableSentenceEls[availableSentenceEls.length - 1].dataset.sentenceIndex
+  );
+
+  bgConfig.transitions = bgConfig.transitions.flatMap(function (transition) {
+    if (!transition) return [];
+    const rawFromLine = Number(transition.fromLine);
+    const rawToLine = Number(transition.toLine);
+    const fromEl = resolveAnchoredSentenceElement(
+      containerEl,
+      rawFromLine,
+      transition.fromAnchor
+    );
+    const toEl = resolveAnchoredSentenceElement(
+      containerEl,
+      rawToLine,
+      transition.toAnchor
+    );
+    const fromInside = rawFromLine >= minAvailableLine && rawFromLine <= maxAvailableLine;
+    const toInside = rawToLine >= minAvailableLine && rawToLine <= maxAvailableLine;
+    if (transition.fromAnchor && fromInside && !fromEl) return [];
+    if (transition.toAnchor && toInside && !toEl) return [];
+
+    const fromLine = fromEl ? Number(fromEl.dataset.sentenceIndex) : rawFromLine;
+    const toLine = toEl ? Number(toEl.dataset.sentenceIndex) : rawToLine;
+    if (!Number.isInteger(fromLine) || !Number.isInteger(toLine) || fromLine >= toLine) return [];
+    return [{ ...transition, fromLine, toLine }];
+  });
+
   if (EFFECT_BG_DEBUG) {
-    const allNodes = containerEl.querySelectorAll('[data-sentence-index]');
     let maxIdx = -1;
-    allNodes.forEach(el => {
+    availableSentenceEls.forEach(el => {
       const n = Number(el.dataset.sentenceIndex);
       if (!Number.isNaN(n) && n > maxIdx) maxIdx = n;
     });
-    console.log('🧩 [BG] 当前 DOM 里句子节点数量 =', allNodes.length, '，最大 index =', maxIdx);
+    console.log('🧩 [BG] 当前 DOM 里句子节点数量 =', availableSentenceEls.length, '，最大 index =', maxIdx);
   }
 
   // 6️⃣ 按绑定生成每一段背景区间
@@ -3659,10 +3792,27 @@ function initReadingBackgroundSystem() {
     const endLine = Number(b.endLine);
     const img = imageMap[String(b.imageId)];
 
-    const startSelector = '[data-sentence-index="' + startLine + '"]';
-    const endSelector   = '[data-sentence-index="' + endLine + '"]';
-    const startEl = containerEl.querySelector(startSelector);
-    const endEl   = containerEl.querySelector(endSelector);
+    const resolvedStartEl = resolveAnchoredSentenceElement(containerEl, startLine, b.startAnchor);
+    const resolvedEndEl = resolveAnchoredSentenceElement(containerEl, endLine, b.endAnchor);
+    const startInside = startLine >= minAvailableLine && startLine <= maxAvailableLine;
+    const endInside = endLine >= minAvailableLine && endLine <= maxAvailableLine;
+    if (b.startAnchor && startInside && !resolvedStartEl) return;
+    if (b.endAnchor && endInside && !resolvedEndEl) return;
+
+    const resolvedStartLine = resolvedStartEl
+      ? Number(resolvedStartEl.dataset.sentenceIndex)
+      : startLine;
+    const resolvedEndLine = resolvedEndEl
+      ? Number(resolvedEndEl.dataset.sentenceIndex)
+      : endLine;
+    const visibleStartLine = Math.max(resolvedStartLine, minAvailableLine);
+    const visibleEndLine = Math.min(resolvedEndLine, maxAvailableLine);
+    const startEl = availableSentenceEls.find(function (el) {
+      return Number(el.dataset.sentenceIndex) >= visibleStartLine;
+    });
+    const endEl = availableSentenceEls.slice().reverse().find(function (el) {
+      return Number(el.dataset.sentenceIndex) <= visibleEndLine;
+    });
 
     if (EFFECT_BG_DEBUG) {
       console.log('🧩 [BG] 处理绑定 #' + idx, {
@@ -3670,8 +3820,10 @@ function initReadingBackgroundSystem() {
         imageName: b.imageName,
         startLine: startLine,
         endLine: endLine,
-        startSelector: startSelector,
-        endSelector: endSelector,
+        resolvedStartLine: resolvedStartLine,
+        resolvedEndLine: resolvedEndLine,
+        visibleStartLine: visibleStartLine,
+        visibleEndLine: visibleEndLine,
         hasImg: !!img,
         hasStartEl: !!startEl,
         hasEndEl: !!endEl,
@@ -3683,10 +3835,19 @@ function initReadingBackgroundSystem() {
     if (!img) {
       return;
     }
+    if (visibleStartLine > visibleEndLine) {
+      return;
+    }
     if (!startEl) {
       return;
     }
     if (!endEl) {
+      return;
+    }
+    if (!Number.isInteger(resolvedStartLine) || !Number.isInteger(resolvedEndLine)) {
+      return;
+    }
+    if (resolvedStartLine > resolvedEndLine) {
       return;
     }
 
@@ -3694,8 +3855,8 @@ function initReadingBackgroundSystem() {
       imageId: img.id,
       imageUrl: img.url,
       imageName: b.imageName || img.name,
-      startLine: startLine,
-      endLine: endLine,
+      startLine: resolvedStartLine,
+      endLine: resolvedEndLine,
       startEl: startEl,
       endEl: endEl,
       startTop: 0,

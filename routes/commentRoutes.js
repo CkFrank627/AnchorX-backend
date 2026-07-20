@@ -1,48 +1,53 @@
 //commentRoutes.js
 
 const express = require('express');
-const router = express.Router();
+const mongoose = require('mongoose');
+
 const Comment = require('../models/Comment');
-const Work = require('../models/Work');               // ✅ 引入作品模型
-const Notification = require('../models/Notification'); // ✅ 引入通知模型
-const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // ✅ 你漏掉了这个！
-const mongoose = require('mongoose'); // ✅ 你后面用到了 mongoose.Types.ObjectId
+const auth = require('../authMiddleware');
+const { decodeRequestUser } = require('../services/authService');
+const {
+  createCommentLikeNotification,
+  createCommentNotification,
+} = require('../services/notificationService');
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) return res.status(500).json({ message: 'JWT_SECRET 未配置' });
+const router = express.Router();
 
-// 认证中间件
-const auth = (req, res, next) => {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-        return res.status(401).json({ message: '请先登录' });
-    }
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.userId = decoded.userId;
-        next();
-    } catch (error) {
-        res.status(401).json({ message: '令牌无效' });
-    }
-};
+function getCurrentUserId(req) {
+  return decodeRequestUser(req)?.userId || null;
+}
 
-// 放在 router.get('/work/:workId', ...) 之前
+function formatComment(comment, currentUserId) {
+  const likes = Array.isArray(comment.likes) ? comment.likes : [];
+  const authorName = comment.author?.username || '匿名用户';
+
+  return {
+    _id: comment._id,
+    content: comment.content,
+    author: authorName,
+    createdAt: comment.createdAt,
+    sentenceId: comment.sentenceId,
+    likesCount: likes.length,
+    isLikedByCurrentUser: currentUserId
+      ? likes.some((likeId) => String(likeId) === String(currentUserId))
+      : false,
+  };
+}
+
 router.post('/work/by-sentence-ids/:workId', async (req, res) => {
   try {
     const workId = req.params.workId;
-    const body = req.body || {};
-    const sentenceIdsRaw = body.sentenceIds;
+    const sentenceIdsRaw = req.body?.sentenceIds;
 
     if (!Array.isArray(sentenceIdsRaw)) {
       return res.status(400).json({ message: 'sentenceIds 必须是数组' });
     }
 
     const sentenceIds = sentenceIdsRaw
-      .map(v => (v == null ? '' : String(v)).trim())
-      .filter(v => v);
+      .map((value) => (value == null ? '' : String(value).trim()))
+      .filter(Boolean);
 
-    if (sentenceIds.length === 0) {
+    if (!sentenceIds.length) {
       return res.json([]);
     }
 
@@ -50,286 +55,153 @@ router.post('/work/by-sentence-ids/:workId', async (req, res) => {
       return res.status(400).json({ message: 'sentenceIds 过多，请分批请求' });
     }
 
-    // 可选：用于计算 isLikedByCurrentUser（不强制登录）
-    const tokenHeader = req.header('Authorization');
-    let currentUserId = null;
+    const currentUserId = getCurrentUserId(req);
+    const workOr = [{ workId }];
 
-    if (tokenHeader) {
-      const token = String(tokenHeader).replace('Bearer ', '');
-      if (token) {
-        try {
-          const decoded = jwt.verify(token, JWT_SECRET);
-          currentUserId = decoded.userId;
-        } catch (e) {
-          currentUserId = null;
-        }
-      }
-    }
-
-    const workOr = [{ workId: workId }];
     if (mongoose.Types.ObjectId.isValid(workId)) {
       workOr.push({ workId: new mongoose.Types.ObjectId(workId) });
     }
 
     const comments = await Comment.find({
       sentenceId: { $in: sentenceIds },
-      $or: workOr
+      $or: workOr,
     })
       .populate('author', 'username')
       .sort({ createdAt: 1 });
 
-    const formatted = comments.map(c => {
-      let isLikedByCurrentUser = false;
-
-      if (currentUserId) {
-        if (Array.isArray(c.likes)) {
-          for (let i = 0; i < c.likes.length; i++) {
-            const likeId = c.likes[i];
-            if (String(likeId) === String(currentUserId)) {
-              isLikedByCurrentUser = true;
-              break;
-            }
-          }
-        }
-      }
-
-      let authorName = '匿名用户';
-      if (c.author) {
-        if (c.author.username) authorName = c.author.username;
-      }
-
-      return {
-        _id: c._id,
-        content: c.content,
-        author: authorName,
-        createdAt: c.createdAt,
-        sentenceId: c.sentenceId,
-        likesCount: Array.isArray(c.likes) ? c.likes.length : 0,
-        isLikedByCurrentUser
-      };
-    });
-
-    res.json(formatted);
+    res.json(comments.map((comment) => formatComment(comment, currentUserId)));
   } catch (error) {
     res.status(500).json({ message: '批量获取评论失败', error: error.message });
   }
 });
 
-
-// GET: 获取某个作品下的所有评论
-// ✅ 修改：GET /api/comments/work/:workId 支持可选 skip/limit
 router.get('/work/:workId', async (req, res) => {
   try {
     const { workId } = req.params;
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    let currentUserId = null;
-
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        currentUserId = decoded.userId;
-      } catch {
-        currentUserId = null;
-      }
-    }
+    const currentUserId = getCurrentUserId(req);
 
     const skip = Math.max(parseInt(req.query.skip, 10) || 0, 0);
     const limitRaw = req.query.limit;
-    const limit = limitRaw === undefined ? null : Math.min(Math.max(parseInt(limitRaw, 10) || 50, 1), 500);
+    const limit = limitRaw === undefined
+      ? null
+      : Math.min(Math.max(parseInt(limitRaw, 10) || 50, 1), 500);
 
-    let q = Comment.find({ workId })
+    let query = Comment.find({ workId })
       .populate('author', 'username')
       .sort({ createdAt: 1 });
 
-    if (skip) q = q.skip(skip);
-    if (limit !== null) q = q.limit(limit);
+    if (skip) query = query.skip(skip);
+    if (limit !== null) query = query.limit(limit);
 
-    const comments = await q;
-
-    const formattedComments = comments.map(comment => {
-      const isLikedByCurrentUser =
-        comment.likes && currentUserId
-          ? comment.likes.some(likeId => likeId.toString() === currentUserId)
-          : false;
-      return {
-        _id: comment._id,
-        content: comment.content,
-        author: comment.author.username,
-        createdAt: comment.createdAt,
-        sentenceId: comment.sentenceId,
-        likesCount: comment.likes ? comment.likes.length : 0,
-        isLikedByCurrentUser
-      };
-    });
-
-    res.json(formattedComments);
+    const comments = await query;
+    res.json(comments.map((comment) => formatComment(comment, currentUserId)));
   } catch (error) {
     res.status(500).json({ message: '获取作品评论失败', error: error.message });
   }
 });
 
-// GET: 获取某个作品特定句子的所有评论
 router.get('/:workId/:sentenceId', async (req, res) => {
-    try {
-        const { workId, sentenceId } = req.params;
-        const token = req.header('Authorization')?.replace('Bearer ', '');
-        let currentUserId = null;
+  try {
+    const { workId, sentenceId } = req.params;
+    const currentUserId = getCurrentUserId(req);
 
-        if (token) {
-            try {
-                const decoded = jwt.verify(token, JWT_SECRET);
-                currentUserId = decoded.userId;
-            } catch (error) {
-                currentUserId = null;
-            }
-        }
+    const comments = await Comment.find({ workId, sentenceId })
+      .populate('author', 'username')
+      .sort({ createdAt: 1 });
 
-        const comments = await Comment.find({ workId, sentenceId })
-            .populate('author', 'username')
-            .sort({ createdAt: 1 });
+    console.log('[GET COMMENTS]', comments.map((comment) => ({
+      id: comment._id.toString(),
+      likesCount: (comment.likes || []).length,
+      likes: (comment.likes || []).map((id) => id.toString()),
+    })));
 
-        // 🔍 日志：获取评论时 likes 状态
-        console.log('[GET COMMENTS]', comments.map(c => ({
-            id: c._id.toString(),
-            likesCount: (c.likes || []).length,
-            likes: (c.likes || []).map(id => id.toString())
-        })));
-
-        const formattedComments = comments.map(comment => {
-            const isLikedByCurrentUser =
-                comment.likes && currentUserId
-                    ? comment.likes.some(likeId => likeId.toString() === currentUserId)
-                    : false;
-            return {
-                _id: comment._id,
-                content: comment.content,
-                author: comment.author.username,
-                createdAt: comment.createdAt,
-                likesCount: comment.likes ? comment.likes.length : 0,
-                isLikedByCurrentUser
-            };
-        });
-
-        res.json(formattedComments);
-    } catch (error) {
-        res.status(500).json({ message: '获取评论失败', error: error.message });
-    }
+    res.json(comments.map((comment) => formatComment(comment, currentUserId)));
+  } catch (error) {
+    res.status(500).json({ message: '获取评论失败', error: error.message });
+  }
 });
 
-// POST: 提交新评论
 router.post('/', auth, async (req, res) => {
-    console.log('[POST /api/comments] incoming:', req.body, 'userId:', req.userId);
-    try {
-        const { workId, sentenceId, content } = req.body;
+  console.log('[POST /api/comments] incoming:', req.body, 'userId:', req.userId);
 
-        // ✅ 1. 统一 sentenceId 格式（自动标准化）
-        const normalizedSentenceId = sentenceId.startsWith('s_')
-            ? sentenceId
-            : `s_${workId}_${sentenceId}`;
+  try {
+    const { workId, sentenceId, content } = req.body;
+    const normalizedSentenceId = String(sentenceId).startsWith('s_')
+      ? sentenceId
+      : `s_${workId}_${sentenceId}`;
 
-        // ✅ 2. 创建评论对象
-        const newComment = new Comment({
-            workId,
-            sentenceId: normalizedSentenceId, // ✅ 改这里
-            author: req.userId,               // ✅ 修正：使用 req.userId 而不是 req.userData
-            content,
-            likes: []
-        });
+    const savedComment = await new Comment({
+      workId,
+      sentenceId: normalizedSentenceId,
+      author: req.userId,
+      content,
+      likes: [],
+    }).save();
 
-        // ✅ 3. 保存到数据库
-        const savedComment = await newComment.save();
+    await createCommentNotification({
+      workId: savedComment.workId,
+      commentId: savedComment._id,
+      senderId: req.userId,
+    });
 
-        // ✅ 4. 给作品作者发通知（非必须，但保留你原来的逻辑）
-        const commenterId = req.userId;
-        const work = await Work.findById(savedComment.workId);
+    const populatedComment = await Comment.findById(savedComment._id)
+      .populate('author', 'username');
 
-        if (work && work.author.toString() !== commenterId) {
-            const sender = await User.findById(commenterId).select('username');
-            const senderName = sender ? sender.username : '未知用户';
-
-            const newNotification = new Notification({
-                recipient: work.author,
-                type: 'comment',
-                sender: commenterId,
-                comment: savedComment._id,
-                message: `${senderName} 评论了你的作品 "${work.title}"`
-            });
-            await newNotification.save();
-        }
-
-        const populatedComment = await Comment.findById(savedComment._id)
-            .populate('author', 'username');
-
-        // ✅ 5. 返回成功响应
-        res.status(201).json({
-            _id: populatedComment._id,
-            content: populatedComment.content,
-            author: populatedComment.author.username,
-            createdAt: populatedComment.createdAt,
-            sentenceId: normalizedSentenceId, // ✅ 返回标准化 ID
-            likesCount: 0,
-            isLikedByCurrentUser: false
-        });
-
-    } catch (error) {
-        console.error('[POST /api/comments] Error:', error);
-        res.status(400).json({ message: '发表评论失败', error: error.message });
-    }
+    res.status(201).json({
+      _id: populatedComment._id,
+      content: populatedComment.content,
+      author: populatedComment.author?.username || '匿名用户',
+      createdAt: populatedComment.createdAt,
+      sentenceId: normalizedSentenceId,
+      likesCount: 0,
+      isLikedByCurrentUser: false,
+    });
+  } catch (error) {
+    console.error('[POST /api/comments] Error:', error);
+    res.status(400).json({ message: '发表评论失败', error: error.message });
+  }
 });
 
-
-// POST: 点赞/取消点赞
 router.post('/:id/like', auth, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const userId = req.userId;
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
 
-        const comment = await Comment.findById(id);
-        if (!comment) {
-            return res.status(404).json({ message: '评论不存在' });
-        }
-
-        const index = comment.likes.findIndex(likeId => likeId.toString() === userId);
-
-        if (index > -1) {
-            comment.likes.splice(index, 1); // 取消点赞
-        } else {
-            comment.likes.push(userId); // 新点赞
-
-            // ✅ 给评论作者发通知
-            if (comment.author.toString() !== userId) {
-                const newNotification = new Notification({
-                    recipient: comment.author,
-                    type: 'like',
-                    sender: userId,
-                    likedComment: comment._id,
-                    message: `点赞了你的评论`
-                });
-                await newNotification.save();
-            }
-        }
-
-        await comment.save();
-
-        // 🔍 点赞操作日志
-        console.log('[LIKE]', {
-            id: comment._id.toString(),
-            likesCount: comment.likes.length,
-            likes: comment.likes.map(id => id.toString())
-        });
-
-        res.json({
-            likesCount: comment.likes.length,
-            isLikedByCurrentUser: comment.likes.some(likeId => likeId.toString() === userId)
-        });
-    } catch (error) {
-        res.status(500).json({ message: '点赞操作失败', error: error.message });
+    const comment = await Comment.findById(id);
+    if (!comment) {
+      return res.status(404).json({ message: '评论不存在' });
     }
+
+    const index = comment.likes.findIndex((likeId) => String(likeId) === String(userId));
+
+    if (index > -1) {
+      comment.likes.splice(index, 1);
+    } else {
+      comment.likes.push(userId);
+      await createCommentLikeNotification({
+        commentAuthorId: comment.author,
+        commentId: comment._id,
+        senderId: userId,
+      });
+    }
+
+    await comment.save();
+
+    console.log('[LIKE]', {
+      id: comment._id.toString(),
+      likesCount: comment.likes.length,
+      likes: comment.likes.map((likeId) => likeId.toString()),
+    });
+
+    res.json({
+      likesCount: comment.likes.length,
+      isLikedByCurrentUser: comment.likes.some((likeId) => String(likeId) === String(userId)),
+    });
+  } catch (error) {
+    res.status(500).json({ message: '点赞操作失败', error: error.message });
+  }
 });
 
-// 新增 GET: 获取某个作品下所有有评论的句子 ID 列表
-// 这个接口用于前端判断哪些句子需要显示“评论”标识
-// 新增 GET: 获取某个作品下所有有评论的句子 ID 列表
 router.get('/work/commented-sentences/:workId', async (req, res) => {
   try {
     const { workId } = req.params;
@@ -338,16 +210,13 @@ router.get('/work/commented-sentences/:workId', async (req, res) => {
       return res.status(400).json({ message: '作品ID格式无效' });
     }
 
-    // ✅ 兼容：有些库里 workId 可能是 String，有些是 ObjectId
     const oid = new mongoose.Types.ObjectId(workId);
-
     const result = await Comment.aggregate([
-      { $match: { $or: [{ workId: workId }, { workId: oid }] } },
-      { $group: { _id: '$sentenceId' } }
+      { $match: { $or: [{ workId }, { workId: oid }] } },
+      { $group: { _id: '$sentenceId' } },
     ]);
 
-    const ids = result.map(r => r._id).filter(Boolean);
-    res.json(ids);
+    res.json(result.map((item) => item._id).filter(Boolean));
   } catch (error) {
     console.error('[GET commented-sentences] Error:', error);
     res.status(500).json({ message: '获取有评论的句子ID失败', error: error.message });

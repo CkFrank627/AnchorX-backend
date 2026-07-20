@@ -1,409 +1,356 @@
-// topicRoutes.js
-
 const express = require('express');
-const router = express.Router();
-const Topic = require('../models/Topic');
-const Reply = require('../models/Reply');
-const auth = require('../authMiddleware'); // 你的身份验证中间件
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const Notification = require('../models/Notification'); // <--- 【修改点 3】引入 Notification 模型
 
+const Topic = require('../models/Topic');
+const Reply = require('../models/Reply');
+const User = require('../models/User');
+const auth = require('../authMiddleware');
+const {
+  createTopicLikeNotification,
+  createTopicReplyLikeNotification,
+  createTopicReplyNotifications,
+} = require('../services/notificationService');
 
-// ===================================
-// 图片上传相关配置 (保持不变)
-// ===================================
+const router = express.Router();
+
 const uploadDir = 'public/uploads';
 try {
-    fs.mkdirSync(uploadDir, { recursive: true });
-} catch (e) {
-    // 忽略目录已存在的错误
+  fs.mkdirSync(uploadDir, { recursive: true });
+} catch (error) {
+  // ignore directory exists errors
 }
 
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
+  destination(req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename(req, file, cb) {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
 });
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
+function isValidObjectId(value) {
+  return mongoose.Types.ObjectId.isValid(value);
+}
 
-// ===================================
-// 接口 0: 文件上传接口 (保持不变)
-// POST /api/topics/upload
-// ===================================
+async function isAdminUser(userId) {
+  const actingUser = await User.findById(userId).select('roles').lean();
+  const adminIds = String(process.env.ADMIN_USER_IDS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return adminIds.includes(String(userId))
+    || (Array.isArray(actingUser?.roles) && actingUser.roles.includes('admin'));
+}
+
 router.post('/upload', upload.single('image'), (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ message: '没有上传文件' });
-        }
-        
-        const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-        
-        res.status(200).json({ message: '上传成功', imageUrl: imageUrl });
-    } catch (error) {
-        res.status(500).json({ message: '上传失败', error: error.message });
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'æ²¡æœ‰ä¸Šä¼ æ–‡ä»¶' });
     }
+
+    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    return res.status(200).json({ message: 'ä¸Šä¼ æˆåŠŸ', imageUrl });
+  } catch (error) {
+    return res.status(500).json({ message: 'ä¸Šä¼ å¤±è´¥', error: error.message });
+  }
 });
 
-
-// ===================================
-// 接口 1: 创建新主题 (保持不变)
-// POST /api/topics
-// ===================================
 router.post('/', auth, async (req, res) => {
-    try {
-        const { title, content, section } = req.body;
-        const author = req.userData.userId;
+  try {
+    const { title, content, section } = req.body;
+    const author = req.userData.userId;
 
-        const newTopic = new Topic({
-            title,
-            content,
-            author,
-            section,
-            lastReplyAt: new Date(),
-            lastRepliedBy: author
-        });
+    const newTopic = new Topic({
+      title,
+      content,
+      author,
+      section,
+      lastReplyAt: new Date(),
+      lastRepliedBy: author,
+    });
 
-        await newTopic.save();
-
-        res.status(201).json({ message: '主题创建成功', topicId: newTopic._id });
-
-    } catch (error) {
-        console.error('创建主题失败:', error);
-        res.status(400).json({ message: '创建主题失败', error: error.message });
-    }
+    await newTopic.save();
+    return res.status(201).json({ message: 'ä¸»é¢˜åˆ›å»ºæˆåŠŸ', topicId: newTopic._id });
+  } catch (error) {
+    console.error('åˆ›å»ºä¸»é¢˜å¤±è´¥:', error);
+    return res.status(400).json({ message: 'åˆ›å»ºä¸»é¢˜å¤±è´¥', error: error.message });
+  }
 });
 
-// ===================================
-// 接口 2: 获取主题列表 (保持不变)
-// GET /api/topics?page=1&limit=10&section=讨论区
-// ===================================
 router.get('/', async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const section = req.query.section;
-        const skip = (page - 1) * limit;
-        
-        const filter = {};
-        if (section) {
-            filter.section = section;
-        }
-
-const topics = await Topic.find(filter)
-    .sort({ isPinned: -1, pinnedAt: -1, lastReplyAt: -1, createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    // 带上作者的 lastActiveAt + avatarUrl
-    .populate('author', 'username lastActiveAt avatarUrl')
-    .populate('lastRepliedBy', 'username lastActiveAt avatarUrl')
-    .select('-content -likedBy')
-    .exec();
-
-        const totalTopics = await Topic.countDocuments(filter);
-
-        res.json({
-            topics,
-            currentPage: page,
-            totalPages: Math.ceil(totalTopics / limit),
-            totalTopics
-        });
-
-    } catch (error) {
-        console.error('获取主题列表失败:', error);
-        res.status(500).json({ message: '获取主题列表失败', error: error.message });
-    }
-});
-
-// ===================================
-// 接口 3: 获取单个主题详情 (【已修改】实现楼中楼嵌套及根回复分页)
-// GET /api/topics/:topicId
-// ===================================
-router.get('/:topicId', async (req, res) => {
-    const topicId = req.params.topicId;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20; // 默认每页根回复数
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+    const section = req.query.section;
     const skip = (page - 1) * limit;
 
-    try {
-        // 1. 获取主题详情
-      const topic = await Topic.findById(topicId)
-    .populate('author', 'username lastActiveAt avatarUrl')
-    .select('-__v')
-    .exec();
+    const filter = {};
+    if (section) {
+      filter.section = section;
+    }
 
-        if (!topic) {
-            return res.status(404).json({ message: '找不到该主题' });
-        }
+    const topics = await Topic.find(filter)
+      .sort({ isPinned: -1, pinnedAt: -1, lastReplyAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('author', 'username lastActiveAt avatarUrl')
+      .populate('lastRepliedBy', 'username lastActiveAt avatarUrl')
+      .select('-content -likedBy')
+      .exec();
 
-        // 2. 增加浏览量 (不等待，异步执行)
-        Topic.findByIdAndUpdate(topicId, { $inc: { viewsCount: 1 } }).exec();
+    const totalTopics = await Topic.countDocuments(filter);
 
-                // 3. 计算当前主题下“所有回复总数”（不再区分根回复）
-        const totalReplies = await Reply.countDocuments({ topic: topicId });
+    return res.json({
+      topics,
+      currentPage: page,
+      totalPages: Math.ceil(totalTopics / limit),
+      totalTopics,
+    });
+  } catch (error) {
+    console.error('èŽ·å–ä¸»é¢˜åˆ—è¡¨å¤±è´¥:', error);
+    return res.status(500).json({ message: 'èŽ·å–ä¸»é¢˜åˆ—è¡¨å¤±è´¥', error: error.message });
+  }
+});
 
-        // 4. 获取当前页的“扁平回复列表”（按时间排序）
-        const replies = await Reply.find({ topic: topicId })
-    .sort({ createdAt: 1 })
-    .skip(skip)
-    .limit(limit)
-    .populate('author', 'username lastActiveAt avatarUrl') // + avatarUrl
-    .populate({
+router.get('/:topicId', async (req, res) => {
+  const { topicId } = req.params;
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+  const skip = (page - 1) * limit;
+
+  if (!isValidObjectId(topicId)) {
+    return res.status(400).json({ message: 'æ— æ•ˆçš„ä¸»é¢˜ID' });
+  }
+
+  try {
+    const topic = await Topic.findById(topicId)
+      .populate('author', 'username lastActiveAt avatarUrl')
+      .select('-__v')
+      .exec();
+
+    if (!topic) {
+      return res.status(404).json({ message: 'æ‰¾ä¸åˆ°è¯¥ä¸»é¢˜' });
+    }
+
+    Topic.findByIdAndUpdate(topicId, { $inc: { viewsCount: 1 } }).exec();
+
+    const totalReplies = await Reply.countDocuments({ topic: topicId });
+    const replies = await Reply.find({ topic: topicId })
+      .sort({ createdAt: 1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('author', 'username lastActiveAt avatarUrl')
+      .populate({
         path: 'parentReply',
         select: 'content author',
         populate: {
-            path: 'author',
-            select: 'username avatarUrl' // 让被回复的那个人也有头像
-        }
-    })
-    .lean()
-    .exec();
+          path: 'author',
+          select: 'username avatarUrl',
+        },
+      })
+      .lean()
+      .exec();
 
-
-        // 5. 返回给前端：topic + 扁平 replies（带 parentReply 信息）
-        res.json({
-            topic,
-            replies, // 现在是一个“扁平列表”，每条里有 parentReply 字段
-            replyPage: page,
-            replyTotalPages: Math.ceil(totalReplies / limit),
-            totalReplies
-        });
-
-
-    } catch (error) {
-        console.error('获取主题详情失败:', error);
-        res.status(500).json({ message: '获取主题详情失败', error: error.message });
-    }
-});
-
-// ===================================
-// 接口 4: 添加回复 (【已修改】支持楼中楼 parentId)
-// POST /api/topics/:topicId/replies
-// ===================================
-router.post('/:topicId/replies', auth, async (req, res) => {
-    const topicId = req.params.topicId;
-    const { content, parentId } = req.body; // <-- 接收 parentId 用于楼中楼
-    const authorId = req.userData.userId;
-
-    // 检查 topicId 是否是有效的 ObjectId
-    if (!mongoose.Types.ObjectId.isValid(topicId)) {
-        return res.status(400).json({ message: '无效的主题ID' });
-    }
-
-    try {
-        // 1. 确保主题存在
-        const topic = await Topic.findById(topicId);
-        if (!topic) {
-            return res.status(404).json({ message: '回复的主题不存在' });
-        }
-        
-        // 2. 验证并设置父回复 ID
-        let parentReplyId = null;
-        if (parentId) {
-            if (!mongoose.Types.ObjectId.isValid(parentId)) {
-                return res.status(400).json({ message: '无效的父回复ID' });
-            }
-            parentReplyId = parentId;
-            
-            // 确保父回复是根回复或已存在的回复
-            // 实际应用中需要检查父回复是否存在，但此处略过以保持代码简洁
-        }
-
-        // 3. 创建新回复
-        const newReply = new Reply({
-            topic: topicId,
-            content,
-            author: authorId,
-            parentReply: parentReplyId // <-- 保存楼中楼 ID
-        });
-        await newReply.save();
-
-        // 4. 更新主题的回复计数和最后回复信息
-        // 保持原逻辑：所有回复（包括楼中楼）都更新总计数和最后回复信息
-        await Topic.findByIdAndUpdate(topicId, {
-            $inc: { repliesCount: 1 }, // 计数器递增 (算上所有评论)
-            lastReplyAt: newReply.createdAt,
-            lastRepliedBy: authorId
-        });
-
-// ✅ 通知主题作者：只要有人在主题内发表评论，主题作者都收到通知
-if (topic.author.toString() !== authorId.toString()) {
-    const topicNotification = new Notification({
-        recipient: topic.author,
-        type: 'comment',
-        sender: authorId,
-        comment: newReply._id,
-        topic: topicId,
-        message: `在你的主题《${topic.title.substring(0, 20)}...》中发表评论`
+    return res.json({
+      topic,
+      replies,
+      replyPage: page,
+      replyTotalPages: Math.ceil(totalReplies / limit),
+      totalReplies,
     });
-    await topicNotification.save();
-}
-        // *如果是楼中楼回复（parentId存在），还需通知被回复的楼层作者*
-        if (parentReplyId) {
-            const parentReply = await Reply.findById(parentReplyId).select('author');
-            // 且被回复者不是当前回复者本人，也不是主题作者（避免重复通知）
-            if (parentReply && 
-                parentReply.author.toString() !== authorId.toString() &&
-                parentReply.author.toString() !== topic.author.toString()) {
-
-                const nestedNotification = new Notification({
-                    recipient: parentReply.author,
-                    type: 'comment',
-                    sender: authorId,
-                    comment: newReply._id,
-                    topic: topicId,
-                    message: `在主题《${topic.title.substring(0, 20)}...》中回复了你的评论: ${content.substring(0, 20)}...`
-                });
-                await nestedNotification.save();
-            }
-        }
-
-        // 保存完再查一遍，populate 出作者和 lastActiveAt
-// 保存完再查一遍，populate 出作者、活跃时间和头像
-const populatedReply = await Reply.findById(newReply._id)
-    .populate('author', 'username lastActiveAt avatarUrl')
-    .lean();
-
-res.status(201).json({
-    message: '回复成功',
-    reply: populatedReply
+  } catch (error) {
+    console.error('èŽ·å–ä¸»é¢˜è¯¦æƒ…å¤±è´¥:', error);
+    return res.status(500).json({ message: 'èŽ·å–ä¸»é¢˜è¯¦æƒ…å¤±è´¥', error: error.message });
+  }
 });
 
+router.post('/:topicId/replies', auth, async (req, res) => {
+  const { topicId } = req.params;
+  const { content, parentId } = req.body;
+  const authorId = req.userData.userId;
 
-    } catch (error) {
-        console.error('添加回复失败:', error);
-        res.status(500).json({ message: '添加回复失败', error: error.message });
+  if (!isValidObjectId(topicId)) {
+    return res.status(400).json({ message: 'æ— æ•ˆçš„ä¸»é¢˜ID' });
+  }
+
+  try {
+    const topic = await Topic.findById(topicId).select('author');
+    if (!topic) {
+      return res.status(404).json({ message: 'å›žå¤çš„ä¸»é¢˜ä¸å­˜åœ¨' });
     }
+
+    let parentReply = null;
+    if (parentId) {
+      if (!isValidObjectId(parentId)) {
+        return res.status(400).json({ message: 'æ— æ•ˆçš„çˆ¶å›žå¤ID' });
+      }
+
+      parentReply = await Reply.findOne({ _id: parentId, topic: topicId }).select('author');
+      if (!parentReply) {
+        return res.status(404).json({ message: 'çˆ¶å›žå¤ä¸å­˜åœ¨æˆ–ä¸å±žäºŽå½“å‰ä¸»é¢˜' });
+      }
+    }
+
+    const newReply = new Reply({
+      topic: topicId,
+      content,
+      author: authorId,
+      parentReply: parentReply?._id || null,
+    });
+    await newReply.save();
+
+    await Topic.findByIdAndUpdate(topicId, {
+      $inc: { repliesCount: 1 },
+      lastReplyAt: newReply.createdAt,
+      lastRepliedBy: authorId,
+    });
+
+    await createTopicReplyNotifications({
+      topicId,
+      replyId: newReply._id,
+      senderId: authorId,
+      parentReplyAuthorId: parentReply?.author || null,
+      replyContent: content,
+    });
+
+    const populatedReply = await Reply.findById(newReply._id)
+      .populate('author', 'username lastActiveAt avatarUrl')
+      .lean();
+
+    return res.status(201).json({
+      message: 'å›žå¤æˆåŠŸ',
+      reply: populatedReply,
+    });
+  } catch (error) {
+    console.error('æ·»åŠ å›žå¤å¤±è´¥:', error);
+    return res.status(500).json({ message: 'æ·»åŠ å›žå¤å¤±è´¥', error: error.message });
+  }
 });
 
-
-// ===================================
-// 接口 5: 点赞/取消点赞主题 (保持不变)
-// POST /api/topics/:topicId/like
-// ===================================
 router.post('/:topicId/like', auth, async (req, res) => {
-    const topicId = req.params.topicId;
-    const userId = req.userData.userId;
+  const { topicId } = req.params;
+  const userId = req.userData.userId;
 
-    try {
-        const topic = await Topic.findById(topicId);
-        if (!topic) {
-            return res.status(404).json({ message: '主题不存在' });
-        }
+  if (!isValidObjectId(topicId)) {
+    return res.status(400).json({ message: 'æ— æ•ˆçš„ä¸»é¢˜ID' });
+  }
 
-        const userLikedIndex = topic.likedBy.findIndex(id => id.toString() === userId.toString());
-
-        if (userLikedIndex === -1) {
-            topic.likedBy.push(userId);
-            topic.likesCount += 1;
-            await topic.save();
-
-            // 【修改点 5】创建通知 (主题点赞)
-            // 只有当点赞者不是主题作者本人时才创建通知
-            if (topic.author.toString() !== userId.toString()) {
-                const newNotification = new Notification({
-                    recipient: topic.author, // 主题作者是通知接收者
-                    type: 'like',
-                    sender: userId, // 点赞者是发送者
-                    likedWork: topic._id, // 关联到被点赞的主题 (Work 可能是 Topic 的别名)
-                    topic: topic._id, // 关联到主题 (用于跳转)
-                    message: `点赞了你的主题: ${topic.title.substring(0, 20)}...`
-                });
-
-                await newNotification.save();
-            }
-            return res.status(200).json({ message: '点赞成功', isLiked: true, likesCount: topic.likesCount });
-        } else {
-            topic.likedBy.splice(userLikedIndex, 1);
-            topic.likesCount -= 1;
-            await topic.save();
-            return res.status(200).json({ message: '取消点赞成功', isLiked: false, likesCount: topic.likesCount });
-        }
-    } catch (error) {
-        console.error('主题点赞操作失败:', error);
-        res.status(500).json({ message: '主题点赞操作失败', error: error.message });
+  try {
+    const topic = await Topic.findById(topicId);
+    if (!topic) {
+      return res.status(404).json({ message: 'ä¸»é¢˜ä¸å­˜åœ¨' });
     }
+
+    if (!Array.isArray(topic.likedBy)) {
+      topic.likedBy = [];
+    }
+
+    const userLikedIndex = topic.likedBy.findIndex((id) => String(id) === String(userId));
+
+    if (userLikedIndex === -1) {
+      topic.likedBy.push(userId);
+      topic.likesCount += 1;
+      await topic.save();
+
+      await createTopicLikeNotification({ topicId: topic._id, senderId: userId });
+
+      return res.status(200).json({
+        message: 'ç‚¹èµžæˆåŠŸ',
+        isLiked: true,
+        likesCount: topic.likesCount,
+      });
+    }
+
+    topic.likedBy.splice(userLikedIndex, 1);
+    topic.likesCount = Math.max((topic.likesCount || 0) - 1, 0);
+    await topic.save();
+
+    return res.status(200).json({
+      message: 'å–æ¶ˆç‚¹èµžæˆåŠŸ',
+      isLiked: false,
+      likesCount: topic.likesCount,
+    });
+  } catch (error) {
+    console.error('ä¸»é¢˜ç‚¹èµžæ“ä½œå¤±è´¥:', error);
+    return res.status(500).json({ message: 'ä¸»é¢˜ç‚¹èµžæ“ä½œå¤±è´¥', error: error.message });
+  }
 });
 
-
-// ===================================
-// 接口 6: 点赞/取消点赞回复 (保持不变)
-// POST /api/topics/replies/:replyId/like
-// ===================================
 router.post('/replies/:replyId/like', auth, async (req, res) => {
-    const replyId = req.params.replyId;
-    const userId = req.userData.userId;
+  const { replyId } = req.params;
+  const userId = req.userData.userId;
 
-    try {
-        const reply = await Reply.findById(replyId);
-        if (!reply) {
-            return res.status(404).json({ message: '回复不存在' });
-        }
+  if (!isValidObjectId(replyId)) {
+    return res.status(400).json({ message: 'æ— æ•ˆçš„å›žå¤ID' });
+  }
 
-        const userLikedIndex = reply.likedBy.findIndex(id => id.toString() === userId.toString());
-
-        if (userLikedIndex === -1) {
-            reply.likedBy.push(userId);
-            reply.likesCount += 1;
-            await reply.save();
-
-// 【修改点 6】创建通知 (回复点赞)
-            // 只有当点赞者不是回复作者本人时才创建通知
-            if (reply.author.toString() !== userId.toString()) {
-                // 需要获取主题标题用于消息内容
-                const topic = await Topic.findById(reply.topic).select('title'); 
-                const topicTitle = topic ? topic.title : '某主题';
-
-                const newNotification = new Notification({
-                    recipient: reply.author, // 回复作者是通知接收者
-                    type: 'like',
-                    sender: userId, // 点赞者是发送者
-                    likedComment: reply._id, // 关联到被点赞的评论
-                    topic: reply.topic, // 关联到主题 (用于跳转)
-                    message: `点赞了你在主题《${topicTitle.substring(0, 20)}...》中的评论`
-                });
-                await newNotification.save();
-            }
-
-            return res.status(200).json({ message: '点赞成功', isLiked: true, likesCount: reply.likesCount });
-        } else {
-            reply.likedBy.splice(userLikedIndex, 1);
-            reply.likesCount -= 1;
-            await reply.save();
-            return res.status(200).json({ message: '取消点赞成功', isLiked: false, likesCount: reply.likesCount });
-        }
-    } catch (error) {
-        console.error('回复点赞操作失败:', error);
-        res.status(500).json({ message: '回复点赞操作失败', error: error.message });
+  try {
+    const reply = await Reply.findById(replyId);
+    if (!reply) {
+      return res.status(404).json({ message: 'å›žå¤ä¸å­˜åœ¨' });
     }
+
+    if (!Array.isArray(reply.likedBy)) {
+      reply.likedBy = [];
+    }
+
+    const userLikedIndex = reply.likedBy.findIndex((id) => String(id) === String(userId));
+
+    if (userLikedIndex === -1) {
+      reply.likedBy.push(userId);
+      reply.likesCount += 1;
+      await reply.save();
+
+      await createTopicReplyLikeNotification({ replyId: reply._id, senderId: userId });
+
+      return res.status(200).json({
+        message: 'ç‚¹èµžæˆåŠŸ',
+        isLiked: true,
+        likesCount: reply.likesCount,
+      });
+    }
+
+    reply.likedBy.splice(userLikedIndex, 1);
+    reply.likesCount = Math.max((reply.likesCount || 0) - 1, 0);
+    await reply.save();
+
+    return res.status(200).json({
+      message: 'å–æ¶ˆç‚¹èµžæˆåŠŸ',
+      isLiked: false,
+      likesCount: reply.likesCount,
+    });
+  } catch (error) {
+    console.error('å›žå¤ç‚¹èµžæ“ä½œå¤±è´¥:', error);
+    return res.status(500).json({ message: 'å›žå¤ç‚¹èµžæ“ä½œå¤±è´¥', error: error.message });
+  }
 });
 
-// ===================================
-// 接口 X: 置顶/取消置顶主题（管理员）
-// POST /api/topics/:topicId/pin
-// body: { isPinned: true/false }
-// ===================================
 router.post('/:topicId/pin', auth, async (req, res) => {
   try {
     const { topicId } = req.params;
     const { isPinned } = req.body;
 
-    // TODO：这里按你实际的管理员字段改
-    // 例如你 authMiddleware 里如果有 req.userData.isAdmin：
-    // if (!req.userData?.isAdmin) return res.status(403).json({ message: '无权限' });
+    if (!isValidObjectId(topicId)) {
+      return res.status(400).json({ message: 'æ— æ•ˆçš„ä¸»é¢˜ID' });
+    }
+
+    if (!(await isAdminUser(req.userData.userId))) {
+      return res.status(403).json({ message: 'æ— æƒé™' });
+    }
 
     const topic = await Topic.findById(topicId);
-    if (!topic) return res.status(404).json({ message: '主题不存在' });
+    if (!topic) {
+      return res.status(404).json({ message: 'ä¸»é¢˜ä¸å­˜åœ¨' });
+    }
 
     if (isPinned) {
-      // ✅ 强制它是置顶的那个：同一 section 先全部取消
       await Topic.updateMany(
         { section: topic.section, _id: { $ne: topic._id } },
         { $set: { isPinned: false, pinnedAt: null } }
@@ -417,13 +364,11 @@ router.post('/:topicId/pin', auth, async (req, res) => {
     }
 
     await topic.save();
-    res.json({ message: 'ok', topicId: topic._id, isPinned: topic.isPinned });
+    return res.json({ message: 'ok', topicId: topic._id, isPinned: topic.isPinned });
   } catch (error) {
-    console.error('置顶操作失败:', error);
-    res.status(500).json({ message: '置顶操作失败', error: error.message });
+    console.error('ç½®é¡¶æ“ä½œå¤±è´¥:', error);
+    return res.status(500).json({ message: 'ç½®é¡¶æ“ä½œå¤±è´¥', error: error.message });
   }
 });
-
-
 
 module.exports = router;
