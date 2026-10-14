@@ -11,6 +11,22 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const CHECK_IN_TIME_ZONE = 'Asia/Shanghai';
+
+function getDateKeyInTimeZone(date) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: CHECK_IN_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(date);
+    const values = {};
+    parts.forEach((part) => {
+        if (part.type !== 'literal') values[part.type] = part.value;
+    });
+    return `${values.year}-${values.month}-${values.day}`;
+}
+
 // 注册
 router.post('/register', async (req, res) => {
     try {
@@ -116,6 +132,85 @@ router.get('/profile', auth, async (req, res) => {
         res.json({ message: '您已成功访问受保护的个人资料！', user });
     } catch (error) {
         res.status(500).json({ message: '无法获取个人资料', error: error.message });
+    }
+});
+
+// 获取每日签到状态。日期按北京时间计算，避免服务器部署地区影响结果。
+router.get('/check-in', auth, async (req, res) => {
+    try {
+        const todayKey = getDateKeyInTimeZone(new Date());
+        const user = await User.findById(req.userData.userId).select('checkIn');
+        if (!user) return res.status(404).json({ message: '找不到该用户' });
+
+        const checkIn = user.checkIn || {};
+        return res.json({
+            checkedInToday: checkIn.lastDateKey === todayKey,
+            streak: Number(checkIn.streak) || 0,
+            totalDays: Number(checkIn.totalDays) || 0,
+            lastAt: checkIn.lastAt || null,
+            timeZone: CHECK_IN_TIME_ZONE,
+        });
+    } catch (error) {
+        return res.status(500).json({ message: '获取签到状态失败', error: error.message });
+    }
+});
+
+// 原子签到：同一账号并发点击也只会累计一次。
+router.post('/check-in', auth, async (req, res) => {
+    try {
+        const now = new Date();
+        const todayKey = getDateKeyInTimeZone(now);
+        const yesterdayKey = getDateKeyInTimeZone(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+
+        const user = await User.findOneAndUpdate(
+            {
+                _id: req.userData.userId,
+                'checkIn.lastDateKey': { $ne: todayKey },
+            },
+            [
+                {
+                    $set: {
+                        checkIn: {
+                            lastDateKey: todayKey,
+                            lastAt: now,
+                            streak: {
+                                $cond: [
+                                    { $eq: ['$checkIn.lastDateKey', yesterdayKey] },
+                                    { $add: [{ $ifNull: ['$checkIn.streak', 0] }, 1] },
+                                    1,
+                                ],
+                            },
+                            totalDays: { $add: [{ $ifNull: ['$checkIn.totalDays', 0] }, 1] },
+                        },
+                    },
+                },
+            ],
+            { new: true }
+        ).select('checkIn');
+
+        if (user) {
+            return res.json({
+                message: '签到成功',
+                checkedInToday: true,
+                streak: user.checkIn.streak,
+                totalDays: user.checkIn.totalDays,
+                lastAt: user.checkIn.lastAt,
+                timeZone: CHECK_IN_TIME_ZONE,
+            });
+        }
+
+        const existing = await User.findById(req.userData.userId).select('checkIn');
+        if (!existing) return res.status(404).json({ message: '找不到该用户' });
+        return res.json({
+            message: '今天已经签到过了',
+            checkedInToday: true,
+            streak: Number(existing.checkIn && existing.checkIn.streak) || 0,
+            totalDays: Number(existing.checkIn && existing.checkIn.totalDays) || 0,
+            lastAt: existing.checkIn ? existing.checkIn.lastAt : null,
+            timeZone: CHECK_IN_TIME_ZONE,
+        });
+    } catch (error) {
+        return res.status(500).json({ message: '签到失败', error: error.message });
     }
 });
 

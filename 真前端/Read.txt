@@ -503,9 +503,38 @@
             flex-wrap: wrap;
             gap: 10px;
             overflow-y: auto;
+            overscroll-behavior: contain;
+            border: 1px solid rgba(0, 0, 0, 0.08);
         }
         .nav-grid-popup.show {
             display: flex;
+        }
+        .nav-grid-title {
+            flex: 1 0 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e9ecef;
+            color: #343a40;
+            font-weight: 700;
+        }
+        .nav-grid-close {
+            width: 32px;
+            height: 32px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: #495057;
+            font-size: 1.25rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .nav-grid-close:hover,
+        .nav-grid-close:focus-visible {
+            background: #e9ecef;
+            outline: none;
         }
         .nav-cell {
             flex-grow: 1;
@@ -525,6 +554,26 @@
         }
         .nav-cell:hover {
             background: #e9ecef;
+        }
+        .nav-cell:focus-visible {
+            outline: 3px solid rgba(0, 119, 204, 0.28);
+            outline-offset: 2px;
+        }
+        .nav-cell.active {
+            color: #fff;
+            background: #0077cc;
+            border-color: #0077cc;
+        }
+
+        @media (max-width: 1050px) {
+            .nav-grid-popup {
+                left: 12px;
+                right: 12px;
+                top: 76px;
+                width: auto;
+                max-height: min(55vh, 420px);
+                transform: none;
+            }
         }
       
 /* ------------------------------------------- */
@@ -609,6 +658,17 @@ body.dark-mode {
 .nav-grid-popup.dark-mode {
     background-color: #2d3035;
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.nav-grid-popup.dark-mode .nav-grid-title {
+    color: #f1f3f5;
+    border-bottom-color: #4b4f55;
+}
+.nav-grid-popup.dark-mode .nav-grid-close {
+    color: #f1f3f5;
+}
+.nav-grid-popup.dark-mode .nav-grid-close:hover,
+.nav-grid-popup.dark-mode .nav-grid-close:focus-visible {
+    background: #44484f;
 }
 .nav-cell.dark-mode {
     background-color: #33363b;
@@ -1231,7 +1291,7 @@ body.bg-peek-mobile-mode .read-page-wrapper > :not(#read-bg-wrapper):not(#bg-pee
 </div>
 
     <div class="sidebar-btn-group" id="nav-toggle-btn">
-      <button class="nav-toggle-icon">&#8635;</button>
+      <button class="nav-toggle-icon" type="button" aria-expanded="false" aria-controls="nav-grid-popup" title="打开导航">&#8635;</button>
       <span>导航</span>
     </div>
     <div class="sidebar-btn-group" id="back-to-top-btn">
@@ -1249,7 +1309,7 @@ body.bg-peek-mobile-mode .read-page-wrapper > :not(#read-bg-wrapper):not(#bg-pee
     </div>
   </aside>
 
-  <aside id="comment-panel" class="comment-panel">
+  <aside id="comment-panel" class="comment-panel" aria-hidden="true" aria-label="评论面板">
     <div class="comment-panel-header">
       <h4>评论</h4>
       <button id="close-comment-panel-btn">×</button>
@@ -1263,7 +1323,7 @@ body.bg-peek-mobile-mode .read-page-wrapper > :not(#read-bg-wrapper):not(#bg-pee
     </div>
   </aside>
 
-  <div class="nav-grid-popup" id="nav-grid-popup"></div>
+  <div class="nav-grid-popup" id="nav-grid-popup" role="dialog" aria-label="章节导航" aria-hidden="true" tabindex="-1"></div>
 <!-- 懒加载 / 弱网切换 提示 -->
 <div id="lazy-load-toast" class="lazy-load-toast" aria-live="polite">
   <div class="spinner" aria-hidden="true"></div>
@@ -1503,14 +1563,14 @@ function registerEffectTrigger(targetEl, cb) {
         return;
     }
 
-    // ⭐ 新增：顶部补触发逻辑（无 && 版本）
+    // ⭐ 新增：顶部补触发逻辑（兼容旧转换器版本）
     (function () {
         var rect = targetEl.getBoundingClientRect();
         var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
         var lowerBandTop = viewportHeight * 0.8;   // 保持 0.8 不变
         var lowerBandBottom = viewportHeight;
 
-        // 计算是否在视口内（不使用 &&）
+        // 计算是否在视口内（使用嵌套判断）
         var inViewport = false;
         if (rect.bottom > 0) {
             if (rect.top < viewportHeight) {
@@ -1520,7 +1580,7 @@ function registerEffectTrigger(targetEl, cb) {
 
         var centerY = rect.top + rect.height / 2;
 
-        // 如果当前已经在视口里，但中心点在下方 1/5 以上，直接播一次特效（不使用 &&）
+        // 如果当前已经在视口里，但中心点在下方 1/5 以上，直接播一次特效
         if (inViewport) {
             if (centerY < lowerBandTop) {
                 if (EFFECT_DEBUG) {
@@ -1614,7 +1674,7 @@ function findFirstSuspiciousChar(raw) {
 
     // BOM / 行分隔符 / 零宽
     if (code === 0xFEFF || code === 0x2028 || code === 0x2029) return { index: i, code: code };
-    if (code >= 0x200B && code <= 0x200D) return { index: i, code: code };
+    if (code >= 0x200B ? code <= 0x200D : false) return { index: i, code: code };
     if (code === 0x2060 || code === 0x00AD) return { index: i, code: code };
   }
   return null;
@@ -1626,7 +1686,7 @@ async function ensureCustomEffectsLoaded() {
     if (customEffectsLoaded) return;
 
     try {
-        const workId = activeWork && (activeWork._id || activeWork.workId);
+        const workId = activeWork ? (activeWork._id || activeWork.workId) : null;
         if (!workId) return;
         const res = await fetch(`${EFFECT_API_BASE_URL}?workId=${encodeURIComponent(workId)}`);
         if (!res.ok) throw new Error('请求失败');
@@ -1710,13 +1770,54 @@ list.forEach(function (item) {
         const likeIcon = likeWorkBtn.querySelector('.like-icon');
         const sidebar = document.getElementById('sidebar');
 
+        function closeNavigationPopup(restoreFocus) {
+          const navPopup = document.getElementById('nav-grid-popup');
+          const navToggleGroup = document.getElementById('nav-toggle-btn');
+          const navToggleButton = navToggleGroup ? navToggleGroup.querySelector('button') : null;
+          if (navPopup) {
+            navPopup.classList.remove('show');
+            navPopup.setAttribute('aria-hidden', 'true');
+          }
+          if (navToggleButton) {
+            navToggleButton.setAttribute('aria-expanded', 'false');
+            navToggleButton.setAttribute('title', '打开导航');
+            if (restoreFocus) navToggleButton.focus();
+          }
+        }
+
+        function setNavigationPopupOpen(shouldOpen) {
+          const navPopup = document.getElementById('nav-grid-popup');
+          const navToggleGroup = document.getElementById('nav-toggle-btn');
+          const navToggleButton = navToggleGroup ? navToggleGroup.querySelector('button') : null;
+          if (!navPopup) return;
+          if (!shouldOpen) {
+            closeNavigationPopup(false);
+            return;
+          }
+
+          sidebar.classList.remove('show');
+          sidebarToggleIcon.textContent = '⮝';
+          sidebarToggleBtn.setAttribute('aria-expanded', 'false');
+          navPopup.classList.add('show');
+          navPopup.setAttribute('aria-hidden', 'false');
+          if (navToggleButton) {
+            navToggleButton.setAttribute('aria-expanded', 'true');
+            navToggleButton.setAttribute('title', '关闭导航');
+          }
+          requestAnimationFrame(function () {
+            const focusTarget = navPopup.querySelector('.nav-cell.active') ||
+              navPopup.querySelector('.nav-cell') || navPopup;
+            focusTarget.focus();
+          });
+        }
+
       const lazyToast = document.getElementById('lazy-load-toast');
 const lazyToastText = document.getElementById('lazy-load-toast-text');
 const lazyToastNavBtn = document.getElementById('lazy-load-toast-nav-btn');
 
 function showLazyToast(text, { weak=false, showNav=false } = {}) {
   if (!lazyToast) return;
-  lazyToastText && (lazyToastText.textContent = text || '');
+  if (lazyToastText) lazyToastText.textContent = text || '';
   lazyToast.classList.toggle('weak', !!weak);
   lazyToast.classList.add('show');
 
@@ -1731,7 +1832,7 @@ function hideLazyToast() {
 if (lazyToastNavBtn) {
   lazyToastNavBtn.addEventListener('click', () => {
     const navBtn = document.getElementById('nav-toggle-btn');
-    navBtn && navBtn.click();
+    if (navBtn) navBtn.click();
   });
 }
 
@@ -1774,7 +1875,7 @@ let pagesFetchInFlight = null;
 let pagesFetchAbort = null;
 
 function getActiveWorkIdForRead() {
-  return (activeWork && (activeWork._id || activeWork.workId)) || null;
+  return activeWork ? (activeWork._id || activeWork.workId || null) : null;
 }
 
 async function fetchWorkMeta(id) {
@@ -1827,10 +1928,13 @@ async function ensurePagesFetchedUpTo(targetEnd, weak = false) {
       const pages = Array.isArray(data.pages) ? data.pages : [];
 
       // ✅ 兼容后端返回 pageCount（以及你未来可能改成 totalPages）
-      const serverTotal =
-        (typeof data.totalPages === "number" && data.totalPages > 0) ? data.totalPages :
-        (typeof data.pageCount === "number" && data.pageCount > 0) ? data.pageCount :
-        0;
+      const hasTotalPages =
+        typeof data.totalPages === "number" ? data.totalPages > 0 : false;
+      const hasPageCount =
+        typeof data.pageCount === "number" ? data.pageCount > 0 : false;
+      const serverTotal = hasTotalPages
+        ? data.totalPages
+        : (hasPageCount ? data.pageCount : 0);
 
       if (serverTotal) {
         totalPageCount = serverTotal;
@@ -2270,6 +2374,7 @@ function refreshRenderedCommentMarkers() {
         // 局部修改: 关闭评论区时，同时取消“查看模式”
 closeCommentBtn.addEventListener('click', () => {
     commentPanel.classList.remove('show');
+    commentPanel.setAttribute('aria-hidden', 'true');
     disableCommentInputArea(false); // <--- 新增: 恢复评论功能
     commentPanel.querySelector('h4').textContent = `评论`; // <--- 恢复标题
 });
@@ -2291,18 +2396,22 @@ function resolveAnchoredSentenceElement(rootEl, rawIndex, anchor) {
     if (!Number.isInteger(expectedIndex) || expectedIndex < 0) return null;
 
     const expected = rootEl.querySelector(`[data-sentence-index="${expectedIndex}"]`);
-    const anchorText = normalizeSentenceAnchorText(anchor && anchor.text);
+    const anchorText = normalizeSentenceAnchorText(anchor ? anchor.text : '');
     if (!anchorText) return expected;
 
-    const textOf = (el) => normalizeSentenceAnchorText(
-        el && el.dataset && el.dataset.sentenceAnchorText
-            ? el.dataset.sentenceAnchorText
-            : el && el.textContent
-    );
-    if (expected && textOf(expected) === anchorText) return expected;
+    const textOf = (el) => {
+        if (!el) return normalizeSentenceAnchorText('');
+        if (el.dataset) {
+            if (el.dataset.sentenceAnchorText) {
+                return normalizeSentenceAnchorText(el.dataset.sentenceAnchorText);
+            }
+        }
+        return normalizeSentenceAnchorText(el.textContent);
+    };
+    if (expected ? textOf(expected) === anchorText : false) return expected;
 
-    const beforeText = normalizeSentenceAnchorText(anchor && anchor.before);
-    const afterText = normalizeSentenceAnchorText(anchor && anchor.after);
+    const beforeText = normalizeSentenceAnchorText(anchor ? anchor.before : '');
+    const afterText = normalizeSentenceAnchorText(anchor ? anchor.after : '');
     const candidates = Array.from(rootEl.querySelectorAll('[data-sentence-index]'))
         .filter((el) => textOf(el) === anchorText);
 
@@ -2314,10 +2423,14 @@ function resolveAnchoredSentenceElement(rootEl, rawIndex, anchor) {
 
         const previous = rootEl.querySelector(`[data-sentence-index="${candidateIndex - 1}"]`);
         const next = rootEl.querySelector(`[data-sentence-index="${candidateIndex + 1}"]`);
-        const beforeMatches = beforeText && textOf(previous) === beforeText;
-        const afterMatches = afterText && textOf(next) === afterText;
+        const beforeMatches = beforeText ? textOf(previous) === beforeText : false;
+        const afterMatches = afterText ? textOf(next) === afterText : false;
         const hasContext = Boolean(beforeText || afterText);
-        if (hasContext && !beforeMatches && !afterMatches) return;
+        if (hasContext) {
+            if (!beforeMatches) {
+                if (!afterMatches) return;
+            }
+        }
 
         let score = 10 - Math.min(Math.abs(candidateIndex - expectedIndex), 100) / 100;
         if (beforeMatches) score += 4;
@@ -2410,7 +2523,7 @@ function applyEffectsToBlocks(rootEl, effectsPublished, workId) {
         // --- 实际特效处理 ---
         // 自定义特效：effectType 形如 "custom:xxx"
         // 自定义特效：effectType 形如 "custom:xxx"
-if (typeof type === 'string' && type.startsWith('custom:')) {
+if (typeof type === 'string' ? type.startsWith('custom:') : false) {
     const customKey = type.slice('custom:'.length) || '';
 
     // 调试用：先加一个占位 class，方便肉眼确认命中
@@ -2422,7 +2535,7 @@ if (typeof type === 'string' && type.startsWith('custom:')) {
     });
 
     // ⭐ 关键：从映射里取出对应的执行函数
-    const runner = customEffectFnMap && customEffectFnMap[customKey];
+    const runner = customEffectFnMap ? customEffectFnMap[customKey] : null;
 
     if (!runner) {
         console.warn('⚠ [effects] 未找到自定义特效函数:', customKey);
@@ -2602,9 +2715,13 @@ async function loadWorkContentById(id) {
 commentedIdsReadyPromise = fetchCommentedSentenceIds(meta.workId || id);
       updateGlobalLoadingProgress(70, '正在渲染作品内容…');
 
-      if (Array.isArray(meta.pages) && meta.pages.length > 0) activePages = meta.pages;
-      else if (Array.isArray(meta.content) && meta.content.length > 0) activePages = meta.content;
-      else activePages = [{ content: { ops: [] } }];
+      if (Array.isArray(meta.pages) ? meta.pages.length > 0 : false) {
+        activePages = meta.pages;
+      } else if (Array.isArray(meta.content) ? meta.content.length > 0 : false) {
+        activePages = meta.content;
+      } else {
+        activePages = [{ content: { ops: [] } }];
+      }
 
       totalPageCount = activePages.length;
       pagesFetchCursor = totalPageCount; // 已经全量
@@ -2711,7 +2828,7 @@ function segmentContentAndAddIds(rawHtmlContent, workId, startIndex = 0) {
     }
 
     const rawText = el.textContent || '';
-    if (el.tagName === 'PRE' && /\r?\n/.test(rawText)) {
+    if (el.tagName === 'PRE' ? /\r?\n/.test(rawText) : false) {
       const lines = rawText.split(/\r?\n/);
       el.textContent = '';
       lines.forEach(function (line, index) {
@@ -2762,7 +2879,8 @@ async function ensurePagesPreparedUpTo(targetCount, { userInitiated = false } = 
   const myToken = pagePrepareToken;
 
   // 等待别的 prepare 结束
-  while (pagePrepareRunning && myToken === pagePrepareToken) {
+  while (pagePrepareRunning) {
+    if (myToken !== pagePrepareToken) break;
     await sleep(40);
   }
   if (myToken !== pagePrepareToken) return;
@@ -2808,9 +2926,11 @@ async function ensurePagesPreparedUpTo(targetCount, { userInitiated = false } = 
       }
 
       // ✅ 已准备过就跳过
-      if (typeof page.sentenceStartIndex === 'number' && typeof page.segmentedHtml === 'string') {
-        pagePrepareCursor++;
-        continue;
+      if (typeof page.sentenceStartIndex === 'number') {
+        if (typeof page.segmentedHtml === 'string') {
+          pagePrepareCursor++;
+          continue;
+        }
       }
 
       // ✅ 生成 sentenceStartIndex + segmentedHtml
@@ -3015,7 +3135,7 @@ function renderFloorsRange(startIndex, endIndex) {
         </button>
       </div>
       <div class="floor-body ql-editor" data-hydrated="0">
-        ${page && page.segmentedHtml ? page.segmentedHtml : floorPlaceholderHtml()}
+        ${page ? (page.segmentedHtml ? page.segmentedHtml : floorPlaceholderHtml()) : floorPlaceholderHtml()}
       </div>
     `;
 
@@ -3032,10 +3152,12 @@ function renderFloorsRange(startIndex, endIndex) {
     }
 
     // 只有真正有内容时才绑定句子点击
-    if (page && page.segmentedHtml) {
-      didRenderHydrated = true;
-      floorBody.dataset.hydrated = '1';
-      processContentForSentenceIds(floorBody);
+    if (page) {
+      if (page.segmentedHtml) {
+        didRenderHydrated = true;
+        floorBody.dataset.hydrated = '1';
+        processContentForSentenceIds(floorBody);
+      }
     }
   }
 
@@ -3642,11 +3764,15 @@ if (pageContainer) {
             if (!work || typeof work !== 'object') {
                 return { images: [], bindings: [], transitions: [] };
             }
-            if (work.backgroundPublished && typeof work.backgroundPublished === 'object') {
-                return work.backgroundPublished;
+            if (work.backgroundPublished) {
+                if (typeof work.backgroundPublished === 'object') {
+                    return work.backgroundPublished;
+                }
             }
-            if (work.backgroundDraft && typeof work.backgroundDraft === 'object') {
-                return work.backgroundDraft;
+            if (work.backgroundDraft) {
+                if (typeof work.backgroundDraft === 'object') {
+                    return work.backgroundDraft;
+                }
             }
             return { images: [], bindings: [], transitions: [] };
         }
@@ -3762,10 +3888,20 @@ function initReadingBackgroundSystem() {
       rawToLine,
       transition.toAnchor
     );
-    const fromInside = rawFromLine >= minAvailableLine && rawFromLine <= maxAvailableLine;
-    const toInside = rawToLine >= minAvailableLine && rawToLine <= maxAvailableLine;
-    if (transition.fromAnchor && fromInside && !fromEl) return [];
-    if (transition.toAnchor && toInside && !toEl) return [];
+    const fromInside =
+      rawFromLine >= minAvailableLine ? rawFromLine <= maxAvailableLine : false;
+    const toInside =
+      rawToLine >= minAvailableLine ? rawToLine <= maxAvailableLine : false;
+    if (transition.fromAnchor) {
+      if (fromInside) {
+        if (!fromEl) return [];
+      }
+    }
+    if (transition.toAnchor) {
+      if (toInside) {
+        if (!toEl) return [];
+      }
+    }
 
     const fromLine = fromEl ? Number(fromEl.dataset.sentenceIndex) : rawFromLine;
     const toLine = toEl ? Number(toEl.dataset.sentenceIndex) : rawToLine;
@@ -3777,7 +3913,7 @@ function initReadingBackgroundSystem() {
     let maxIdx = -1;
     availableSentenceEls.forEach(el => {
       const n = Number(el.dataset.sentenceIndex);
-      if (!Number.isNaN(n) && n > maxIdx) maxIdx = n;
+      if (!Number.isNaN(n) ? n > maxIdx : false) maxIdx = n;
     });
     console.log('🧩 [BG] 当前 DOM 里句子节点数量 =', availableSentenceEls.length, '，最大 index =', maxIdx);
   }
@@ -3794,10 +3930,20 @@ function initReadingBackgroundSystem() {
 
     const resolvedStartEl = resolveAnchoredSentenceElement(containerEl, startLine, b.startAnchor);
     const resolvedEndEl = resolveAnchoredSentenceElement(containerEl, endLine, b.endAnchor);
-    const startInside = startLine >= minAvailableLine && startLine <= maxAvailableLine;
-    const endInside = endLine >= minAvailableLine && endLine <= maxAvailableLine;
-    if (b.startAnchor && startInside && !resolvedStartEl) return;
-    if (b.endAnchor && endInside && !resolvedEndEl) return;
+    const startInside =
+      startLine >= minAvailableLine ? startLine <= maxAvailableLine : false;
+    const endInside =
+      endLine >= minAvailableLine ? endLine <= maxAvailableLine : false;
+    if (b.startAnchor) {
+      if (startInside) {
+        if (!resolvedStartEl) return;
+      }
+    }
+    if (b.endAnchor) {
+      if (endInside) {
+        if (!resolvedEndEl) return;
+      }
+    }
 
     const resolvedStartLine = resolvedStartEl
       ? Number(resolvedStartEl.dataset.sentenceIndex)
@@ -4115,9 +4261,11 @@ function bgHeartbeatTick() {
         // 如果 bindings 总数 > 已成功生成的 bgSegments 数，说明有一部分绑定还没被懒加载到 DOM 里，
         // 这时候不要清空背景，否则就会出现你现在遇到的“提前变灰一下”的情况。
         let allowClearToDefault = true;
-        if (bgConfig && Array.isArray(bgConfig.bindings)) {
-            if (bgConfig.bindings.length > bgSegments.length) {
-                allowClearToDefault = false;
+        if (bgConfig) {
+            if (Array.isArray(bgConfig.bindings)) {
+                if (bgConfig.bindings.length > bgSegments.length) {
+                    allowClearToDefault = false;
+                }
             }
         }
 
@@ -4161,7 +4309,7 @@ function bgHeartbeatTick() {
         }
     }
 
-    // 4️⃣ 如果判定结果和当前背景完全一样，就不重复切换（保持你之前的“无 &&”写法）
+    // 4️⃣ 如果判定结果和当前背景完全一样，就不重复切换
     if (currentBgSegment) {
         if (currentBgSegment === targetSeg) {
             if (currentBgImageId === targetSeg.imageId) {
@@ -4190,11 +4338,11 @@ function bgHeartbeatTick() {
             }
             const fromLine = fromSeg.endLine;
             const toLine = toSeg.startLine;
-            const found = bgConfig.transitions.find(t =>
-                Number(t.fromLine) === fromLine &&
-                Number(t.toLine) === toLine
-            );
-            return (found && found.effectType) || 'fade';
+            const found = bgConfig.transitions.find(function (t) {
+                if (Number(t.fromLine) !== fromLine) return false;
+                return Number(t.toLine) === toLine;
+            });
+            return found ? (found.effectType || 'fade') : 'fade';
         }
         function clearReadingBackground() {
             if (!bgLayerA || !bgLayerB) return;
@@ -4291,16 +4439,38 @@ function renderSidebar(total, type) {
     const navPopup = document.getElementById('nav-grid-popup');
     navPopup.innerHTML = '';
 
+    const navTitle = document.createElement('div');
+    navTitle.className = 'nav-grid-title';
+    const navTitleText = document.createElement('span');
+    navTitleText.textContent = type === 'floor' ? '楼层导航' : '页码导航';
+    const navCloseButton = document.createElement('button');
+    navCloseButton.type = 'button';
+    navCloseButton.className = 'nav-grid-close';
+    navCloseButton.textContent = '×';
+    navCloseButton.setAttribute('aria-label', '关闭导航');
+    navCloseButton.addEventListener('click', function () {
+        closeNavigationPopup(true);
+    });
+    navTitle.appendChild(navTitleText);
+    navTitle.appendChild(navCloseButton);
+    navPopup.appendChild(navTitle);
+
     for (let i = 0; i < total; i++) {
-        const cell = document.createElement('div');
+        const cell = document.createElement('button');
+        cell.type = 'button';
         cell.className = 'nav-cell';
         cell.textContent = i + 1;
         cell.dataset.targetIndex = String(i);
+        cell.setAttribute('aria-label', `${type === 'floor' ? '第' : '前往第'} ${i + 1} ${type === 'floor' ? '楼' : '页'}`);
+        if (i === currentPageIndex) {
+            cell.classList.add('active');
+            cell.setAttribute('aria-current', 'page');
+        }
 
         // ⭐ 把点击逻辑放在真正的点击回调里，而不是 for 循环里直接执行
         cell.addEventListener('click', function () {
             // 点击后关闭浮窗
-            navPopup.classList.remove('show');
+            closeNavigationPopup(false);
 
             if (type === 'floor') {
                 // 楼层模式：先保证该楼已经渲染，再滚过去
@@ -4453,7 +4623,7 @@ function extractSentenceIdsAndTextMapFromHtml(htmlContent) {
     }
 
     const txt = normalizeSentenceText(el.textContent);
-    if (txt && !textMap.has(sid)) textMap.set(sid, txt);
+    if (txt ? !textMap.has(sid) : false) textMap.set(sid, txt);
   });
 
   return { ids, idSet, textMap };
@@ -4483,7 +4653,7 @@ function renderComments(comments, sentenceTextMap) {
     // ✅ 新增：原句框（仅在传入 map 时显示）
     let quoteHtml = '';
     if (hasMap) {
-      const sid = (c && c.sentenceId) ? String(c.sentenceId) : '';
+      const sid = c ? (c.sentenceId ? String(c.sentenceId) : '') : '';
       const full = sid ? (sentenceTextMap.get(sid) || '') : '';
       const finalFull = full ? full : '（原句未加载）';
       const short = clipText(finalFull, 160);
@@ -4555,7 +4725,9 @@ async function openCommentPanelForPage(pageIndex) {
   if (!workId) { alert('作品尚未加载完成'); return; }
 
   // ✅ 把 sentenceStartIndex/count 作为“补全”，但用 Set 去重，避免重复汇总
-  if (typeof pageObj.sentenceStartIndex === 'number' && typeof pageObj.__sentenceIdsCount === 'number') {
+  if (typeof pageObj.sentenceStartIndex === 'number'
+    ? typeof pageObj.__sentenceIdsCount === 'number'
+    : false) {
     const start = pageObj.sentenceStartIndex;
     const count = pageObj.__sentenceIdsCount;
 
@@ -4605,7 +4777,9 @@ async function openCommentPanelForPage(pageIndex) {
   // ✅ 只渲染一次，并把原句映射传进去
   renderComments(commentsForPage, sentenceTextMap);
   header.textContent = `${pageTitle} 的所有评论 (${commentsForPage.length} 条)`;
-  commentPanel.classList.add('show');
+    closeNavigationPopup(false);
+    commentPanel.classList.add('show');
+    commentPanel.setAttribute('aria-hidden', 'false');
 }
 
       
@@ -4686,7 +4860,9 @@ async function openCommentPanelForSentence(sentenceId, isNewCommentMode = false)
   const targetEl = document.querySelector(`[data-sentence-id="${sentenceId}"]`);
   if (targetEl) targetEl.classList.add('active-comment-target');
 
+  closeNavigationPopup(false);
   panel.classList.add('show');
+  panel.setAttribute('aria-hidden', 'false');
 }
 
 
@@ -4696,7 +4872,11 @@ function processContentForSentenceIds(containerEl) {
 
   // 特效只应用一次（避免重复包裹/重复注入）
   if (!containerEl.dataset.effectsApplied) {
-    if (activeWork && Array.isArray(activeWork.effectsPublished) && activeWork.effectsPublished.length) {
+    if (activeWork
+      ? (Array.isArray(activeWork.effectsPublished)
+        ? Boolean(activeWork.effectsPublished.length)
+        : false)
+      : false) {
       const workIdForEffect = activeWork._id || activeWork.workId;
       applyEffectsToBlocks(containerEl, activeWork.effectsPublished, workIdForEffect);
     }
@@ -4728,7 +4908,11 @@ function processContentForSentenceIds(containerEl) {
     if (!el.dataset.commentBound) {
       el.dataset.commentBound = '1';
       el.addEventListener('click', (e) => {
-        if (e.target && e.target.classList && e.target.classList.contains('comment-indicator')) return;
+        if (e.target
+          ? (e.target.classList
+            ? e.target.classList.contains('comment-indicator')
+            : false)
+          : false) return;
         activeSentenceEl = el;
         Promise.resolve(openCommentPanelForSentence(sentenceId, true)).catch(console.error);
       });
@@ -4775,7 +4959,7 @@ async function submitComment() {
 
     if (!res.ok) {
       const errJson = await res.json().catch(() => null);
-      const msg = errJson && errJson.message ? errJson.message : '发表评论失败';
+      const msg = errJson ? (errJson.message ? errJson.message : '发表评论失败') : '发表评论失败';
       throw new Error(msg);
     }
 
@@ -4787,7 +4971,7 @@ async function submitComment() {
 
     // ====== ✅ 写入“哪些句子有评论”的集合 ======
     if (!commentedSentenceIds) commentedSentenceIds = new Set();
-    if (saved && saved.sentenceId) commentedSentenceIds.add(saved.sentenceId);
+    if (saved ? Boolean(saved.sentenceId) : false) commentedSentenceIds.add(saved.sentenceId);
     commentedIdsReady = true;
 
     // ====== ✅ 写入“评论内容缓存” ======
@@ -4849,7 +5033,7 @@ async function submitComment() {
 
   } catch (err) {
     console.error('submitComment error', err);
-    alert('发表评论失败：' + (err && err.message ? err.message : err));
+                alert('发表评论失败：' + (err ? (err.message ? err.message : err) : err));
   }
 }
 
@@ -4863,7 +5047,7 @@ function renderCurrentMode() {
     // ⭐ 首次渲染时，尝试根据本地记录恢复阅读位置
     if (!hasAppliedLastView) {
         const lastView = loadLastViewFromStorage();
-        if (lastView && typeof lastView.pageIndex === 'number') {
+        if (lastView ? typeof lastView.pageIndex === 'number' : false) {
             // 优先恢复到当时的模式（page / scroll）
             if (lastView.mode === 'page') {
                 currentMode = 'page';
@@ -4973,36 +5157,66 @@ function renderCurrentMode() {
         const pageBtnGroup = document.getElementById('page-mode-btn');
         const navToggleBtnGroup = document.getElementById('nav-toggle-btn');
 
-        scrollBtnGroup.addEventListener('click', () => {
+        scrollBtnGroup.addEventListener('click', () => {
             currentMode = 'scroll';
             renderCurrentMode();
-            // 关闭导航浮窗
-            const navPopup = document.getElementById('nav-grid-popup');
-            if (navPopup) navPopup.classList.remove('show');
+            closeNavigationPopup(false);
         });
 
         pageBtnGroup.addEventListener('click', () => {
             currentMode = 'page';
             renderCurrentMode();
-            const navPopup = document.getElementById('nav-grid-popup');
-            if (navPopup) navPopup.classList.remove('show');
+            closeNavigationPopup(false);
         });
 
         navToggleBtnGroup.addEventListener('click', (e) => {
             e.stopPropagation();
-            const navPopup = document.getElementById('nav-grid-popup');
-            if (navPopup) {
-                navPopup.classList.toggle('show');
-            }
+            const navPopup = document.getElementById('nav-grid-popup');
+            const shouldOpen = navPopup ? !navPopup.classList.contains('show') : false;
+            setNavigationPopupOpen(shouldOpen);
         });
 
-                              console.log(sidebarToggleBtn);  
+        document.addEventListener('click', (e) => {
+            const navPopup = document.getElementById('nav-grid-popup');
+            if (!navPopup) return;
+            if (!navPopup.classList.contains('show')) return;
+            if (navPopup.contains(e.target)) return;
+            if (navToggleBtnGroup.contains(e.target)) return;
+            closeNavigationPopup(false);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const navPopup = document.getElementById('nav-grid-popup');
+            if (navPopup ? navPopup.classList.contains('show') : false) {
+                e.preventDefault();
+                closeNavigationPopup(true);
+                return;
+            }
+            if (sidebar.classList.contains('show')) {
+                sidebar.classList.remove('show');
+                sidebarToggleIcon.textContent = '⮝';
+                sidebarToggleBtn.setAttribute('aria-expanded', 'false');
+                sidebarToggleBtn.focus();
+                return;
+            }
+            if (commentPanel.classList.contains('show')) {
+                const hasDraft = commentTextarea ? Boolean(commentTextarea.value.trim()) : false;
+                const isViewerMode = commentPanel.classList.contains('viewer-mode');
+                if (hasDraft ? !isViewerMode : false) {
+                    commentTextarea.focus();
+                    return;
+                }
+                closeCommentBtn.click();
+            }
+        });
 
       sidebarToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     const isMobile = window.matchMedia("(max-width: 1050px)").matches;
 
     if (isMobile) {
+        closeNavigationPopup(false);
         const isShown = sidebar.classList.toggle('show');
         sidebarToggleIcon.textContent = isShown ? '⮟' : '⮝'; // 左右箭头
         sidebarToggleBtn.setAttribute('aria-expanded', isShown ? 'true' : 'false');
@@ -5013,6 +5227,46 @@ function renderCurrentMode() {
         sidebarToggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
         sidebarToggleBtn.setAttribute('title', isCollapsed ? '展开侧边栏' : '收起侧边栏');
     }
+});
+
+      document.addEventListener('click', (e) => {
+    const isMobile = window.matchMedia("(max-width: 1050px)").matches;
+    if (!isMobile) return;
+    if (!sidebar.classList.contains('show')) return;
+    if (sidebar.contains(e.target)) return;
+    if (sidebarToggleBtn.contains(e.target)) return;
+    sidebar.classList.remove('show');
+    sidebarToggleIcon.textContent = '⮝';
+    sidebarToggleBtn.setAttribute('aria-expanded', 'false');
+    sidebarToggleBtn.setAttribute('title', '展开侧边栏');
+});
+
+      document.addEventListener('keydown', (e) => {
+    if (currentMode !== 'page') return;
+    if (e.altKey ? true : (e.ctrlKey ? true : e.metaKey)) return;
+
+    const target = e.target;
+    const tagName = target ? String(target.tagName || '').toLowerCase() : '';
+    const isEditable = target ? Boolean(target.isContentEditable) : false;
+    if (isEditable) return;
+    if (tagName === 'input' ? true : (tagName === 'textarea' ? true : tagName === 'select')) return;
+
+    let nextIndex = currentPageIndex;
+    if (e.key === 'ArrowLeft') {
+        nextIndex = currentPageIndex - 1;
+    } else if (e.key === 'ArrowRight') {
+        nextIndex = currentPageIndex + 1;
+    } else {
+        return;
+    }
+    if (nextIndex < 0) return;
+    if (nextIndex >= activePages.length) return;
+
+    e.preventDefault();
+    currentPageIndex = nextIndex;
+    renderCurrentMode();
+    saveLastViewToStorage('page', nextIndex);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
               // 新增：统一的“回到顶部”函数

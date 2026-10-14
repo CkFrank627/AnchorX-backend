@@ -2,6 +2,7 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
     <title>创作页面</title>
     <link href="https://api.anchorx.ca/vendor_assets/quill.snow.css" rel="stylesheet">
 
@@ -1827,6 +1828,7 @@ body {
   --ax-sticky-top: env(safe-area-inset-top, 0px);
   --ax-toolbar-fixed-left: 0px;
   --ax-toolbar-fixed-width: 100vw;
+  --ax-viewport-height: 100vh;
 }
 
 body.ax-editor-fullscreen {
@@ -2276,8 +2278,14 @@ body.ax-editor-fullscreen #main-page {
 }
 
 @media (max-width: 900px) {
+  :root {
+    --ax-sticky-top: env(safe-area-inset-top, 0px);
+  }
+
   .page-container {
     flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .sidebar-nav,
@@ -2310,43 +2318,134 @@ body.ax-editor-fullscreen #main-page {
   }
 
   #editor-page .editor-toolbar {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 6px 8px;
+    min-height: 0;
+    padding: 6px max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left));
   }
 
-  #editor-page .page-controls,
   #editor-page .editor-toolbar-actions {
     grid-column: 1 / -1;
   }
 
+  #editor-page .editor-title-group {
+    display: block;
+    min-width: 0;
+  }
+
+  #editor-page .editor-title {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #editor-page .editor-word-counts {
+    margin-top: 2px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  #editor-page .editor-word-counts::-webkit-scrollbar {
+    display: none;
+  }
+
+  #editor-page .editor-word-count {
+    flex: 0 0 auto;
+    padding: 1px 5px;
+    font-size: 0.7rem;
+  }
+
+  #editor-page .page-controls {
+    grid-column: auto;
+    min-width: 0;
+  }
+
+  #editor-page .page-current {
+    min-height: 36px;
+    padding: 7px 8px;
+    white-space: nowrap;
+  }
+
   #editor-page .editor-toolbar-actions {
+    max-width: 100%;
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 5px;
+    padding-bottom: 1px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #editor-page .editor-toolbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  #editor-page .editor-toolbar-actions button,
+  #editor-page #autoSaveToggleBtn {
+    flex: 0 0 auto;
+    min-height: 36px;
+    touch-action: manipulation;
   }
 
   #editor-page .ax-ribbon-tabs {
+    min-height: 36px;
     padding-inline: 6px;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #editor-page .ax-ribbon-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   #editor-page .ax-ribbon-tab {
     min-width: 58px;
+    min-height: 36px;
     padding-inline: 8px;
+    touch-action: manipulation;
   }
 
   #editor-page .ax-ribbon-quick-actions {
     position: sticky;
     right: 0;
+    flex: 0 0 auto;
+    padding-left: 6px;
     background: #fbfcfe;
   }
 
+  #editor-page .ax-ribbon-quick-actions .ax-chrome-button {
+    min-height: 34px;
+    touch-action: manipulation;
+  }
+
+  #editor-page .ax-ribbon.is-mobile-collapsed #toolbar-quill {
+    display: none;
+  }
+
   #editor-page .ax-ribbon-panel {
+    flex-wrap: nowrap;
+    min-height: 54px;
     padding-inline: 6px;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
   }
 
   #editor-page .ax-ribbon-group {
+    flex: 0 0 auto;
+    min-height: 52px;
     padding-inline: 8px;
   }
 
   #editor-page .editor-workspace {
-    padding: 12px 8px 28px;
+    padding: 8px max(6px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
   }
 
   #editor-page .editor-container {
@@ -2354,11 +2453,19 @@ body.ax-editor-fullscreen #main-page {
   }
 
   #editor-page #editor {
-    min-height: 70vh;
+    width: 100%;
+    min-height: max(320px, calc(var(--ax-viewport-height) - var(--ax-toolbar-height) - 20px));
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
   }
 
   #editor-page #editor .ql-editor {
-    padding: 28px 22px;
+    min-height: inherit;
+    padding: clamp(20px, 5vw, 28px) clamp(16px, 5vw, 28px);
+    font-size: 16px;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
   }
 
   #editor-page .right-sidebar {
@@ -2376,6 +2483,7 @@ body.ax-editor-fullscreen #main-page {
     max-height: none;
     overflow-y: auto;
     box-shadow: 0 18px 50px rgba(22, 34, 52, 0.28);
+    overscroll-behavior: contain;
   }
 
   .floating-sidebar {
@@ -2388,28 +2496,31 @@ body.ax-editor-fullscreen #main-page {
     padding: 7px 8px;
   }
 
-  #editor-page .editor-title-group {
-    display: block;
-  }
-
-  #editor-page .editor-word-counts {
-    margin-top: 4px;
-  }
-
   #editor-page .editor-toolbar-actions button,
   #editor-page #autoSaveToggleBtn {
     padding: 6px 8px;
     font-size: 0.78rem;
   }
 
-  #editor-page .ax-ribbon-quick-actions .ax-action-label {
-    display: none;
+  #editor-page .ax-ribbon-quick-actions .ax-chrome-button {
+    padding-inline: 6px;
+    font-size: 0.72rem;
   }
 
   #editor-page .ax-ribbon-group {
-    flex: 1 1 100%;
-    border-right: 0;
-    border-bottom: 1px solid #edf0f4;
+    flex: 0 0 auto;
+    border-right: 1px solid #e2e6ec;
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  #editor-page .editor-word-counts .editor-word-count:last-child {
+    display: none;
+  }
+
+  #editor-page .page-current {
+    font-size: 0.78rem;
   }
 }
 
@@ -2620,6 +2731,10 @@ body.ax-editor-fullscreen #main-page {
                             <button class="ax-chrome-button" id="fullscreenBtn" type="button"
                                 data-ui-action="toggle-fullscreen" aria-pressed="false" title="进入或退出全屏">
                                 <span class="ax-action-label">全屏</span>
+                            </button>
+                            <button class="ax-chrome-button" id="mobileRibbonToggleBtn" type="button"
+                                data-ui-action="toggle-ribbon" aria-pressed="false" title="展开编辑工具">
+                                <span class="ax-action-label">工具</span><span class="ax-ribbon-toggle-icon" aria-hidden="true">⌄</span>
                             </button>
                         </div>
                     </div>
@@ -3007,6 +3122,7 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
   const toolbarContainer = document.getElementById('editorToolbarContainer');
   const ribbonTabs = Array.from(document.querySelectorAll('[data-ribbon-tab]'));
   const ribbonPanels = Array.from(document.querySelectorAll('[data-ribbon-panel]'));
+  const ribbon = toolbarContainer?.querySelector('.ax-ribbon');
   const mobileQuery = window.matchMedia('(max-width: 900px)');
   const rightCloseBtn = document.getElementById('rightSidebarToggle');
   const openHistoryBtn = document.getElementById('openHistoryBtn');
@@ -3014,6 +3130,23 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
   const pageContainer = document.querySelector('.page-container');
   const stickyPlaceholder = document.createElement('div');
   let stickyFrame = 0;
+
+  function setViewportHeight() {
+    const height = window.visualViewport?.height || window.innerHeight;
+    if (height > 0) document.documentElement.style.setProperty('--ax-viewport-height', `${Math.round(height)}px`);
+  }
+
+  function setMobileRibbon(open) {
+    const collapsed = mobileQuery.matches && !open;
+    ribbon?.classList.toggle('is-mobile-collapsed', collapsed);
+    document.querySelectorAll('[data-ui-action="toggle-ribbon"]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(!collapsed));
+      button.setAttribute('title', collapsed ? '展开编辑工具' : '收起编辑工具');
+      const icon = button.querySelector('.ax-ribbon-toggle-icon');
+      if (icon) icon.textContent = collapsed ? '⌄' : '⌃';
+    });
+    scheduleStickySync();
+  }
 
   stickyPlaceholder.className = 'editor-toolbar-placeholder';
   stickyPlaceholder.setAttribute('aria-hidden', 'true');
@@ -3032,7 +3165,11 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
       panel.hidden = panel.dataset.ribbonPanel !== tabName;
     });
 
-    scheduleStickySync();
+    if (mobileQuery.matches && ribbon?.classList.contains('is-mobile-collapsed')) {
+      setMobileRibbon(true);
+    } else {
+      scheduleStickySync();
+    }
   }
 
   ribbonTabs.forEach((tab, index) => {
@@ -3113,6 +3250,8 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
       setRightSidebar(!currentlyOpen);
     } else if (action === 'toggle-fullscreen') {
       toggleFullscreen();
+    } else if (action === 'toggle-ribbon') {
+      setMobileRibbon(ribbon?.classList.contains('is-mobile-collapsed'));
     }
   }
 
@@ -3221,15 +3360,27 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
   visibilityObserver.observe(editorPage, { attributes: true, attributeFilter: ['class'] });
   visibilityObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
-  mobileQuery.addEventListener('change', () => {
+  const handleMobileChange = () => {
     rightSidebar.classList.remove('mobile-open');
+    setMobileRibbon(!mobileQuery.matches);
     syncSidebarButtons();
     scheduleStickySync();
-  });
+  };
+  if (typeof mobileQuery.addEventListener === 'function') {
+    mobileQuery.addEventListener('change', handleMobileChange);
+  } else {
+    mobileQuery.addListener(handleMobileChange);
+  }
   document.addEventListener('scroll', scheduleStickySync, { passive: true, capture: true });
-  window.addEventListener('resize', scheduleStickySync, { passive: true });
+  window.addEventListener('resize', () => {
+    setViewportHeight();
+    scheduleStickySync();
+  }, { passive: true });
   window.addEventListener('orientationchange', scheduleStickySync, { passive: true });
-  window.visualViewport?.addEventListener('resize', scheduleStickySync, { passive: true });
+  window.visualViewport?.addEventListener('resize', () => {
+    setViewportHeight();
+    scheduleStickySync();
+  }, { passive: true });
   window.visualViewport?.addEventListener('scroll', scheduleStickySync, { passive: true });
   pageContainer?.addEventListener('transitionend', scheduleStickySync);
   sidebar.addEventListener('transitionend', scheduleStickySync);
@@ -3244,7 +3395,9 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
     setRightSidebar(false);
   });
 
+  setViewportHeight();
   activateRibbon('home', false);
+  setMobileRibbon(!mobileQuery.matches);
   syncSidebarButtons();
   scheduleStickySync();
 })();

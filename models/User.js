@@ -10,6 +10,14 @@ const userSchema = new mongoose.Schema({
 
   // ✅ 新增：角色/权限
   roles: { type: [String], default: [] }, // 例如 ['admin']
+
+  // 每日签到只记录进度，不和积分系统耦合，后续可以安全扩展奖励。
+  checkIn: {
+    lastDateKey: { type: String, default: '' },
+    lastAt: { type: Date, default: null },
+    streak: { type: Number, default: 0, min: 0 },
+    totalDays: { type: Number, default: 0, min: 0 },
+  },
 });
 
 // 在保存之前对密码进行哈希加密

@@ -116,6 +116,7 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
   const toolbarContainer = document.getElementById('editorToolbarContainer');
   const ribbonTabs = Array.from(document.querySelectorAll('[data-ribbon-tab]'));
   const ribbonPanels = Array.from(document.querySelectorAll('[data-ribbon-panel]'));
+  const ribbon = toolbarContainer?.querySelector('.ax-ribbon');
   const mobileQuery = window.matchMedia('(max-width: 900px)');
   const rightCloseBtn = document.getElementById('rightSidebarToggle');
   const openHistoryBtn = document.getElementById('openHistoryBtn');
@@ -123,6 +124,23 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
   const pageContainer = document.querySelector('.page-container');
   const stickyPlaceholder = document.createElement('div');
   let stickyFrame = 0;
+
+  function setViewportHeight() {
+    const height = window.visualViewport?.height || window.innerHeight;
+    if (height > 0) document.documentElement.style.setProperty('--ax-viewport-height', `${Math.round(height)}px`);
+  }
+
+  function setMobileRibbon(open) {
+    const collapsed = mobileQuery.matches && !open;
+    ribbon?.classList.toggle('is-mobile-collapsed', collapsed);
+    document.querySelectorAll('[data-ui-action="toggle-ribbon"]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(!collapsed));
+      button.setAttribute('title', collapsed ? '展开编辑工具' : '收起编辑工具');
+      const icon = button.querySelector('.ax-ribbon-toggle-icon');
+      if (icon) icon.textContent = collapsed ? '⌄' : '⌃';
+    });
+    scheduleStickySync();
+  }
 
   stickyPlaceholder.className = 'editor-toolbar-placeholder';
   stickyPlaceholder.setAttribute('aria-hidden', 'true');
@@ -141,7 +159,11 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
       panel.hidden = panel.dataset.ribbonPanel !== tabName;
     });
 
-    scheduleStickySync();
+    if (mobileQuery.matches && ribbon?.classList.contains('is-mobile-collapsed')) {
+      setMobileRibbon(true);
+    } else {
+      scheduleStickySync();
+    }
   }
 
   ribbonTabs.forEach((tab, index) => {
@@ -222,6 +244,8 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
       setRightSidebar(!currentlyOpen);
     } else if (action === 'toggle-fullscreen') {
       toggleFullscreen();
+    } else if (action === 'toggle-ribbon') {
+      setMobileRibbon(ribbon?.classList.contains('is-mobile-collapsed'));
     }
   }
 
@@ -311,13 +335,14 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
     stickyFrame = requestAnimationFrame(syncStickyState);
   }
 
-  if (toolbarContainer && 'ResizeObserver' in window) {
+  if (toolbarContainer) {
+  if ('ResizeObserver' in window) {
     const layoutObserver = new ResizeObserver(scheduleStickySync);
     layoutObserver.observe(toolbarContainer);
     layoutObserver.observe(editorPage);
     layoutObserver.observe(sidebar);
   }
-
+}
   const sidebarObserver = new MutationObserver(() => {
     syncSidebarButtons();
     scheduleStickySync();
@@ -329,15 +354,27 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
   visibilityObserver.observe(editorPage, { attributes: true, attributeFilter: ['class'] });
   visibilityObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
-  mobileQuery.addEventListener('change', () => {
+  const handleMobileChange = () => {
     rightSidebar.classList.remove('mobile-open');
+    setMobileRibbon(!mobileQuery.matches);
     syncSidebarButtons();
     scheduleStickySync();
-  });
+  };
+  if (typeof mobileQuery.addEventListener === 'function') {
+    mobileQuery.addEventListener('change', handleMobileChange);
+  } else {
+    mobileQuery.addListener(handleMobileChange);
+  }
   document.addEventListener('scroll', scheduleStickySync, { passive: true, capture: true });
-  window.addEventListener('resize', scheduleStickySync, { passive: true });
+  window.addEventListener('resize', () => {
+    setViewportHeight();
+    scheduleStickySync();
+  }, { passive: true });
   window.addEventListener('orientationchange', scheduleStickySync, { passive: true });
-  window.visualViewport?.addEventListener('resize', scheduleStickySync, { passive: true });
+  window.visualViewport?.addEventListener('resize', () => {
+    setViewportHeight();
+    scheduleStickySync();
+  }, { passive: true });
   window.visualViewport?.addEventListener('scroll', scheduleStickySync, { passive: true });
   pageContainer?.addEventListener('transitionend', scheduleStickySync);
   sidebar.addEventListener('transitionend', scheduleStickySync);
@@ -352,7 +389,9 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
     setRightSidebar(false);
   });
 
+  setViewportHeight();
   activateRibbon('home', false);
+  setMobileRibbon(!mobileQuery.matches);
   syncSidebarButtons();
   scheduleStickySync();
 })();

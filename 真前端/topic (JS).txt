@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let replyCurrentPage = 1;
     let replyTotalPages = 1;
     let isLiked = false; 
+    let currentTopic = null;
 
     // -------------------------------------------------------------------
     // --- DOM & Quill 初始化 ---
@@ -228,6 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ... renderTopicDetail (保持不变) ...
     function renderTopicDetail(topic, _isLiked) {
+        currentTopic = topic;
         document.getElementById('topicTitle').textContent = topic.title;
         document.getElementById('topicAuthor').textContent = `作者: ${topic.author ? escapeHtml(topic.author.username) : '匿名'}`;
         document.getElementById('topicCreatedAt').textContent = formatDate(topic.createdAt);
@@ -254,6 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
             likeButton.classList.remove('liked');
             likeButton.innerHTML = `❤️ <span>${likeCountEl.textContent}</span>`;
         }
+        likeButton.setAttribute('aria-pressed', isLiked ? 'true' : 'false');
         likeButton.disabled = false; 
 
         const contentContainer = document.getElementById('topicContent');
@@ -410,24 +413,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({}) 
             });
 
-            const result = await response.json();
+            const responseText = await response.text();
+            let result = {};
+            if (responseText) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (parseError) {
+                    throw new Error(`服务器返回了无法解析的数据（HTTP ${response.status}）`);
+                }
+            }
 
             if (response.ok) {
-                const newLikesCount = result.likesCount || 0;
-                const newIsLiked = result.isLiked; 
+                const parsedCount = Number(result.likesCount);
+                const newLikesCount = Number.isFinite(parsedCount) ? parsedCount : 0;
+                const newIsLiked = Boolean(result.isLiked);
+                isLiked = newIsLiked;
 
-                renderTopicDetail({
-                    ...data.topic, 
-                    likesCount: newLikesCount
-                }, newIsLiked);
+                if (currentTopic) {
+                    currentTopic.likesCount = newLikesCount;
+                }
+
+                const likeCountEl = document.getElementById('likeCount');
+                likeCountEl.textContent = String(newLikesCount);
+                likeButton.classList.toggle('liked', newIsLiked);
+                likeButton.innerHTML = `${newIsLiked ? '🧡' : '❤️'} <span>${newLikesCount}</span>`;
+                likeButton.setAttribute('aria-pressed', newIsLiked ? 'true' : 'false');
 
             } else {
                 alert(`操作失败: ${result.message || '服务器错误'}`);
             }
 
         } catch (error) {
-            console.error('提交点赞时发生网络错误:', error);
-            alert('提交失败: 网络连接错误。');
+            console.error('提交点赞失败:', error);
+            alert(`提交失败: ${error.message || '未知错误'}`);
         } finally {
             likeButton.disabled = false;
         }
@@ -457,6 +475,7 @@ async function fetchTopicAndReplies() {
         progressBar.style.width = '40%';
 
         const data = await response.json();
+        currentTopic = data.topic;
 
         // 渲染主题部分
         renderTopicDetail(data.topic, !!data.isLiked);

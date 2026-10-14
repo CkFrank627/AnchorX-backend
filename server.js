@@ -15,6 +15,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const textEffectRoutes = require('./routes/textEffectRoutes');
 const topicRoutes = require('./routes/topicRoutes');
 const effectRoutes = require('./routes/effectRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 const Work = require('./models/Work');
 const { loadWorkForRead } = require('./services/readWorkService');
 
@@ -138,6 +139,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/topics', topicRoutes);
 app.use('/api/effects', effectRoutes);
 app.use('/api/text-effects', textEffectRoutes);
+app.use('/api/ai', aiRoutes);
 
 app.get('/read/:id', async (req, res) => {
   try {

@@ -232,12 +232,44 @@ router.get('/public-tags', async (req, res) => {
   }
 });
 
+router.get('/public-stats', async (req, res) => {
+  try {
+    const rows = await Work.aggregate([
+      { $match: { isPublished: true } },
+      {
+        $group: {
+          _id: null,
+          works: { $sum: 1 },
+          authors: { $addToSet: '$author' },
+          views: { $sum: { $ifNull: ['$views', 0] } },
+          likes: { $sum: { $ifNull: ['$likesCount', 0] } },
+          words: { $sum: { $ifNull: ['$wordCount', 0] } },
+        },
+      },
+    ]);
+
+    const stats = rows[0] || { works: 0, authors: [], views: 0, likes: 0, words: 0 };
+    return res.json({
+      ok: true,
+      works: stats.works,
+      authors: stats.authors.length,
+      views: stats.views,
+      likes: stats.likes,
+      words: stats.words,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: '获取公开统计失败', error: error.message });
+  }
+});
+
 router.get('/public', async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
     const skip = (page - 1) * limit;
     const match = String(req.query.match || 'any').toLowerCase() === 'all' ? 'all' : 'any';
+    const queryText = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 80) : '';
+    const sortName = String(req.query.sort || 'updated').toLowerCase();
 
     let rawInclude = req.query.tag || req.query.tags;
     let rawExclude = req.query.notTag || req.query.notTags;
@@ -282,12 +314,24 @@ router.get('/public', async (req, res) => {
       and.push({ tagsNorm: { $nin: exclude } });
     }
 
+    if (queryText) {
+      const escapedQuery = queryText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      and.push({ title: { $regex: escapedQuery, $options: 'i' } });
+    }
+
     const filter = and.length === 1 ? and[0] : { $and: and };
+    const sortOptions = {
+      updated: { updatedAt: -1, _id: -1 },
+      views: { views: -1, updatedAt: -1, _id: -1 },
+      likes: { likesCount: -1, updatedAt: -1, _id: -1 },
+      newest: { createdAt: -1, _id: -1 },
+    };
+    const sort = sortOptions[sortName] || sortOptions.updated;
 
     const [works, total] = await Promise.all([
       Work.find(filter)
         .select('-content -pages -likedBy -diceLog -effectsDraft -effectsPublished -backgroundDraft -backgroundPublished')
-        .sort({ updatedAt: -1, _id: -1 })
+        .sort(sort)
         .skip(skip)
         .limit(limit)
         .populate('author', 'username'),
