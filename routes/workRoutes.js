@@ -460,7 +460,15 @@ router.post('/:id/pages', auth, async (req, res) => {
       return res.status(400).json({ message: '该作品不是 separate 存储（暂不支持新增页）' });
     }
 
-    const newIndex = Number(work.pageCount || 0);
+    // pageCount 可能因旧版新增/删除流程而与实际页面不同；以真实最大索引为准，
+    // 否则会重复创建 index=1，表现为“第二页能打开但无法继续保存”。
+    const lastPage = await WorkPage.findOne({ workId: work._id })
+      .sort({ index: -1 })
+      .select('index')
+      .lean();
+    const newIndex = lastPage && Number.isInteger(lastPage.index)
+      ? lastPage.index + 1
+      : 0;
 
     await WorkPage.create({
       workId: work._id,

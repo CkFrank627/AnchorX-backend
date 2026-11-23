@@ -19,7 +19,9 @@ if (bodyStart < 0 || vendorScript < 0 || vendorBlockStart < 0 || scriptStart < 0
 }
 
 const markup = `${source.slice(0, vendorBlockStart).trimEnd()}\n</body>\n</html>\n`;
-const script = `${source.slice(scriptStart, scriptEnd + '</script>'.length).trimEnd()}\n`;
+// JS 拆分版必须包含外部依赖及其备用加载器；只截取最后一个内联脚本会让
+// Quill/imageCompression 在单独部署 write (JS).txt 时根本没有加载机会。
+const script = `${source.slice(vendorBlockStart, scriptEnd + '</script>'.length).trimEnd()}\n`;
 
 fs.writeFileSync(markupPath, markup, 'utf8');
 fs.writeFileSync(scriptPath, script, 'utf8');

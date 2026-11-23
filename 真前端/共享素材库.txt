@@ -440,6 +440,272 @@
 }
 
       
+/* ===== AnchorX creative studio: shared asset library ===== */
+:root {
+  --studio-ink: #282621;
+  --studio-muted: #756f65;
+  --studio-paper: #fffdf8;
+  --studio-canvas: #ece8df;
+  --studio-line: rgba(67,58,46,.14);
+  --studio-accent: #8b5d3b;
+  --studio-accent-dark: #684129;
+  --studio-accent-soft: #f1e5d7;
+}
+* { box-sizing: border-box; }
+body {
+  color: var(--studio-ink);
+  background: var(--studio-canvas);
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+}
+.page-container { background: var(--studio-canvas); }
+.sidebar-nav {
+  position: sticky;
+  top: 0;
+  width: 240px;
+  min-height: 100vh;
+  align-self: flex-start;
+  padding: 24px 14px;
+  overflow-y: auto;
+  border-right: 0;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(210,164,119,.18), transparent 28%),
+    linear-gradient(180deg,#292b26,#252722);
+  box-shadow: 8px 0 28px rgba(31,28,23,.1);
+}
+.sidebar-nav::before {
+  content: "ANCHOR X\A创作中心";
+  display: block;
+  margin: 2px 10px 28px;
+  color: #f4efe6;
+  font: 700 1.08rem/1.6 Georgia, "Songti SC", serif;
+  letter-spacing: .12em;
+  white-space: pre;
+}
+.sidebar-nav .nav-link {
+  min-height: 46px;
+  margin-bottom: 6px;
+  padding: 11px 13px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #bbb8ad;
+}
+.sidebar-nav .nav-link:hover {
+  border-color: rgba(255,255,255,.08);
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  transform: translateX(2px);
+}
+.sidebar-nav .nav-link.active {
+  border-color: rgba(224,184,144,.2);
+  background: rgba(210,164,119,.15);
+  color: #f1cfad;
+}
+.sidebar-nav .nav-link .nav-icon svg,
+.sidebar-nav .nav-link.active .nav-icon svg { fill: currentColor; }
+.main-content {
+  min-width: 0;
+  width: min(100%, 1500px);
+  margin: 0 auto;
+  padding: clamp(28px,5vw,72px);
+}
+.content-header {
+  position: relative;
+  margin-bottom: 32px;
+  padding: 28px 30px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 22px;
+  background: rgba(255,253,248,.88);
+  box-shadow: 0 18px 48px rgba(53,45,34,.09);
+  backdrop-filter: blur(14px);
+}
+.content-header::after {
+  content: "ASSET LIBRARY";
+  position: absolute;
+  right: 24px;
+  bottom: -9px;
+  color: rgba(139,93,59,.07);
+  font: 800 clamp(2rem,5vw,4.8rem)/1 Georgia,serif;
+  letter-spacing: .08em;
+  pointer-events: none;
+}
+.header-left, .header-right { position: relative; z-index: 1; }
+.header-title h2 {
+  margin-left: 0;
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC","Songti SC",STSong,Georgia,serif;
+  font-size: clamp(1.5rem,2.5vw,2.2rem);
+  letter-spacing: .04em;
+}
+.create-button {
+  min-height: 43px;
+  padding: 10px 17px;
+  border: 1px solid var(--studio-accent);
+  border-radius: 12px;
+  background: var(--studio-accent);
+  box-shadow: 0 7px 16px rgba(104,65,41,.17);
+}
+.create-button:hover { background: var(--studio-accent-dark); transform: translateY(-1px); }
+.gallery-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill,minmax(min(100%,240px),1fr));
+  gap: 20px;
+  margin-top: 0;
+}
+.gallery-list > p { grid-column: 1 / -1; }
+.gallery-card {
+  width: auto;
+  min-width: 0;
+  border: 1px solid rgba(101,85,63,.13);
+  border-radius: 17px;
+  background: var(--studio-paper);
+  box-shadow: 0 10px 30px rgba(53,45,34,.08);
+}
+.gallery-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(139,93,59,.28);
+  box-shadow: 0 20px 42px rgba(53,45,34,.14);
+}
+.card-image-container { height: 190px; background: #ded9d0; }
+.card-image-container img { transition: transform .35s ease; }
+.gallery-card:hover .card-image-container img { transform: scale(1.035); }
+.card-info { padding: 17px 18px 19px; }
+.card-title {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC","Songti SC",STSong,Georgia,serif;
+  font-size: 1.12rem;
+}
+.card-meta { color: var(--studio-muted); }
+.gallery-card button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255,255,255,.35);
+  box-shadow: 0 6px 18px rgba(20,17,14,.22);
+  backdrop-filter: blur(8px);
+}
+.download-btn { right: 54px; background: rgba(104,65,41,.86); }
+.download-btn:hover { background: var(--studio-accent-dark); }
+.delete-btn { background: rgba(157,55,55,.84); }
+.modal {
+  z-index: 30000;
+  background: rgba(26,23,19,.5);
+  backdrop-filter: blur(7px);
+}
+.modal-content {
+  padding: clamp(22px,4vw,34px);
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 20px;
+  background: var(--studio-paper);
+  box-shadow: 0 28px 80px rgba(26,22,17,.28);
+}
+.modal-content h3 {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC","Songti SC",serif;
+}
+#gallery-name-input {
+  min-height: 44px;
+  border-color: #d8d0c5;
+  border-radius: 11px;
+}
+#gallery-name-input:focus {
+  border-color: var(--studio-accent);
+  outline: 3px solid rgba(139,93,59,.12);
+}
+.image-upload-area {
+  border-color: #cfc2b2;
+  border-radius: 15px;
+  background: rgba(139,93,59,.035);
+}
+.upload-button { color: var(--studio-accent); }
+.image-preview-item { border-radius: 11px; }
+.image-preview-item.selected { border-color: var(--studio-accent); }
+.cover-thumbnails { padding: 10px; border-radius: 12px; background: #f5f0e8; }
+#confirm-upload-btn { border-radius: 10px; background: var(--studio-accent); }
+#cancel-upload-btn { border-radius: 10px; background: #e8e2d9; }
+.progress-bar { background: var(--studio-accent); }
+@media (max-width: 800px) {
+  .page-container { display: block; }
+  .sidebar-nav {
+    position: relative;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-shadow: 0 5px 18px rgba(31,28,23,.14);
+  }
+  .sidebar-nav::before { display: none; }
+  .sidebar-nav .nav-link { flex: 0 0 auto; margin: 0; }
+  .main-content { padding: 22px 14px 60px; }
+  .content-header { padding: 20px; border-radius: 17px; }
+  .content-header::after { display: none; }
+}
+@media (max-width: 520px) {
+  .content-header { align-items: flex-start; gap: 14px; }
+  .header-left { flex-wrap: wrap; }
+  .gallery-list { grid-template-columns: 1fr; }
+  .card-image-container { height: min(56vw,230px); }
+  .gallery-card button { opacity: 1; }
+}
+/* ===== 移动端最终适配层 ===== */
+@media (max-width: 800px) {
+  body { overflow-x: hidden; }
+  .main-content { min-width: 0; }
+  .sidebar-nav {
+    padding-top: max(8px, env(safe-area-inset-top));
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+  .sidebar-nav .nav-link { min-height: 44px; touch-action: manipulation; }
+  .content-header { gap: 12px; }
+  .create-button { min-height: 44px; touch-action: manipulation; }
+  .gallery-card button { min-width: 40px; min-height: 40px; opacity: 1; touch-action: manipulation; }
+  .modal {
+    padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
+    overflow: hidden;
+  }
+  .modal-content {
+    width: min(100%, 620px);
+    max-width: 100%;
+    max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 22px 16px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  #gallery-name-input { font-size: 16px; }
+  .image-upload-area { padding: 15px 10px; }
+  .image-previews { gap: 8px; }
+  .image-preview-item { width: 86px; height: 86px; }
+  .modal-buttons { position: sticky; bottom: -22px; margin: 16px -16px -22px; padding: 12px 16px max(12px, env(safe-area-inset-bottom)); background: rgba(255,253,248,.96); }
+  .modal-buttons button { min-height: 44px; }
+}
+@media (max-width: 520px) {
+  .main-content { padding: 12px 8px 54px; }
+  .content-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 17px 14px;
+  }
+  .header-left,
+  .header-right { width: 100%; }
+  .header-title h2 { font-size: 1.45rem; }
+  .create-button { width: 100%; justify-content: center; }
+  .gallery-list { gap: 11px; }
+  .gallery-card { border-radius: 14px; }
+  .card-image-container { height: min(58vw, 220px); }
+  .card-info { padding: 14px 15px 16px; }
+  .download-btn { right: 56px; }
+  .cover-thumbnails { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-inline: contain; }
+}
+@media (max-width: 360px) {
+  .image-preview-item { width: 72px; height: 72px; }
+  .modal-buttons { display: grid; grid-template-columns: 1fr 1fr; }
+}
+
     </style>
 </head>
 

@@ -64,11 +64,189 @@ static create(value) {
     // 注册自定义 Blot
     Quill.register(HiddenTextBlot);
 
+    /* ---------- 兼容创作端保存的可缩放图片 ---------- */
+    const ReaderBaseImage = Quill.import('formats/image');
+
+    class ReaderImage extends ReaderBaseImage {
+        static create(value) {
+            let src = '';
+            let width = '';
+            let alt = '';
+
+            if (typeof value === 'string') {
+                src = value;
+            } else if (value) {
+                if (typeof value === 'object') {
+                    if (typeof value.src === 'string') src = value.src;
+                    else if (typeof value.url === 'string') src = value.url;
+                    if (typeof value.width === 'string') width = value.width.trim();
+                    if (typeof value.alt === 'string') alt = value.alt;
+                }
+            }
+
+            const node = super.create(src);
+            node.setAttribute('loading', 'lazy');
+            node.setAttribute('decoding', 'async');
+            node.style.maxWidth = '100%';
+            node.style.height = 'auto';
+            node.style.display = 'block';
+            node.style.margin = '12px auto';
+
+            if (alt) node.setAttribute('alt', alt);
+
+            // 只接受创作端会产生的百分比或像素宽度，避免异常样式污染阅读页。
+            const validPercent = /^(?:100|[1-9]?\d)%$/.test(width);
+            const validPixels = /^(?:[1-9]\d{0,3})px$/.test(width);
+            if (validPercent) {
+                node.style.width = width;
+                node.setAttribute('data-width', width);
+            } else if (validPixels) {
+                node.style.width = width;
+                node.setAttribute('data-width', width);
+            }
+
+            return node;
+        }
+
+        static value(node) {
+            const src = node.getAttribute('src') || '';
+            const width = node.getAttribute('data-width') || node.style.width || '';
+            const alt = node.getAttribute('alt') || '';
+            if (!width) {
+                if (!alt) return src;
+            }
+            return { src: src, width: width, alt: alt };
+        }
+    }
+
+    // 覆盖默认 image blot，同时兼容旧的纯 URL 与新的对象型图片数据。
+    Quill.register(ReaderImage, true);
+
+    /* ---------- 同行图片组、裁剪与注释 ---------- */
+    const ReaderImageLayoutBlock = Quill.import('blots/block/embed');
+
+    function readerClampImageNumber(value, min, max, fallback) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return fallback;
+        return Math.max(min, Math.min(max, number));
+    }
+
+    function readerSafeImageSource(value) {
+        const source = String(value || '').trim();
+        if (!source) return '';
+        if (/^data:image\//i.test(source)) return source;
+        if (/^blob:/i.test(source)) return source;
+        try {
+            const parsed = new URL(source, window.location.href);
+            if (parsed.protocol === 'https:') return parsed.href;
+            if (parsed.protocol === 'http:') return parsed.href;
+        } catch (error) {
+            console.warn('阅读端无法解析图片地址', error);
+        }
+        return '';
+    }
+
+    function normalizeReaderImageItem(value) {
+        const source = typeof value === 'string' ? { src: value } : (value || {});
+        const allowedAspects = ['auto', '1 / 1', '4 / 3', '3 / 4', '16 / 9'];
+        const cropAspect = allowedAspects.indexOf(source.cropAspect) >= 0 ? source.cropAspect : 'auto';
+        let width = source.width;
+        if (typeof width === 'string') width = parseFloat(width);
+        return {
+            src: readerSafeImageSource(source.src || source.url || ''),
+            alt: String(source.alt || '').slice(0, 300),
+            caption: String(source.caption || '').slice(0, 300),
+            width: readerClampImageNumber(width, 12, 100, 70),
+            cropAspect: cropAspect,
+            cropZoom: readerClampImageNumber(source.cropZoom, 100, 250, 100),
+            cropX: readerClampImageNumber(source.cropX, 0, 100, 50),
+            cropY: readerClampImageNumber(source.cropY, 0, 100, 50)
+        };
+    }
+
+    function normalizeReaderImageLayout(value) {
+        const source = value ? value : {};
+        let rawItems = [];
+        if (Array.isArray(source.items)) rawItems = source.items.slice(0, 4);
+        const items = rawItems.map(normalizeReaderImageItem).filter(function (item) {
+            return Boolean(item.src);
+        });
+        if (!items.length) {
+            if (source.src) items.push(normalizeReaderImageItem(source));
+        }
+        return { version: 1, items: items };
+    }
+
+    function renderReaderImageLayout(node, rawValue) {
+        const layout = normalizeReaderImageLayout(rawValue);
+        node.dataset.layout = JSON.stringify(layout);
+        node.innerHTML = '';
+        const row = document.createElement('div');
+        row.className = 'ax-reader-image-row';
+
+        layout.items.forEach(function (item) {
+            const figure = document.createElement('figure');
+            figure.className = 'ax-reader-image-item';
+            figure.style.flexBasis = item.width + '%';
+            figure.style.maxWidth = item.width + '%';
+
+            const stage = document.createElement('div');
+            stage.className = 'ax-reader-image-stage';
+            if (item.cropAspect !== 'auto') {
+                stage.classList.add('is-cropped');
+                stage.style.aspectRatio = item.cropAspect;
+            }
+
+            const image = document.createElement('img');
+            image.src = item.src;
+            image.alt = item.alt;
+            image.loading = 'lazy';
+            image.decoding = 'async';
+            if (item.cropAspect !== 'auto') {
+                image.style.objectPosition = item.cropX + '% ' + item.cropY + '%';
+                image.style.transform = 'scale(' + (item.cropZoom / 100) + ')';
+            }
+            stage.appendChild(image);
+            figure.appendChild(stage);
+
+            if (item.caption) {
+                const caption = document.createElement('figcaption');
+                caption.textContent = item.caption;
+                figure.appendChild(caption);
+            }
+            row.appendChild(figure);
+        });
+        node.appendChild(row);
+    }
+
+    class ReaderImageLayout extends ReaderImageLayoutBlock {
+        static create(value) {
+            const node = super.create();
+            renderReaderImageLayout(node, value);
+            return node;
+        }
+
+        static value(node) {
+            try {
+                return normalizeReaderImageLayout(JSON.parse(node.dataset.layout || '{}'));
+            } catch (error) {
+                console.warn('阅读端读取图片组失败', error);
+                return normalizeReaderImageLayout({});
+            }
+        }
+    }
+
+    ReaderImageLayout.blotName = 'imageLayout';
+    ReaderImageLayout.tagName = 'div';
+    ReaderImageLayout.className = 'ax-image-layout';
+    Quill.register(ReaderImageLayout, true);
+
       // ================= 自定义特效（阅读端）全局配置 =================
 const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects/public';
 
 let customEffectFnMap = {};
 let customEffectsLoaded = false;
+let customEffectsLoadedWorkId = '';
 
       const EFFECT_DEBUG = true;           // ⭐ 打开调试日志
       const EFFECT_BG_DEBUG = true;        // ⭐ 新增：背景系统调试开关
@@ -89,6 +267,7 @@ let effectObserver = null;
 // 重写 initEffectObserver —— 触发条件改成“句子到达屏幕下方 1/5”
 // ---------------------------------------------------------------------
 function initEffectObserver() {
+    if (effectObserver) return effectObserver;
     if (!('IntersectionObserver' in window)) {
         if (EFFECT_DEBUG) {
             console.log('⚠️ [effects] 当前环境不支持 IntersectionObserver，改用滚动监听方案');
@@ -120,7 +299,7 @@ function initEffectObserver() {
         t = t + 0.1;     // 每 0.1 一个点，你也可以改成 0.05 更细
     }
 
-    effectObserver = new IntersectionObserver(function (entries) {
+    var observer = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
             var target = entry.target;
             var cb = target.__effectTrigger;
@@ -156,12 +335,13 @@ function initEffectObserver() {
 
             try {
                 cb(target);
+                target.dataset.effectTriggered = '1';
             } catch (err) {
                 console.error('执行特效时出错:', err);
             }
 
             // 只触发一次就取消监听
-            effectObserver.unobserve(target);
+            observer.unobserve(target);
             delete target.__effectTrigger;
         });
     }, {
@@ -169,7 +349,7 @@ function initEffectObserver() {
         threshold: thresholds
     });
 
-
+    effectObserver = observer;
     return effectObserver;
 }
 
@@ -179,6 +359,7 @@ function initEffectObserver() {
 // 把某个元素注册进“滚动触发一次”的队列（调试版）
 function registerEffectTrigger(targetEl, cb) {
     if (!targetEl || typeof cb !== 'function') return;
+    if (targetEl.dataset.effectTriggered === '1') return;
 
     const sid = targetEl.getAttribute('data-sentence-id') || '(no-id)';
 
@@ -225,6 +406,7 @@ function registerEffectTrigger(targetEl, cb) {
     }
 
     // ⭐ 新增：顶部补触发逻辑（兼容旧转换器版本）
+    var triggeredImmediately = false;
     (function () {
         var rect = targetEl.getBoundingClientRect();
         var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
@@ -257,6 +439,8 @@ function registerEffectTrigger(targetEl, cb) {
                 }
                 try {
                     cb(targetEl);
+                    targetEl.dataset.effectTriggered = '1';
+                    triggeredImmediately = true;
                 } catch (err) {
                     console.error('❌ [registerEffectTrigger] 顶部补触发失败:', sid, err);
                 }
@@ -265,6 +449,8 @@ function registerEffectTrigger(targetEl, cb) {
             }
         }
     })();
+
+    if (triggeredImmediately) return;
 
     // 正常情况：交给 IntersectionObserver，等它滚到屏幕下方 1/5 再触发
     targetEl.__effectTrigger = cb;
@@ -343,12 +529,14 @@ function findFirstSuspiciousChar(raw) {
 
 
 // 只在第一次需要时，从后端加载自定义特效列表
-async function ensureCustomEffectsLoaded() {
-    if (customEffectsLoaded) return;
+async function ensureCustomEffectsLoaded(workIdValue) {
+    var workId = String(workIdValue || '').trim();
+    if (!workId) return;
+    if (customEffectsLoaded) {
+      if (customEffectsLoadedWorkId === workId) return;
+    }
 
     try {
-        const workId = activeWork ? (activeWork._id || activeWork.workId) : null;
-        if (!workId) return;
         const res = await fetch(`${EFFECT_API_BASE_URL}?workId=${encodeURIComponent(workId)}`);
         if (!res.ok) throw new Error('请求失败');
 
@@ -410,7 +598,10 @@ list.forEach(function (item) {
 
 
         customEffectsLoaded = true;
+        customEffectsLoadedWorkId = workId;
     } catch (err) {
+        customEffectsLoaded = false;
+        customEffectsLoadedWorkId = '';
         console.error('加载自定义特效失败:', err);
     }
 }
@@ -430,6 +621,17 @@ list.forEach(function (item) {
         const likeCounter = likeWorkBtn.querySelector('.like-counter');
         const likeIcon = likeWorkBtn.querySelector('.like-icon');
         const sidebar = document.getElementById('sidebar');
+        const textSearchBtn = document.getElementById('text-search-btn');
+        const readerSearchModal = document.getElementById('reader-search-modal');
+        const readerSearchDialog = readerSearchModal ? readerSearchModal.querySelector('.reader-search-dialog') : null;
+        const readerSearchClose = document.getElementById('reader-search-close');
+        const readerSearchForm = document.getElementById('reader-search-form');
+        const readerSearchInput = document.getElementById('reader-search-input');
+        const readerSearchSubmit = document.getElementById('reader-search-submit');
+        const readerSearchStatus = document.getElementById('reader-search-status');
+        const readerSearchResults = document.getElementById('reader-search-results');
+        let readerSearchMatches = [];
+        let readerSearchReturnFocus = null;
 
         function closeNavigationPopup(restoreFocus) {
           const navPopup = document.getElementById('nav-grid-popup');
@@ -520,6 +722,7 @@ const bgPeekMobileBtn = document.getElementById('bg-peek-mobile-btn');
         let currentPageIndex = 0;
         let activeSentenceEl = null; // 被点击用于评论的段落元素
         let pageQuill = null;        // 在翻页模式下动态创建的 Quill 实例
+        let pageLoadToken = 0;       // 防止快速翻页时旧请求覆盖新页面
         let rendererQuill = null;    // 隐藏的 Quill 用于 Delta -> HTML 转换
 
         // 楼层懒加载相关
@@ -1014,6 +1217,36 @@ if (typeof type === 'string' ? type.startsWith('custom:') : false) {
             rendererQuill = new Quill(r, { theme: 'snow', modules: { toolbar: false }, readOnly: true });
         })();
 
+// 清理从网页复制时混入的“默认白底深色字”。只影响阅读渲染，不改数据库内容。
+function sanitizeReaderDeltaFormatting(delta) {
+    if (!delta) return delta;
+    if (typeof delta !== 'object') return delta;
+    if (!Array.isArray(delta.ops)) return delta;
+
+    const whiteBackgrounds = ['#fff', '#ffffff', 'white', 'rgb(255,255,255)', 'rgba(255,255,255,1)', 'rgba(255,255,255,0.9)'];
+    const defaultDarkColors = ['#000', '#000000', 'black', '#333', '#333333', '#363636', 'rgb(0,0,0)', 'rgb(51,51,51)', 'rgb(54,54,54)'];
+
+    return {
+      ...delta,
+      ops: delta.ops.map(function (op) {
+        if (!op) return op;
+        if (!op.attributes) return op;
+        const attributes = { ...op.attributes };
+        const background = String(attributes.background || '').toLowerCase().replace(/\s+/g, '');
+        const color = String(attributes.color || '').toLowerCase().replace(/\s+/g, '');
+        var removedWhiteBackground = whiteBackgrounds.includes(background);
+        if (!removedWhiteBackground) {
+          if (background.startsWith('rgba(255,255,255,')) removedWhiteBackground = true;
+        }
+        if (removedWhiteBackground) {
+          delete attributes.background;
+          if (defaultDarkColors.includes(color)) delete attributes.color;
+        }
+        return { ...op, attributes: attributes };
+      })
+    };
+}
+
 // Delta -> HTML（安全降级：如果传入的是字符串就直接返回字符串）
 function deltaToHtml(deltaOrHtml) {
     try {
@@ -1024,7 +1257,7 @@ if (typeof deltaOrHtml === 'string') {
         const maybeDelta = JSON.parse(deltaOrHtml);
         if (maybeDelta) {
     if (maybeDelta.ops) {
-        rendererQuill.setContents(maybeDelta);
+        rendererQuill.setContents(sanitizeReaderDeltaFormatting(maybeDelta));
         return rendererQuill.root.innerHTML;
     }
 }
@@ -1034,7 +1267,7 @@ if (typeof deltaOrHtml === 'string') {
     return deltaOrHtml;
 }
         
-        rendererQuill.setContents(deltaOrHtml);
+        rendererQuill.setContents(sanitizeReaderDeltaFormatting(deltaOrHtml));
         const contentHtml = rendererQuill.root.innerHTML;
 
         // 💥 关键修改：检测是否已有 .ql-editor 容器，防止嵌套
@@ -1106,7 +1339,7 @@ async function loadWorkContentById(id) {
 
     // ✅ 2) 特效（仍然只加载一次）
     const effectsPublished = meta.effectsPublished || [];
-    await ensureCustomEffectsLoaded();
+    await ensureCustomEffectsLoaded(meta._id || meta.workId || id);
     activeWork.effectsPublished = effectsPublished;
 
     // ✅ 3) pages：真懒加载模式下只建“空壳数组”，不填 content
@@ -1370,6 +1603,7 @@ function hydrateRenderedFloorsRange(startIndex, endIndex) {
 
     floorBody.innerHTML = page.segmentedHtml;
     floorBody.dataset.hydrated = '1';
+    delete floorBody.dataset.effectsApplied;
     processContentForSentenceIds(floorBody);
     // 如果评论标记还在路上：等它到了再给本楼补一次“评论符号”
 if (commentedIdsReadyPromise) {
@@ -2097,22 +2331,42 @@ footer.innerHTML = `
 
   const pageCommentBtn = document.getElementById('page-view-comment-btn');
 if (pageCommentBtn) {
-    const commentCount = getCommentsCountForPage(pageIndex);
+    const commentCount = getCommentsCountForPage(currentPageIndex);
     pageCommentBtn.textContent = `查看评论 (${commentCount})`;
 }
 processContentForSentenceIds(bookContent);
 }
 
         // 【修改 script.txt: 91-96 行附近，在 loadPageIntoPageQuill 函数体内部】
-function loadPageIntoPageQuill(pageIndex) {
+async function loadPageIntoPageQuill(pageIndex) {
     if (!pageQuill) return;
+    const loadToken = pageLoadToken + 1;
+    pageLoadToken = loadToken;
+
+    pageQuill.root.innerHTML = '<p class="lazy-floor-placeholder">正在加载本页内容…</p>';
+    try {
+      await ensurePagesPreparedUpTo(pageIndex + 1, { userInitiated: true });
+    } catch (error) {
+      console.error('翻页内容准备失败:', error);
+      if (loadToken === pageLoadToken) {
+        if (pageQuill) {
+          pageQuill.root.innerHTML = '<p>本页加载失败，请重试。</p>';
+        }
+      }
+      return;
+    }
+    if (loadToken !== pageLoadToken) return;
+    if (!pageQuill) return;
+
     const pageObj = activePages[pageIndex] || { content: { ops: [] } };
     
     let contentHtml = '';
     
     // 1. 获取原始内容（通常是 Delta 或 HTML）
     try {
-        if (typeof pageObj.content === 'object') {
+        if (typeof pageObj.segmentedHtml === 'string') {
+            contentHtml = pageObj.segmentedHtml;
+        } else if (typeof pageObj.content === 'object') {
             // 将 Delta 转换为 HTML
             contentHtml = deltaToHtml(pageObj.content); 
         } else {
@@ -2130,11 +2384,14 @@ function loadPageIntoPageQuill(pageIndex) {
     
     // 3. 调用无副作用的 ID 注入函数，使用固定的起始索引
     // 注意：不更新全局 contentIndexCounter
-    const result = segmentContentAndAddIds(contentHtml, activeWork._id, pageStartIndex);
+    const result = typeof pageObj.segmentedHtml === 'string'
+      ? { element: null }
+      : segmentContentAndAddIds(contentHtml, activeWork._id, pageStartIndex);
     
     // 4. 将带有 ID 的 HTML 注入到 Quill 的根元素中 (绕过 setContents 导致的 ID 丢失)
     // ⚠️ 必须直接操作 root.innerHTML
-    pageQuill.root.innerHTML = result.element.innerHTML;
+    pageQuill.root.innerHTML = result.element ? result.element.innerHTML : contentHtml;
+    delete pageQuill.root.dataset.effectsApplied;
 
     // 更新页码指示
     const indicator = document.getElementById('page-indicator');
@@ -3129,23 +3386,29 @@ async function openCommentPanelForSentence(sentenceId, isNewCommentMode = false)
 
 
 function processContentForSentenceIds(containerEl) {
+  if (!containerEl) return;
   // 只清本容器的评论符号（避免越跑越多）
   containerEl.querySelectorAll('.comment-indicator').forEach(el => el.remove());
 
-  // 特效只应用一次（避免重复包裹/重复注入）
-  if (!containerEl.dataset.effectsApplied) {
+  const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
+
+  // 占位容器没有句子，不能提前写入“已应用”标记，否则内容加载后会永远跳过。
+  if (sentenceElements.length) {
     if (activeWork) {
       if (Array.isArray(activeWork.effectsPublished)) {
         if (activeWork.effectsPublished.length) {
           const workIdForEffect = activeWork._id || activeWork.workId;
-          applyEffectsToBlocks(containerEl, activeWork.effectsPublished, workIdForEffect);
+          const firstSentenceId = sentenceElements[0].getAttribute('data-sentence-id') || '';
+          const lastSentenceId = sentenceElements[sentenceElements.length - 1].getAttribute('data-sentence-id') || '';
+          const effectApplyKey = String(workIdForEffect || '') + ':' + firstSentenceId + ':' + lastSentenceId;
+          if (containerEl.dataset.effectsApplied !== effectApplyKey) {
+            applyEffectsToBlocks(containerEl, activeWork.effectsPublished, workIdForEffect);
+            containerEl.dataset.effectsApplied = effectApplyKey;
+          }
         }
       }
     }
-    containerEl.dataset.effectsApplied = '1';
   }
-
-  const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
 
   sentenceElements.forEach(el => {
     const sentenceId = el.getAttribute('data-sentence-id');
@@ -3259,15 +3522,6 @@ function renderCurrentMode() {
                 renderPageMode();
             }
 
-            setTimeout(() => {
-                const root = currentMode === 'scroll'
-                    ? bookContent
-                    : (pageQuill?.root || bookContent);
-                if (root) {
-                    processContentForSentenceIds(root);
-                    console.log('✅ 评论句子点击绑定完成（恢复阅读位置）');
-                }
-            }, 50);
             return; // 已按记录渲染，不再走下面的默认逻辑
         }
 
@@ -3282,16 +3536,195 @@ function renderCurrentMode() {
         renderPageMode();
     }
 
-    setTimeout(() => {
-        const root = currentMode === 'scroll'
-            ? bookContent
-            : (pageQuill?.root || bookContent);
-        if (root) {
-            processContentForSentenceIds(root);
-            console.log('✅ 评论句子点击绑定完成');
-        }
-    }, 50);
 }
+
+        /* ---------- 文内搜索 ---------- */
+        function openReaderSearch() {
+            if (!readerSearchModal) return;
+            closeNavigationPopup(false);
+            readerSearchReturnFocus = document.activeElement;
+            readerSearchModal.hidden = false;
+            document.body.classList.add('reader-search-open');
+            requestAnimationFrame(function () {
+                if (readerSearchInput) readerSearchInput.focus();
+            });
+        }
+
+        function closeReaderSearch(restoreFocus) {
+            if (!readerSearchModal) return;
+            readerSearchModal.hidden = true;
+            document.body.classList.remove('reader-search-open');
+            if (restoreFocus) {
+                if (readerSearchReturnFocus) readerSearchReturnFocus.focus();
+            }
+        }
+
+        function normalizeReaderSearchText(value) {
+            return String(value || '').replace(/\s+/g, ' ').trim();
+        }
+
+        function makeReaderSearchSnippet(text, keyword) {
+            const cleanText = normalizeReaderSearchText(text);
+            const lowerText = cleanText.toLocaleLowerCase();
+            const lowerKeyword = keyword.toLocaleLowerCase();
+            const foundAt = lowerText.indexOf(lowerKeyword);
+            const radius = 58;
+            const start = Math.max(0, foundAt - radius);
+            const end = Math.min(cleanText.length, foundAt + keyword.length + radius);
+            const prefix = start > 0 ? '…' : '';
+            const suffix = end < cleanText.length ? '…' : '';
+            return prefix + cleanText.slice(start, end) + suffix;
+        }
+
+        function collectReaderSearchMatches(keyword) {
+            const matches = [];
+            const seen = new Set();
+            const lowerKeyword = keyword.toLocaleLowerCase();
+
+            activePages.forEach(function (page, pageIndex) {
+                if (!page) return;
+                if (!page.segmentedHtml) return;
+                const holder = document.createElement('div');
+                holder.innerHTML = page.segmentedHtml;
+                const sentenceNodes = holder.querySelectorAll('[data-sentence-id]');
+                sentenceNodes.forEach(function (node, sentenceIndex) {
+                    const text = normalizeReaderSearchText(node.textContent);
+                    if (!text) return;
+                    if (!text.toLocaleLowerCase().includes(lowerKeyword)) return;
+                    const sentenceId = node.getAttribute('data-sentence-id') || '';
+                    const identity = String(pageIndex) + ':' + sentenceId + ':' + String(sentenceIndex);
+                    if (seen.has(identity)) return;
+                    seen.add(identity);
+                    matches.push({
+                        pageIndex: pageIndex,
+                        sentenceId: sentenceId,
+                        sentenceIndex: sentenceIndex,
+                        snippet: makeReaderSearchSnippet(text, keyword)
+                    });
+                });
+            });
+
+            return matches;
+        }
+
+        function renderReaderSearchMatches(matches) {
+            if (!readerSearchResults) return;
+            readerSearchResults.textContent = '';
+            if (!matches.length) {
+                const empty = document.createElement('li');
+                empty.className = 'reader-search-empty';
+                empty.textContent = '没有找到包含该词语的句子或段落。';
+                readerSearchResults.appendChild(empty);
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            matches.forEach(function (match, index) {
+                const item = document.createElement('li');
+                item.className = 'reader-search-result';
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.setAttribute('data-search-result-index', String(index));
+                const floor = document.createElement('strong');
+                floor.className = 'reader-search-floor';
+                floor.textContent = '第 ' + String(match.pageIndex + 1) + ' 楼';
+                const snippet = document.createElement('span');
+                snippet.className = 'reader-search-snippet';
+                snippet.textContent = match.snippet;
+                button.appendChild(floor);
+                button.appendChild(snippet);
+                item.appendChild(button);
+                fragment.appendChild(item);
+            });
+            readerSearchResults.appendChild(fragment);
+        }
+
+        async function runReaderSearch() {
+            if (!readerSearchInput) return;
+            const keyword = readerSearchInput.value.trim();
+            if (!keyword) {
+                readerSearchStatus.textContent = '请先输入要搜索的词语。';
+                readerSearchInput.focus();
+                return;
+            }
+
+            readerSearchSubmit.disabled = true;
+            readerSearchStatus.textContent = '正在载入并搜索全部楼层…';
+            readerSearchResults.textContent = '';
+            try {
+                await ensurePagesFetchedUpTo(activePages.length, false);
+                await ensurePagesPreparedUpTo(activePages.length, { userInitiated: true });
+                readerSearchMatches = collectReaderSearchMatches(keyword);
+                renderReaderSearchMatches(readerSearchMatches);
+                readerSearchStatus.textContent = readerSearchMatches.length
+                    ? '找到 ' + String(readerSearchMatches.length) + ' 处匹配，点击结果可跳转。'
+                    : '全部楼层中均未找到“' + keyword + '”。';
+            } catch (error) {
+                console.error('reader search failed', error);
+                readerSearchStatus.textContent = '搜索失败，请检查网络后重试。';
+            } finally {
+                readerSearchSubmit.disabled = false;
+            }
+        }
+
+        function findRenderedSentence(sentenceId, sentenceIndex) {
+            const nodes = document.querySelectorAll('[data-sentence-id]');
+            for (let index = 0; index < nodes.length; index += 1) {
+                if (sentenceId) {
+                    if (nodes[index].getAttribute('data-sentence-id') === sentenceId) return nodes[index];
+                }
+            }
+            if (nodes[sentenceIndex]) return nodes[sentenceIndex];
+            return null;
+        }
+
+        async function jumpToReaderSearchMatch(match) {
+            if (!match) return;
+            closeReaderSearch(false);
+            currentPageIndex = match.pageIndex;
+            if (isWeakLazyMode) currentMode = 'page';
+
+            if (currentMode === 'page') {
+                renderPageMode();
+            } else {
+                await renderScrollMode(match.pageIndex);
+            }
+
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    const previousTarget = document.querySelector('.reader-search-target');
+                    if (previousTarget) previousTarget.classList.remove('reader-search-target');
+                    const target = findRenderedSentence(match.sentenceId, match.sentenceIndex);
+                    if (!target) return;
+                    target.classList.remove('reader-search-target');
+                    void target.offsetWidth;
+                    target.classList.add('reader-search-target');
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(function () {
+                        target.classList.remove('reader-search-target');
+                    }, 3600);
+                });
+            });
+        }
+
+        if (textSearchBtn) textSearchBtn.addEventListener('click', openReaderSearch);
+        if (readerSearchClose) readerSearchClose.addEventListener('click', function () { closeReaderSearch(true); });
+        if (readerSearchForm) readerSearchForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            runReaderSearch();
+        });
+        if (readerSearchModal) readerSearchModal.addEventListener('click', function (event) {
+            if (event.target === readerSearchModal) closeReaderSearch(true);
+        });
+        if (readerSearchDialog) readerSearchDialog.addEventListener('click', function (event) {
+            event.stopPropagation();
+        });
+        if (readerSearchResults) readerSearchResults.addEventListener('click', function (event) {
+            const button = event.target.closest('[data-search-result-index]');
+            if (!button) return;
+            const resultIndex = Number(button.getAttribute('data-search-result-index'));
+            jumpToReaderSearchMatch(readerSearchMatches[resultIndex]);
+        });
 
         /* ---------- 作品点赞功能 ---------- */
         async function toggleWorkLike() {
@@ -3378,6 +3811,11 @@ function renderCurrentMode() {
 
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
+            if (readerSearchModal ? !readerSearchModal.hidden : false) {
+                e.preventDefault();
+                closeReaderSearch(true);
+                return;
+            }
             const navPopup = document.getElementById('nav-grid-popup');
             if (navPopup ? navPopup.classList.contains('show') : false) {
                 e.preventDefault();

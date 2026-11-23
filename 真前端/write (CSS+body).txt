@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
     <title>创作页面</title>
-    <link href="https://api.anchorx.ca/vendor_assets/quill.snow.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://unpkg.com/quill@2.0.3/dist/quill.snow.css';">
 
 <style> /* 隐藏类 */ .hidden {
   display:none !important;
@@ -1661,6 +1661,197 @@ body {
   outline-offset: 4px;
 }
 
+#editor .ql-editor img.ax-image-selected{
+  outline: 3px solid var(--axPrimary);
+  outline-offset: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+#ax-imgsize-panel .ax-imgsize-main{
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) 44px auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+#ax-imgsize-panel .ax-imgsize-presets{
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+#ax-imgsize-panel #imgSizeRange{
+  width: 180px;
+  max-width: 100%;
+  min-height: 32px;
+  touch-action: pan-x;
+}
+
+#ax-imgsize-panel #imgSizeLabel{
+  width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#ax-imgsize-panel .ax-image-panel-actions,
+#ax-imgsize-panel .ax-crop-ratios,
+#ax-imgsize-panel .ax-caption-editor-actions{
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+
+#ax-imgsize-panel .ax-crop-editor,
+#ax-imgsize-panel .ax-caption-editor{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.18);
+}
+
+#ax-imgsize-panel .ax-crop-control{
+  display: grid;
+  grid-template-columns: 74px minmax(120px, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+#ax-imgsize-panel .ax-crop-control input{ width: 100%; }
+#ax-imgsize-panel .ax-caption-input{
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--axBtnBd);
+  border-radius: 9px;
+  padding: 9px 10px;
+  background: rgba(255,255,255,0.1);
+  color: var(--axPanelFg);
+  font-size: 14px;
+}
+
+#editor .ql-editor .ax-image-layout{
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 18px 0;
+  padding: 12px 42px;
+  border: 1px dashed transparent;
+  border-radius: 14px;
+  transition: border-color .18s ease, background .18s ease;
+}
+
+#editor .ql-editor .ax-image-layout:hover,
+#editor .ql-editor .ax-image-layout:focus-within{
+  border-color: rgba(74,163,255,0.5);
+  background: rgba(74,163,255,0.045);
+}
+
+#editor .ql-editor .ax-image-row{
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+#editor .ql-editor .ax-image-item{
+  min-width: 0;
+  margin: 0;
+  transition: transform .18s ease, filter .18s ease;
+}
+
+#editor .ql-editor .ax-image-item:hover{ transform: translateY(-2px); }
+#editor .ql-editor .ax-image-stage{
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  border-radius: 11px;
+  background: rgba(30,38,48,0.08);
+  box-shadow: 0 5px 16px rgba(25,32,40,0.1);
+}
+
+#editor .ql-editor .ax-image-stage > img{
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  border-radius: inherit;
+  transition: filter .18s ease, box-shadow .18s ease;
+}
+
+#editor .ql-editor .ax-image-stage.is-cropped > img{
+  height: 100%;
+  object-fit: cover;
+}
+
+#editor .ql-editor .ax-image-item:hover .ax-image-stage > img{ filter: brightness(.88); }
+#editor .ql-editor .ax-image-hover-actions{
+  position: absolute;
+  inset: auto 7px 7px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+#editor .ql-editor .ax-image-item:hover .ax-image-hover-actions,
+#editor .ql-editor .ax-image-item:focus-within .ax-image-hover-actions{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#editor .ql-editor .ax-image-action{
+  min-height: 30px;
+  border: 1px solid rgba(255,255,255,0.42);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(20,27,35,0.82);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  backdrop-filter: blur(7px);
+}
+
+#editor .ql-editor .ax-image-action:hover{ background: var(--axPrimary); }
+#editor .ql-editor .ax-image-add{
+  position: relative;
+  z-index: 3;
+  flex: 0 0 34px;
+  align-self: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(74,163,255,0.5);
+  border-radius: 50%;
+  background: var(--axPanelBg);
+  color: var(--axPrimary);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: .72;
+  transform: none;
+  transition: opacity .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+#editor .ql-editor .ax-image-add:hover{
+  opacity: 1;
+  transform: scale(1.08);
+  box-shadow: 0 5px 15px rgba(74,163,255,0.28);
+}
+
+#editor .ql-editor .ax-image-item figcaption{
+  margin-top: 7px;
+  color: #697386;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 /* =========================
    ✅ 精准：仅作用于作品标签弹窗（#tag-modal-backdrop）
    目标：按钮/输入框/标签chip上色 + hover/active
@@ -2524,6 +2715,883 @@ body.ax-editor-fullscreen #main-page {
   }
 }
 
+/* ==========================================================
+   AnchorX creative studio v3 — calmer project shelf + paper
+   ========================================================== */
+:root {
+  --studio-ink: #282621;
+  --studio-muted: #756f65;
+  --studio-paper: #fffdf8;
+  --studio-canvas: #ece8df;
+  --studio-line: rgba(67, 58, 46, 0.14);
+  --studio-accent: #8b5d3b;
+  --studio-accent-dark: #684129;
+  --studio-accent-soft: #f1e5d7;
+  --studio-nav: #252722;
+  --studio-nav-muted: #bbb8ad;
+  --ax-blue: var(--studio-accent);
+  --ax-blue-dark: var(--studio-accent-dark);
+  --ax-blue-soft: var(--studio-accent-soft);
+  --ax-border: #d9d3c9;
+  --ax-muted: var(--studio-muted);
+  --ax-surface: var(--studio-paper);
+  --ax-workspace: var(--studio-canvas);
+}
+
+body {
+  color: var(--studio-ink);
+  background: var(--studio-canvas);
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+}
+
+.page-container { background: var(--studio-canvas); }
+
+.sidebar-nav {
+  padding: 24px 14px;
+  border-right: 0;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(210, 164, 119, 0.18), transparent 28%),
+    linear-gradient(180deg, #292b26 0%, var(--studio-nav) 100%);
+  box-shadow: 8px 0 28px rgba(31, 28, 23, 0.1);
+}
+
+.sidebar-nav::before {
+  content: "创作中心";
+  display: block;
+  margin: 2px 10px 28px;
+  color: #f4efe6;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.6;
+  letter-spacing: 0.12em;
+  white-space: pre;
+}
+
+.sidebar-nav.sidebar-collapsed::before {
+  content: "AX";
+  margin: 4px 0 24px;
+  text-align: center;
+}
+
+.sidebar-nav .nav-link {
+  min-height: 46px;
+  margin-bottom: 6px;
+  padding: 11px 13px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--studio-nav-muted);
+}
+
+.sidebar-nav .nav-link:hover {
+  border-color: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  transform: translateX(2px);
+}
+
+.sidebar-nav .nav-link.active {
+  border-color: rgba(224, 184, 144, 0.2);
+  background: rgba(210, 164, 119, 0.15);
+  color: #f1cfad;
+}
+
+.sidebar-nav .nav-link .nav-icon svg,
+.sidebar-nav .nav-link.active .nav-icon svg { fill: currentColor; }
+
+#main-page.main-content {
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 72px) clamp(22px, 5vw, 72px) 90px;
+  background: transparent;
+}
+
+#main-page .content-header {
+  position: relative;
+  margin-bottom: 34px;
+  padding: 28px 30px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 22px;
+  background: rgba(255,253,248,0.86);
+  box-shadow: 0 18px 48px rgba(53, 45, 34, 0.09);
+  backdrop-filter: blur(14px);
+}
+
+#main-page .content-header::after {
+  content: "APPLY YOUR COLOR";
+  position: absolute;
+  right: 26px;
+  bottom: -8px;
+  color: rgba(139, 93, 59, 0.07);
+  font: 800 clamp(1.8rem, 4vw, 4rem)/1 Georgia, serif;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+#main-page .header-left,
+#main-page .header-right { position: relative; z-index: 1; }
+
+#main-page .header-title h2 {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: clamp(1.45rem, 2.3vw, 2.15rem);
+  letter-spacing: 0.04em;
+}
+
+#main-page .icon-plane {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--studio-accent-soft);
+  color: var(--studio-accent);
+}
+
+#main-page .create-button {
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--studio-accent);
+  border-radius: 12px;
+  background: var(--studio-accent);
+  box-shadow: 0 7px 16px rgba(104, 65, 41, 0.17);
+}
+
+#main-page .create-button:hover {
+  background: var(--studio-accent-dark);
+  transform: translateY(-1px);
+}
+
+#main-page #bulk-delete-btn {
+  border-color: #d8d0c5;
+  background: rgba(255,255,255,0.72);
+  color: #675f56;
+  box-shadow: none;
+}
+
+#main-page #bulk-delete-btn:hover { border-color: #b45d5d; background: #fff2f1; color: #9b3e3e; }
+
+#main-page .sort-button {
+  min-height: 42px;
+  padding-inline: 15px;
+  border-color: #d8d0c5;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.7);
+  color: #5f584f;
+}
+
+#main-page .work-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  gap: 18px;
+}
+
+#main-page .work-list > p { grid-column: 1 / -1; }
+
+#main-page .work-item-wrapper {
+  min-height: 142px;
+  margin: 0;
+  overflow: visible;
+  border: 1px solid rgba(101, 85, 63, 0.13);
+  border-radius: 18px;
+  background: rgba(255,253,248,0.94);
+  box-shadow: 0 10px 30px rgba(53, 45, 34, 0.07);
+}
+
+#main-page .work-item-wrapper::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 0;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--studio-accent);
+  opacity: 0.68;
+}
+
+#main-page .work-item-wrapper:hover {
+  transform: translateY(-4px);
+  border-color: rgba(139, 93, 59, 0.28);
+  box-shadow: 0 18px 38px rgba(53, 45, 34, 0.12);
+}
+
+#main-page .work-item {
+  min-height: 142px;
+  align-items: flex-start;
+  padding: 22px 20px 18px 24px;
+  border-radius: inherit;
+}
+
+#main-page .work-title {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: 1.18rem;
+  line-height: 1.45;
+}
+
+#main-page .work-date { margin-bottom: 8px; color: var(--studio-muted); }
+#main-page .work-status { border-radius: 999px; background: var(--studio-accent-soft); color: var(--studio-accent-dark); }
+
+#main-page .work-actions-buttons button {
+  border: 1px solid #ddd5ca;
+  border-radius: 9px;
+  background: #fff;
+  color: #635b52;
+}
+
+#main-page .menu-container {
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  box-shadow: 0 16px 38px rgba(42, 35, 27, 0.18);
+}
+
+.modal { z-index: 30000; background: rgba(26, 23, 19, 0.48); backdrop-filter: blur(7px); }
+.modal-content {
+  border: 1px solid rgba(255,255,255,0.72);
+  border-radius: 20px;
+  background: var(--studio-paper);
+  box-shadow: 0 28px 80px rgba(26, 22, 17, 0.28);
+}
+.modal-content input,
+.modal-content textarea { border-color: #d8d0c5; border-radius: 11px; background: #fff; }
+.modal-content input:focus,
+.modal-content textarea:focus { border-color: var(--studio-accent); outline: 3px solid rgba(139,93,59,0.12); }
+
+/* Editor chrome is deliberately quiet so the manuscript remains dominant. */
+#editor-page.main-content { background: var(--studio-canvas); }
+
+#editor-page .editor-toolbar-container {
+  border-bottom-color: rgba(82, 70, 55, 0.16);
+  background: rgba(255,253,248,0.95);
+  box-shadow: 0 8px 26px rgba(51, 43, 33, 0.09);
+  backdrop-filter: blur(18px) saturate(115%);
+}
+
+#editor-page .editor-toolbar { min-height: 64px; padding: 10px 18px; }
+#editor-page .editor-title {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: 1.08rem;
+}
+
+#editor-page .editor-word-count {
+  border-color: var(--studio-line);
+  background: rgba(139,93,59,0.06);
+  color: var(--studio-muted);
+}
+
+#editor-page .page-current,
+#editor-page .editor-toolbar-actions button,
+#editor-page .back-button {
+  border-color: #d6cec2;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.78);
+  color: #49433b;
+}
+
+#editor-page .editor-toolbar-actions button:hover,
+#editor-page .back-button:hover { border-color: var(--studio-accent); background: var(--studio-accent-soft); color: var(--studio-accent-dark); }
+
+#editor-page #publishBtn {
+  border-color: var(--studio-accent);
+  background: var(--studio-accent);
+  color: #fff;
+  box-shadow: 0 6px 15px rgba(104,65,41,0.18);
+}
+
+#editor-page #saveBtn { border-color: var(--studio-accent); color: var(--studio-accent-dark); }
+#editor-page .ax-ribbon { border-top-color: var(--studio-line); background: rgba(249,246,240,0.96); }
+#editor-page .ax-ribbon-tabs { border-bottom-color: var(--studio-line); }
+#editor-page .ax-ribbon-tab { color: #595249; }
+#editor-page .ax-ribbon-tab:hover { background: rgba(139,93,59,0.07); }
+#editor-page #toolbar-quill.ax-ribbon-panels { background: rgba(255,253,248,0.94); }
+#editor-page .ax-ribbon-group { border-right-color: var(--studio-line); }
+
+#editor-page .editor-workspace {
+  padding: clamp(18px, 3vw, 38px);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,0.58), transparent 38%),
+    var(--studio-canvas);
+}
+
+#editor-page #editor {
+  width: min(100%, 940px);
+  border: 1px solid rgba(91, 77, 59, 0.16);
+  border-radius: 8px;
+  background: var(--studio-paper);
+  box-shadow: 0 22px 58px rgba(48, 40, 30, 0.13);
+}
+
+#editor-page #editor .ql-editor {
+  padding: clamp(48px, 7vw, 88px) clamp(34px, 9vw, 104px);
+  color: #2b2823;
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: 17px;
+  line-height: 1.9;
+  letter-spacing: 0.018em;
+}
+
+#editor-page #editor .ql-editor p { margin-bottom: 0.85em; }
+
+#editor-page .right-sidebar {
+  padding: 16px;
+  border-color: rgba(91, 77, 59, 0.15);
+  border-radius: 16px;
+  background: rgba(255,253,248,0.92);
+  box-shadow: 0 12px 34px rgba(48, 40, 30, 0.09);
+  backdrop-filter: blur(14px);
+}
+
+#editor-page .ax-side-panel-header h3 {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC", "Songti SC", serif;
+}
+
+#editor-page .dropdown-container {
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid var(--studio-line);
+  border-radius: 11px;
+  background: rgba(255,255,255,0.64);
+}
+
+#editor-page .dropdown-header { background: transparent; color: #4b453d; }
+
+@media (max-width: 1180px) {
+  #main-page .content-header { align-items: flex-start; gap: 18px; }
+  #main-page .header-left { flex-wrap: wrap; }
+}
+
+@media (max-width: 900px) {
+  .sidebar-nav::before { display: none; }
+  .sidebar-nav,
+  .sidebar-nav.sidebar-collapsed {
+    background: #292b26;
+    box-shadow: 0 5px 18px rgba(31,28,23,0.14);
+  }
+  #main-page.main-content { padding: 22px 14px 60px; }
+  #main-page .content-header { padding: 20px; border-radius: 17px; }
+  #main-page .content-header::after { display: none; }
+  #main-page .work-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  #editor-page #editor { border-radius: 5px; }
+}
+
+@media (max-width: 620px) {
+  #main-page .content-header { display: block; }
+  #main-page .header-left { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #main-page .header-title { grid-column: 1 / -1; margin-bottom: 6px; }
+  #main-page .header-right { margin-top: 10px; }
+  #main-page .create-button { justify-content: center; }
+  #main-page .sort-button { width: 100%; justify-content: space-between; }
+  #editor-page #editor .ql-editor { padding: 30px 20px; font-size: 16px; line-height: 1.78; }
+}
+
+/* ==========================================================
+   Creative studio v4 — card actions and assistant drawer
+   ========================================================== */
+#main-page .work-item-wrapper {
+  min-height: 190px;
+}
+
+#main-page .work-item {
+  height: 100%;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 21px 20px 0 24px;
+}
+
+#main-page .work-info {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-right: 42px;
+  padding-bottom: 18px;
+}
+
+#main-page .work-details { align-items: flex-start; }
+#main-page .work-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+#main-page .work-actions-buttons {
+  width: calc(100% + 44px);
+  min-height: 55px;
+  margin: auto -20px 0 -24px;
+  padding: 8px 11px 8px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--studio-line);
+  background: rgba(247, 242, 234, 0.72);
+  border-radius: 0 0 17px 17px;
+}
+
+#main-page .work-actions-buttons button {
+  min-width: 0;
+  min-height: 36px;
+  margin: 0;
+  padding: 7px 9px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #62594f;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+#main-page .work-actions-buttons button:hover {
+  background: #fff;
+  color: var(--studio-accent-dark);
+  box-shadow: 0 3px 10px rgba(53,45,34,0.08);
+}
+
+#main-page .cover-settings-btn::before { content: "▣ "; }
+#main-page .tag-settings-btn::before { content: "⌑ "; }
+#main-page .work-actions-buttons .menu-button {
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  width: 38px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid var(--studio-line);
+  background: rgba(255,255,255,0.72);
+  color: var(--studio-muted);
+  font-size: 0;
+}
+#main-page .work-actions-buttons .menu-button::after { content: "•••"; font-size: 0.76rem; letter-spacing: 0.08em; }
+
+#main-page .menu-container {
+  top: 52px;
+  right: 12px;
+  bottom: auto;
+  width: 132px;
+}
+
+/* 中文 Ribbon：分组文字更清晰，不再像英文 Office 工具栏。 */
+#editor-page .ax-ribbon-tab { min-width: 58px; }
+#editor-page .ax-ribbon-group-label {
+  color: #756c62;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+/* 创作辅助改为不挤占稿纸宽度的右侧抽屉。 */
+#editor-page .editor-container {
+  display: block;
+}
+
+#editor-page .right-sidebar,
+#editor-page .right-sidebar.collapsed {
+  position: fixed;
+  top: calc(var(--ax-toolbar-height) + 18px);
+  right: 18px;
+  bottom: 18px;
+  z-index: 1750;
+  display: block;
+  width: min(370px, calc(100vw - 36px)) !important;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(91,77,59,0.17);
+  border-radius: 20px;
+  background: rgba(255,253,248,0.97);
+  box-shadow: 0 24px 68px rgba(38,31,23,0.22);
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  pointer-events: auto;
+  backdrop-filter: blur(18px) saturate(112%);
+  transition: transform 0.24s ease, opacity 0.2s ease, visibility 0.2s ease;
+}
+
+#editor-page .right-sidebar.collapsed {
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(calc(100% + 30px));
+  pointer-events: none;
+}
+
+#editor-page .right-sidebar .tool-section {
+  height: 100%;
+  padding: 0 15px 18px;
+  overflow-y: auto;
+  scrollbar-color: #c8baa9 transparent;
+}
+
+#editor-page .ax-side-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 -15px 14px;
+  padding: 17px 17px 14px;
+  border-bottom: 1px solid var(--studio-line);
+  background: rgba(255,253,248,0.96);
+  backdrop-filter: blur(14px);
+}
+
+#editor-page .ax-side-panel-header h3 {
+  margin: 0 0 4px;
+  font-size: 1.12rem;
+}
+
+#editor-page .ax-side-panel-header p {
+  margin: 0;
+  color: var(--studio-muted);
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+
+#editor-page .right-sidebar-toggle {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 10px;
+  background: #f1ebe3;
+  color: #62594f;
+  font-size: 1.1rem;
+}
+
+#editor-page .dropdown-container {
+  margin-bottom: 9px;
+  overflow: hidden;
+  border: 1px solid var(--studio-line);
+  border-radius: 13px;
+  background: rgba(255,255,255,0.66);
+}
+
+#editor-page .dropdown-header {
+  min-height: 53px;
+  padding: 10px 12px;
+  border-radius: 0;
+  background: transparent;
+  color: #494239;
+  font-size: 0.88rem;
+  font-weight: 650;
+  outline: none;
+}
+
+#editor-page .dropdown-header:hover,
+#editor-page .dropdown-header:focus-visible {
+  background: #f5eee6;
+}
+
+#editor-page .dropdown-header.open {
+  background: var(--studio-accent-soft);
+  color: var(--studio-accent-dark);
+}
+
+#editor-page .dropdown-header > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+#editor-page .tool-section-icon {
+  width: 29px;
+  height: 29px;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  background: #eee6dc;
+  color: var(--studio-accent-dark);
+  font-family: "Songti SC", STSong, serif;
+  font-size: 0.76rem;
+  font-style: normal;
+}
+
+#editor-page .dropdown-header.open .tool-section-icon {
+  background: var(--studio-accent);
+  color: #fff;
+}
+
+#editor-page .dropdown-header .arrow {
+  color: #948a7e;
+  font-size: 0.8rem;
+}
+
+#editor-page .dropdown-content {
+  padding: 12px;
+  border-top: 1px solid var(--studio-line);
+  background: #fbf8f3;
+}
+
+#editor-page .role-list,
+#editor-page #historyList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#editor-page #historyList li,
+#editor-page #diceLogList li {
+  margin-bottom: 6px;
+  padding: 9px 10px;
+  border: 1px solid rgba(91,77,59,0.1);
+  border-radius: 9px;
+  background: #fff;
+  color: #5f574e;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+#editor-page .add-role-btn {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 9px;
+  border: 1px dashed #c9b8a6;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--studio-accent-dark);
+  cursor: pointer;
+}
+
+#editor-page .add-role-btn:hover { background: var(--studio-accent-soft); }
+
+.floating-sidebar-btn {
+  right: 20px;
+  bottom: 22px;
+  z-index: 1800;
+  width: auto;
+  height: 46px;
+  min-width: 116px;
+  display: none;
+  padding: 0 15px;
+  flex-direction: row;
+  gap: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 999px;
+  background: var(--studio-accent);
+  box-shadow: 0 12px 30px rgba(63,43,29,0.26);
+  color: #fff;
+}
+
+.floating-sidebar-btn.is-editor-visible { display: flex; }
+.floating-sidebar-btn:hover {
+  background: var(--studio-accent-dark);
+  transform: translateY(-2px);
+}
+.floating-sidebar-icon { width: 19px; height: 19px; }
+.floating-sidebar-label { font-size: 0.82rem; font-weight: 700; letter-spacing: 0.04em; }
+
+@media (max-width: 900px) {
+  #editor-page .right-sidebar,
+  #editor-page .right-sidebar.collapsed {
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 2100;
+    display: block !important;
+    width: min(390px, calc(100vw - 20px)) !important;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(calc(100% + 24px));
+    pointer-events: none;
+  }
+  #editor-page .right-sidebar.mobile-open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+  .floating-sidebar-btn,
+  .floating-sidebar-btn.is-editor-visible {
+    right: 13px;
+    bottom: max(13px, env(safe-area-inset-bottom));
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .floating-sidebar-label { display: none; }
+}
+
+@media (max-width: 520px) {
+  #main-page .work-item-wrapper,
+  #main-page .work-item { min-height: 176px; }
+  #main-page .work-actions-buttons { grid-template-columns: 1fr 1fr; }
+  #main-page .work-actions-buttons button { font-size: 0.78rem; }
+}
+
+/* ===== 移动端最终适配层 ===== */
+@media (max-width: 900px) {
+  body.ax-editor-fullscreen,
+  body.ax-editor-fullscreen-fallback { overscroll-behavior: none; }
+  #main-page .content-header { display: block; }
+  #main-page .header-left {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  #main-page .header-title { grid-column: 1 / -1; }
+  #main-page .header-right { margin-top: 9px; }
+  #main-page .create-button,
+  #main-page .sort-button { min-height: 44px; justify-content: center; }
+  #main-page .sort-dropdown,
+  #main-page .sort-button { width: 100%; }
+  #main-page .work-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+  #editor-page .editor-toolbar-container {
+    top: env(safe-area-inset-top, 0px);
+    max-height: calc(100dvh - env(safe-area-inset-top));
+  }
+  #editor-page .editor-toolbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 7px 8px;
+  }
+  #editor-page .editor-toolbar > .back-button { min-width: 48px; min-height: 42px; }
+  #editor-page .page-current { min-height: 42px; }
+  #editor-page .editor-toolbar-actions button,
+  #editor-page #autoSaveToggleBtn { min-height: 42px; }
+  #editor-page .page-select-dropdown {
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    right: 10px;
+    left: 10px;
+    z-index: 2300;
+    width: auto;
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-radius: 15px;
+    box-shadow: 0 24px 70px rgba(35,29,22,0.3);
+  }
+  #editor-page .ax-ribbon-tabs { min-height: 42px; }
+  #editor-page .ax-ribbon-tab { min-height: 42px; }
+  #editor-page .ax-ribbon-panel { min-height: 62px; }
+  #editor-page #toolbar-quill button,
+  #editor-page #toolbar-quill select,
+  #editor-page #toolbar-quill .ql-picker-label { min-width: 38px; min-height: 38px; }
+  #editor-page .editor-workspace { padding: 7px 4px max(70px, env(safe-area-inset-bottom)); }
+  #editor-page #editor { min-height: calc(var(--ax-viewport-height) - var(--ax-toolbar-height) - 14px); }
+  #editor-page .right-sidebar,
+  #editor-page .right-sidebar.collapsed {
+    max-height: none;
+    border-radius: 18px;
+  }
+  #editor-page .dropdown-header { min-height: 56px; }
+  #editor-page .dropdown-content { max-height: min(48dvh, 420px); overflow-y: auto; }
+  .modal { padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+  .modal-content {
+    width: min(100%, 560px);
+    max-width: 100%;
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 22px 16px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .modal-content input,
+  .modal-content textarea,
+  .modal-content select { font-size: 16px; }
+  #ax-imgsize-panel {
+    box-sizing: border-box;
+    right: 8px !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    left: 8px !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none;
+    padding: 13px !important;
+    border-radius: 16px !important;
+  }
+  #ax-imgsize-panel .ax-imgsize-main {
+    grid-template-columns: minmax(0, 1fr) 46px 50px 46px;
+    gap: 8px;
+  }
+  #ax-imgsize-panel .ax-imgsize-title { grid-column: 1 / -1; font-size: 14px; }
+  #ax-imgsize-panel #imgSizeRange { width: 100% !important; min-height: 44px; }
+  #ax-imgsize-panel #imgSizeReset,
+  #ax-imgsize-panel #imgSizeClose { min-width: 44px; min-height: 44px; padding: 0 !important; }
+  #ax-imgsize-panel #imgSizeClose { display: grid; place-items: center; line-height: 1 !important; }
+  #ax-imgsize-panel .ax-imgsize-presets {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 10px;
+  }
+  #ax-imgsize-panel button[data-preset] {
+    min-width: 0;
+    min-height: 44px;
+    padding: 6px 3px !important;
+    touch-action: manipulation;
+  }
+  #ax-imgsize-panel input[type="range"]::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+    margin-top: -10px;
+  }
+  #ax-imgsize-panel input[type="range"]::-moz-range-thumb { width: 26px; height: 26px; }
+  #editor .ql-editor img { touch-action: manipulation; }
+  #ax-imgsize-panel { max-height: min(72dvh, 620px); overflow-y: auto; overscroll-behavior: contain; }
+  #ax-imgsize-panel .ax-image-panel-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  #ax-imgsize-panel .ax-image-panel-actions button { min-height: 44px; }
+  #ax-imgsize-panel .ax-crop-control { grid-template-columns: 62px minmax(0, 1fr) 40px; }
+  #ax-imgsize-panel .ax-caption-input { font-size: 16px; }
+  #editor .ql-editor .ax-image-layout { padding: 12px 34px; }
+  #editor .ql-editor .ax-image-row { gap: 6px; }
+  #editor .ql-editor .ax-image-add { flex-basis: 32px; width: 32px; height: 44px; border-radius: 12px; opacity: 1; }
+  #editor .ql-editor .ax-image-hover-actions {
+    inset: auto 4px 4px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    opacity: 1;
+    transform: none;
+  }
+  #editor .ql-editor .ax-image-action { min-height: 34px; padding: 3px 5px; font-size: 10px; }
+  #editor .ql-editor .ax-image-item figcaption { font-size: 12px; }
+}
+
+@media (max-width: 560px) {
+  #main-page.main-content { padding: 12px 8px 58px; }
+  #main-page .content-header { padding: 16px 13px; }
+  #main-page .header-title h2 { font-size: 1.45rem; }
+  #main-page .work-list { gap: 10px; }
+  #main-page .work-item-wrapper,
+  #main-page .work-item { min-height: 166px; }
+  #main-page .work-item { padding: 17px 14px 0 18px; }
+  #main-page .work-info { padding-right: 38px; }
+  #main-page .work-actions-buttons {
+    width: calc(100% + 32px);
+    margin-inline: -18px -14px;
+    padding-inline: 9px;
+  }
+  #editor-page .editor-title { font-size: 0.84rem; }
+  #editor-page .editor-word-counts { max-width: 100%; }
+  #editor-page .editor-toolbar-actions { padding-bottom: 3px; }
+  #editor-page .ax-ribbon-quick-actions { padding-left: 3px; }
+  #editor-page .ax-ribbon-quick-actions .ax-chrome-button { min-width: 42px; min-height: 40px; }
+  #editor-page #editor .ql-editor { min-height: inherit; padding: 28px 17px 70px; font-size: 16px; line-height: 1.78; }
+  #editor-page .right-sidebar,
+  #editor-page .right-sidebar.collapsed { width: calc(100vw - 12px) !important; inset-inline: 6px; top: max(6px, env(safe-area-inset-top)); bottom: max(6px, env(safe-area-inset-bottom)); }
+  .floating-sidebar-btn,
+  .floating-sidebar-btn.is-editor-visible { right: max(10px, env(safe-area-inset-right)); }
+  .gallery-modal-content { width: 100%; }
+  .gallery-image-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 380px) {
+  #main-page .header-left { grid-template-columns: 1fr; }
+  #main-page .header-title { grid-column: auto; }
+  #editor-page .editor-toolbar { grid-template-columns: auto minmax(0, 1fr); }
+  #editor-page .page-controls { grid-column: 1 / -1; }
+  #editor-page .editor-toolbar-actions { grid-column: 1 / -1; }
+  #editor-page .editor-word-counts .editor-word-count:last-child { display: none; }
+}
+
 </style>
 </head>
 
@@ -2709,15 +3777,15 @@ body.ax-editor-fullscreen #main-page {
                 <div class="ax-ribbon" aria-label="文档编辑工具栏">
                     <div class="ax-ribbon-tabs" role="tablist" aria-label="工具栏菜单">
                         <button class="ax-ribbon-tab is-active" type="button" role="tab"
-                            aria-selected="true" data-ribbon-tab="home">Home</button>
+                            aria-selected="true" data-ribbon-tab="home">常用</button>
                         <button class="ax-ribbon-tab" type="button" role="tab"
-                            aria-selected="false" data-ribbon-tab="insert">Insert</button>
+                            aria-selected="false" data-ribbon-tab="insert">插入</button>
                         <button class="ax-ribbon-tab" type="button" role="tab"
-                            aria-selected="false" data-ribbon-tab="design">Design</button>
+                            aria-selected="false" data-ribbon-tab="design">排版</button>
                         <button class="ax-ribbon-tab" type="button" role="tab"
-                            aria-selected="false" data-ribbon-tab="review">Review</button>
+                            aria-selected="false" data-ribbon-tab="review">审阅</button>
                         <button class="ax-ribbon-tab" type="button" role="tab"
-                            aria-selected="false" data-ribbon-tab="view">View</button>
+                            aria-selected="false" data-ribbon-tab="view">视图</button>
 
                         <div class="ax-ribbon-quick-actions" aria-label="视图快捷操作">
                             <button class="ax-chrome-button" id="leftSidebarToggleBtn" type="button"
@@ -2752,7 +3820,7 @@ body.ax-editor-fullscreen #main-page {
                                         <path d="M12 10v-3H5V5h7V2l4 4-4 4z"></path>
                                     </svg>
                                 </button>
-                                <span class="ax-ribbon-group-label">History</span>
+                                <span class="ax-ribbon-group-label">撤销与重做</span>
                             </div>
 
                             <div class="ax-ribbon-group">
@@ -2773,7 +3841,7 @@ body.ax-editor-fullscreen #main-page {
                                     <option value="large">大</option>
                                     <option value="huge">特大</option>
                                 </select>
-                                <span class="ax-ribbon-group-label">Font</span>
+                                <span class="ax-ribbon-group-label">字体与字号</span>
                             </div>
 
                             <div class="ax-ribbon-group">
@@ -2783,7 +3851,7 @@ body.ax-editor-fullscreen #main-page {
                                 <button class="ql-strike" type="button" title="删除线"></button>
                                 <select class="ql-color" title="文字颜色"></select>
                                 <select class="ql-background" title="高亮颜色"></select>
-                                <span class="ax-ribbon-group-label">Format</span>
+                                <span class="ax-ribbon-group-label">文字格式</span>
                             </div>
 
                             <div class="ax-ribbon-group">
@@ -2792,7 +3860,7 @@ body.ax-editor-fullscreen #main-page {
                                 <button class="ql-indent" value="-1" type="button" title="减少缩进"></button>
                                 <button class="ql-indent" value="+1" type="button" title="增加缩进"></button>
                                 <select class="ql-align" title="对齐方式"></select>
-                                <span class="ax-ribbon-group-label">Paragraph</span>
+                                <span class="ax-ribbon-group-label">段落</span>
                             </div>
                         </div>
 
@@ -2801,19 +3869,19 @@ body.ax-editor-fullscreen #main-page {
                                 <button class="ax-text-tool" id="uploadImageBtn" type="button" title="上传图片">图片</button>
                                 <input type="file" id="uploadImageInput" accept="image/*" hidden>
                                 <button class="ql-link" type="button" title="插入链接"></button>
-                                <span class="ax-ribbon-group-label">Media</span>
+                                <span class="ax-ribbon-group-label">图片与链接</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <button class="ql-blockquote" type="button" title="引用"></button>
                                 <button class="ql-code-block" type="button" title="代码块"></button>
-                                <button class="ax-text-tool" id="listBtn" type="button" title="插入 1 至 10 列表">L10</button>
-                                <span class="ax-ribbon-group-label">Blocks</span>
+                                <button class="ax-text-tool" id="listBtn" type="button" title="插入 1 至 10 列表">十列</button>
+                                <span class="ax-ribbon-group-label">引用与列表</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <button class="ax-text-tool" id="diceBtn" type="button" title="掷骰子">骰子</button>
                                 <button class="ax-text-tool" id="insertThemeTriggerBtn" type="button"
                                     title="插入主题切换标记">主题标记</button>
-                                <span class="ax-ribbon-group-label">Story Tools</span>
+                                <span class="ax-ribbon-group-label">叙事工具</span>
                             </div>
                         </div>
 
@@ -2830,13 +3898,13 @@ body.ax-editor-fullscreen #main-page {
                                     <option value="large">大</option>
                                     <option value="huge">特大</option>
                                 </select>
-                                <span class="ax-ribbon-group-label">Typography</span>
+                                <span class="ax-ribbon-group-label">文档排版</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <select class="ql-color" title="主题文字颜色"></select>
                                 <select class="ql-background" title="主题背景颜色"></select>
                                 <button class="ql-direction" value="rtl" type="button" title="从右向左"></button>
-                                <span class="ax-ribbon-group-label">Theme</span>
+                                <span class="ax-ribbon-group-label">颜色与方向</span>
                             </div>
                         </div>
 
@@ -2845,12 +3913,12 @@ body.ax-editor-fullscreen #main-page {
                                 <button class="ax-text-tool" id="hiddenTextBtn" type="button"
                                     title="隐藏文本设置（剧透或暗骰）">隐藏文本</button>
                                 <button class="ql-clean" type="button" title="清除格式"></button>
-                                <span class="ax-ribbon-group-label">Review</span>
+                                <span class="ax-ribbon-group-label">内容检查</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <button class="ax-text-tool" id="openHistoryBtn" type="button">历史记录</button>
                                 <button class="ax-text-tool" id="openDiceLogBtn" type="button">骰子记录</button>
-                                <span class="ax-ribbon-group-label">Logs</span>
+                                <span class="ax-ribbon-group-label">创作记录</span>
                             </div>
                         </div>
 
@@ -2858,11 +3926,11 @@ body.ax-editor-fullscreen #main-page {
                             <div class="ax-ribbon-group">
                                 <button class="ax-text-tool" type="button" data-ui-action="toggle-left">切换左栏</button>
                                 <button class="ax-text-tool" type="button" data-ui-action="toggle-right">切换右栏</button>
-                                <span class="ax-ribbon-group-label">Sidebars</span>
+                                <span class="ax-ribbon-group-label">侧栏</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <button class="ax-text-tool" type="button" data-ui-action="toggle-fullscreen">切换全屏</button>
-                                <span class="ax-ribbon-group-label">Window</span>
+                                <span class="ax-ribbon-group-label">窗口</span>
                             </div>
                         </div>
                     </div>
@@ -2878,14 +3946,17 @@ body.ax-editor-fullscreen #main-page {
                     <aside id="rightSidebar" class="right-sidebar">
                         <div class="tool-section">
                             <div class="ax-side-panel-header">
-                                <h3>创作工具</h3>
+                                <div>
+                                    <h3>创作辅助</h3>
+                                    <p>角色资料、版本记录与骰子结果</p>
+                                </div>
                                 <button id="rightSidebarToggle" class="right-sidebar-toggle" type="button"
                                     aria-label="收起右侧栏" title="收起右侧栏">×</button>
                             </div>
 
                             <div class="dropdown-container">
-                                <div class="dropdown-header" id="roleDropdownHeader">
-                                    <span>角色差分图集</span>
+                                <div class="dropdown-header" id="roleDropdownHeader" role="button" tabindex="0" aria-expanded="false" aria-controls="roleDropdownContent">
+                                    <span><b class="tool-section-icon">角</b>角色与立绘</span>
                                     <span class="arrow">&gt;</span>
                                 </div>
                                 <div class="dropdown-content" id="roleDropdownContent">
@@ -2897,8 +3968,8 @@ body.ax-editor-fullscreen #main-page {
                             </div>
 
                             <div class="dropdown-container">
-                                <div class="dropdown-header" id="historyDropdownHeader">
-                                    <span>历史记录</span>
+                                <div class="dropdown-header" id="historyDropdownHeader" role="button" tabindex="0" aria-expanded="false" aria-controls="historyDropdownContent">
+                                    <span><b class="tool-section-icon">史</b>版本记录</span>
                                     <span class="arrow">&gt;</span>
                                 </div>
                                 <div class="dropdown-content" id="historyDropdownContent">
@@ -2907,11 +3978,11 @@ body.ax-editor-fullscreen #main-page {
                             </div>
 
                             <div class="dropdown-container">
-                                <div class="dropdown-header" id="diceLogDropdownHeader">
-                                    <span>🎲 骰子记录</span>
+                                <div class="dropdown-header" id="diceLogDropdownHeader" role="button" tabindex="0" aria-expanded="false" aria-controls="diceLogDropdownContent">
+                                    <span><b class="tool-section-icon">骰</b>骰子结果</span>
                                     <span class="arrow">&gt;</span>
                                 </div>
-                                <div class="dropdown-content open" id="diceLogDropdownContent">
+                                <div class="dropdown-content" id="diceLogDropdownContent">
                                     <ul class="role-list" id="diceLogList"
                                         style="list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto;">
                                     </ul>
@@ -2997,7 +4068,7 @@ body.ax-editor-fullscreen #main-page {
     <path d="M10 12v3"></path>
     <path d="M14 12v3"></path>
   </svg>
-  <span class="floating-sidebar-label">创作工具</span>
+  <span class="floating-sidebar-label">辅助工具</span>
 </button>
 </body>
 </html>

@@ -228,6 +228,7 @@
     }
     .nav-icon { width: 22px; text-align: center; }
 
+    .mobile-feature-strip { display: contents; }
     .theme-panel { padding: 14px; }
     .theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .theme-option {
@@ -548,6 +549,50 @@
     }
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+    /* 主内容统一使用深色文字，覆盖站点主题可能注入的白色标题/正文。 */
+    .content-layout,
+    .content-layout .panel,
+    .content-layout .panel h1,
+    .content-layout .panel h2,
+    .content-layout .panel h3,
+    .content-layout .panel h4,
+    .content-layout .panel h5,
+    .content-layout .panel h6,
+    .content-layout .panel p,
+    .content-layout .panel div,
+    .content-layout .panel span,
+    .content-layout .panel label,
+    .content-layout .panel li,
+    .content-layout .panel a,
+    .content-layout .panel button {
+      color: #24343a !important;
+      text-shadow: none !important;
+    }
+    .content-layout .panel input,
+    .content-layout .panel select,
+    .content-layout .panel textarea {
+      color: #17202a !important;
+    }
+    .content-layout .panel input::placeholder,
+    .content-layout .panel textarea::placeholder {
+      color: #6d7b81 !important;
+      opacity: 1;
+    }
+
+    /* 深色实心控件继续使用白字，保持正确对比度。 */
+    .content-layout .primary-action,
+    .content-layout .primary-action span,
+    .content-layout .publish-action,
+    .content-layout .publish-action span,
+    .content-layout .apply-button,
+    .content-layout .apply-button span,
+    .content-layout .category-chip.active,
+    .content-layout .category-chip.active span,
+    .content-layout .category-chip:hover,
+    .content-layout .category-chip:hover span {
+      color: #fff !important;
+    }
+
     :focus-visible { outline: 3px solid rgba(23, 107, 104, 0.3); outline-offset: 2px; }
 
     @media (max-width: 1180px) {
@@ -561,6 +606,37 @@
       .left-rail, .right-rail { position: static; width: 100%; }
       .left-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .member-card, .rail-nav { grid-column: 1 / -1; }
+      .mobile-feature-strip {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(190px, 1fr));
+        gap: 0;
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: inline proximity;
+        scrollbar-width: thin;
+        background: var(--paper);
+        border: 1px solid rgba(180, 201, 205, 0.7);
+        border-radius: var(--radius);
+        box-shadow: var(--soft-shadow);
+      }
+      .mobile-feature-strip > .panel {
+        min-width: 0;
+        min-height: 100%;
+        border: 0;
+        border-left: 3px solid #79a7a8;
+        border-radius: 0;
+        box-shadow: none;
+        background: transparent;
+        scroll-snap-align: start;
+      }
+      .mobile-feature-strip > .feature-card.winter,
+      .mobile-feature-strip > .feature-card.monthly { border-top: 0; }
+      .mobile-feature-strip > .theme-panel { border-left-color: var(--pine); }
+      .mobile-feature-strip > .feature-card.winter { border-left-color: #88afb2; }
+      .mobile-feature-strip > .feature-card.monthly { border-left-color: var(--berry); }
       .right-rail { grid-template-columns: 1fr; }
       .filter-grid { grid-template-columns: 1fr; }
       .works-list.grid-mode { grid-template-columns: 1fr; }
@@ -579,6 +655,74 @@
       .work-stats { margin-top: 9px; }
       .works-list.grid-mode { padding: 10px; }
       .filter-popover { right: -2px; width: calc(100vw - 32px); }
+    }
+    /* ===== 移动端最终适配层 ===== */
+    @media (max-width: 560px) {
+      .page-shell { width: calc(100% - 12px); padding: 6px 0 52px; }
+      .winter-hero { height: 180px; border-radius: 14px; }
+      .hero-copy { padding: 16px; }
+      .hero-copy h1 { font-size: clamp(1.45rem, 8vw, 2.2rem); }
+      .content-layout { gap: 10px; margin-top: 10px; }
+      .panel { border-radius: 14px; }
+      .left-rail { gap: 10px; }
+      .mobile-feature-strip {
+        grid-template-columns: repeat(3, minmax(176px, 1fr));
+        border-radius: 14px;
+      }
+      .mobile-feature-strip > .panel { padding: 13px 12px; }
+      .mobile-feature-strip .panel-heading { margin-bottom: 10px; white-space: nowrap; }
+      .mobile-feature-strip .panel-heading small { display: none; }
+      .mobile-feature-strip .theme-options { grid-template-columns: 1fr; gap: 6px; }
+      .mobile-feature-strip .theme-option { min-height: 40px; }
+      .mobile-feature-strip .mini-work { padding: 8px; }
+      .mobile-feature-strip .mini-work strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .member-card,
+      .rail-nav,
+      .theme-card,
+      .campaign-card,
+      .recommend-card { padding: 14px; }
+      .works-toolbar { padding: 13px; gap: 11px; }
+      .toolbar-actions { display: grid; grid-template-columns: 1fr auto auto; gap: 7px; }
+      .toolbar-actions button,
+      .toolbar-actions select { min-height: 44px; }
+      .filter-popover {
+        position: fixed;
+        inset: auto 8px max(8px, env(safe-area-inset-bottom));
+        z-index: 200;
+        width: auto;
+        max-height: min(72dvh, 620px);
+        overflow-y: auto;
+        border-radius: 16px;
+        box-shadow: 0 24px 70px rgba(18,35,39,0.28);
+      }
+      .works-list,
+      .works-list.grid-mode { padding: 8px; }
+      .work-item,
+      .grid-mode .work-item {
+        grid-template-columns: 68px minmax(0, 1fr);
+        gap: 10px;
+        padding: 11px 8px;
+      }
+      .work-cover,
+      .grid-mode .work-cover { width: 68px; min-height: 96px; border-radius: 9px; }
+      .work-title { font-size: 0.96rem; line-height: 1.42; }
+      .work-summary { display: none; }
+      .work-meta { font-size: 0.7rem; }
+      .work-tags { gap: 4px; }
+      .work-tag { padding: 3px 6px; font-size: 0.66rem; }
+      .toast { width: calc(100% - 24px); bottom: max(12px, env(safe-area-inset-bottom)); text-align: center; }
+    }
+    @media (max-width: 370px) {
+      .toolbar-actions { grid-template-columns: 1fr 1fr; }
+      .toolbar-actions > :first-child { grid-column: 1 / -1; }
+      .work-item,
+      .grid-mode .work-item { grid-template-columns: 58px minmax(0, 1fr); }
+      .work-cover,
+      .grid-mode .work-cover { width: 58px; min-height: 84px; }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; }
@@ -615,25 +759,27 @@
           <button type="button" id="openCategoriesBtn"><span class="nav-icon">⌗</span>作品分类</button>
         </nav>
 
-        <section class="panel theme-panel" aria-labelledby="themeHeading">
-          <h2 class="panel-heading" id="themeHeading"><span>◐ 页面主题</span><small>配色</small></h2>
-          <div class="theme-options" id="themeOptions">
-            <button class="theme-option active" type="button" data-theme="winter"><span class="theme-swatch swatch-winter"></span>冬日青</button>
-            <button class="theme-option" type="button" data-theme="plum"><span class="theme-swatch swatch-plum"></span>雾梅紫</button>
-            <button class="theme-option" type="button" data-theme="forest"><span class="theme-swatch swatch-forest"></span>松林绿</button>
-            <button class="theme-option" type="button" data-theme="sunset"><span class="theme-swatch swatch-sunset"></span>落日橙</button>
-          </div>
-        </section>
+        <div class="mobile-feature-strip" aria-label="页面主题与专题推荐">
+          <section class="panel theme-panel" aria-labelledby="themeHeading">
+            <h2 class="panel-heading" id="themeHeading"><span>◐ 页面主题</span><small>配色</small></h2>
+            <div class="theme-options" id="themeOptions">
+              <button class="theme-option active" type="button" data-theme="winter"><span class="theme-swatch swatch-winter"></span>冬日青</button>
+              <button class="theme-option" type="button" data-theme="plum"><span class="theme-swatch swatch-plum"></span>雾梅紫</button>
+              <button class="theme-option" type="button" data-theme="forest"><span class="theme-swatch swatch-forest"></span>松林绿</button>
+              <button class="theme-option" type="button" data-theme="sunset"><span class="theme-swatch swatch-sunset"></span>落日橙</button>
+            </div>
+          </section>
 
-        <section class="panel feature-card winter">
-          <h2 class="panel-heading"><span>❄ 冬季征文</span><small>专题</small></h2>
-          <div class="mini-work-list" id="winterList"><p class="empty-mini">作品加载后将在这里展示冬季专题。</p></div>
-        </section>
+          <section class="panel feature-card winter">
+            <h2 class="panel-heading"><span>❄ 冬季征文</span><small>专题</small></h2>
+            <div class="mini-work-list" id="winterList"><p class="empty-mini">作品加载后将在这里展示冬季专题。</p></div>
+          </section>
 
-        <section class="panel feature-card monthly">
-          <h2 class="panel-heading"><span>✦ 本月强推</span><small>精选</small></h2>
-          <div class="mini-work-list" id="monthlyList"><p class="empty-mini">正在挑选本月值得阅读的作品。</p></div>
-        </section>
+          <section class="panel feature-card monthly">
+            <h2 class="panel-heading"><span>✦ 本月强推</span><small>精选</small></h2>
+            <div class="mini-work-list" id="monthlyList"><p class="empty-mini">正在挑选本月值得阅读的作品。</p></div>
+          </section>
+        </div>
       </aside>
 
       <section class="main-column">
@@ -704,7 +850,7 @@
         </section>
 
         <section class="panel panel-inner">
-          <h2 class="panel-heading"><span>◌ 正在讨论</span><a class="more-link" href="/discussion/">全部 ›</a></h2>
+          <h2 class="panel-heading"><span>◌ 正在讨论</span><a class="more-link" href="/%E8%AE%A8%E8%AE%BA%E5%8C%BA/">全部 ›</a></h2>
           <div class="topic-list" id="topicList"><p class="empty-mini">正在加载讨论……</p></div>
         </section>
 

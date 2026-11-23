@@ -808,7 +808,9 @@ body.dark-mode .ql-editor .spoiler-hidden[data-mode="secret"]:hover {
 /* ------------------------------------------- */
 
 /* 针对 #book-content 容器内的所有图片进行限制 */
-#book-content img {
+#book-content img,
+.floor-body img,
+.page-view .ql-editor img {
     /* 1. 限制宽度和高度，确保图片不会超出阅读区 */
     max-width: 100%; /* 图片最大宽度不能超过其父元素（阅读内容区）的宽度 */
     max-height: 80vh; /* 限制图片的最大高度为视口高度的 80% (例如，防止超长图片霸屏) */
@@ -823,7 +825,70 @@ body.dark-mode .ql-editor .spoiler-hidden[data-mode="secret"]:hover {
     
     /* 可选: 增加过渡效果，使图片调整更平滑 */
     transition: max-width 0.3s, max-height 0.3s; 
+    object-fit: contain;
 }
+
+#book-content .ax-image-layout{
+    box-sizing: border-box;
+    width: 100%;
+    margin: 22px 0;
+}
+
+#book-content .ax-reader-image-row{
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+}
+
+#book-content .ax-reader-image-item{
+    min-width: 0;
+    margin: 0;
+    transition: transform .2s ease, filter .2s ease;
+}
+
+#book-content .ax-reader-image-stage{
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    border-radius: 10px;
+    background: rgba(31,42,49,0.07);
+    box-shadow: 0 7px 22px rgba(23,34,39,0.12);
+    transition: box-shadow .2s ease;
+}
+
+#book-content .ax-reader-image-stage > img{
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: none;
+    margin: 0;
+    border-radius: inherit;
+    object-fit: contain;
+}
+
+#book-content .ax-reader-image-stage.is-cropped > img{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#book-content .ax-reader-image-item:hover{ transform: translateY(-3px); }
+#book-content .ax-reader-image-item:hover .ax-reader-image-stage{
+    box-shadow: 0 12px 30px rgba(23,34,39,0.2);
+}
+
+#book-content .ax-reader-image-item figcaption{
+    margin-top: 8px;
+    color: #68777d;
+    font-size: .84rem;
+    line-height: 1.55;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+body.dark-mode #book-content .ax-reader-image-item figcaption{ color: #bac5c9; }
 
 /* 新增：句末评论标识样式 */
 .comment-indicator {
@@ -1235,6 +1300,364 @@ body.bg-peek-mobile-mode .read-page-wrapper > :not(#read-bg-wrapper):not(#bg-pee
   background: rgba(255,255,255,0.05);
 }
 
+/* ===== 沉浸式电子书排版 ===== */
+:root {
+  --reader-paper: rgba(255, 253, 248, 0.94);
+  --reader-ink: #29251f;
+  --reader-muted: #766f65;
+  --reader-line: rgba(83, 70, 51, 0.14);
+  --reader-accent: #8c5f3d;
+  --reader-shadow: 0 24px 70px rgba(45, 35, 24, 0.16);
+}
+
+.read-page-wrapper {
+  padding: 42px 20px 96px;
+  color: var(--reader-ink);
+}
+
+.book-container {
+  width: min(980px, calc(100% - 40px));
+  max-width: none;
+  min-height: calc(100vh - 84px);
+  margin: 0 auto;
+  padding: clamp(36px, 6vw, 86px) clamp(24px, 8vw, 108px) 80px;
+  box-sizing: border-box;
+  border: 1px solid rgba(104, 86, 61, 0.12);
+  border-radius: 22px;
+  background: var(--reader-paper);
+  box-shadow: var(--reader-shadow);
+  backdrop-filter: blur(14px) saturate(112%);
+}
+
+.book-header {
+  width: min(100%, 720px);
+  margin: 0 auto 34px;
+  padding: 0 0 28px;
+  border-bottom: 1px solid var(--reader-line);
+  text-align: left;
+}
+
+.book-header::after {
+  content: "";
+  display: block;
+  width: 42px;
+  height: 3px;
+  margin-top: 24px;
+  border-radius: 999px;
+  background: var(--reader-accent);
+}
+
+.book-header h1 {
+  margin: 0 0 14px;
+  color: var(--reader-ink);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 1.25;
+  letter-spacing: 0.03em;
+}
+
+.book-header p {
+  margin: 0;
+  color: var(--reader-muted);
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+}
+
+.book-content,
+.page-view {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.floor {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 26px 0 46px;
+  border: 0;
+  border-bottom: 1px solid var(--reader-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.floor:last-child { border-bottom: 0; }
+
+.floor-header,
+.page-header,
+.page-footer {
+  width: min(100%, 720px);
+  margin-left: auto;
+  margin-right: auto;
+  color: var(--reader-muted);
+}
+
+.floor-header {
+  padding: 0 0 14px;
+  border-bottom: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+}
+
+.floor-body,
+.page-view .ql-editor,
+.book-content > .ql-container .ql-editor {
+  width: min(100%, 720px);
+  max-width: 720px;
+  margin: 0 auto;
+  color: var(--reader-ink);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: clamp(17px, 1.25vw, 20px);
+  line-height: 2;
+  letter-spacing: 0.025em;
+}
+
+.floor-body p,
+.page-view .ql-editor p { margin: 0 0 1.15em; }
+
+.floor-comment-btn,
+.page-view-comment-btn {
+  border: 1px solid var(--reader-line);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.5);
+  color: var(--reader-muted);
+}
+
+#sidebar {
+  left: max(18px, calc(50vw - 590px));
+  top: 50%;
+  width: 78px;
+  padding: 10px 7px;
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 20px;
+  background: rgba(250, 247, 241, 0.82);
+  box-shadow: 0 12px 36px rgba(40, 32, 24, 0.16);
+  backdrop-filter: blur(16px);
+  transform: translateY(-50%);
+}
+
+#sidebar.collapsed { transform: translate(-140%, -50%); }
+
+.sidebar-btn-group {
+  margin: 2px 0;
+  padding: 7px 3px;
+  border-radius: 12px;
+  color: #514a42;
+}
+
+.sidebar-btn-group:hover { background: rgba(140, 95, 61, 0.1); }
+.sidebar-btn-group button { color: #4c463f; }
+.sidebar-btn-group span { font-size: 0.72rem; }
+
+#sidebar-toggle-container {
+  left: max(104px, calc(50vw - 502px));
+  top: 50%;
+}
+
+.comment-panel {
+  border-left: 1px solid rgba(104, 86, 61, 0.16);
+  border-radius: 24px 0 0 24px;
+  background: rgba(255, 253, 248, 0.97);
+  box-shadow: -20px 0 54px rgba(40, 32, 24, 0.2);
+  backdrop-filter: blur(18px);
+}
+
+/* ===== 文内搜索 ===== */
+.reader-search-modal[hidden] { display: none; }
+body.reader-search-open { overflow: hidden; }
+.reader-search-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3600;
+  display: grid;
+  place-items: start center;
+  padding: max(8vh, 46px) 18px 30px;
+  background: rgba(24, 21, 18, 0.46);
+  backdrop-filter: blur(6px);
+}
+
+.reader-search-dialog {
+  width: min(680px, 100%);
+  max-height: min(78vh, 760px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.58);
+  border-radius: 22px;
+  background: #fffdf8;
+  color: #29251f;
+  box-shadow: 0 30px 90px rgba(17, 13, 9, 0.34);
+}
+
+.reader-search-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 24px 12px;
+}
+.reader-search-head h2 { margin: 0; font: 700 1.3rem/1.3 "Noto Serif SC", "Songti SC", serif; }
+.reader-search-close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1ece4;
+  color: #3d3730;
+  cursor: pointer;
+  font-size: 1.4rem;
+}
+.reader-search-form { display: flex; gap: 10px; padding: 10px 24px 14px; }
+.reader-search-input {
+  min-width: 0;
+  flex: 1;
+  padding: 13px 15px;
+  border: 1px solid #d8d0c5;
+  border-radius: 12px;
+  background: #fff;
+  color: #26221d;
+  font-size: 1rem;
+  outline: none;
+}
+.reader-search-input:focus { border-color: var(--reader-accent); box-shadow: 0 0 0 3px rgba(140,95,61,0.12); }
+.reader-search-submit {
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--reader-accent);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+.reader-search-submit:disabled { opacity: 0.58; cursor: wait; }
+.reader-search-status { min-height: 22px; margin: 0; padding: 0 24px 10px; color: #7a7167; font-size: 0.85rem; }
+.reader-search-results { margin: 0; padding: 0 14px 18px; overflow-y: auto; list-style: none; }
+.reader-search-result { margin: 0 0 7px; }
+.reader-search-result button {
+  width: 100%;
+  padding: 13px 14px;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #38322b;
+  cursor: pointer;
+  text-align: left;
+}
+.reader-search-result button:hover,
+.reader-search-result button:focus-visible { background: #f2ece3; outline: none; }
+.reader-search-floor { color: var(--reader-accent); font-size: 0.78rem; letter-spacing: 0.04em; }
+.reader-search-snippet { overflow: hidden; line-height: 1.55; }
+.reader-search-empty { padding: 32px 16px; color: #81786e; text-align: center; }
+.reader-search-target { animation: readerSearchPulse 3.4s ease; border-radius: 5px; }
+@keyframes readerSearchPulse {
+  0%, 35% { background: rgba(255, 208, 87, 0.55); box-shadow: 0 0 0 7px rgba(255,208,87,0.18); }
+  100% { background: transparent; box-shadow: none; }
+}
+
+body.dark-mode {
+  --reader-paper: rgba(27, 28, 30, 0.95);
+  --reader-ink: #e7e2d9;
+  --reader-muted: #aaa298;
+  --reader-line: rgba(235, 226, 213, 0.13);
+  --reader-accent: #d2a477;
+  --reader-shadow: 0 26px 80px rgba(0,0,0,0.48);
+}
+body.dark-mode #sidebar { border-color: rgba(255,255,255,0.1); background: rgba(31,32,34,0.88); }
+body.dark-mode .sidebar-btn-group,
+body.dark-mode .sidebar-btn-group button { color: #ded8cf; }
+body.dark-mode .reader-search-dialog { border-color: #45413b; background: #202124; color: #eee9e1; }
+body.dark-mode .reader-search-close { background: #343536; color: #eee9e1; }
+body.dark-mode .reader-search-input { border-color: #4d4b47; background: #292a2c; color: #f0ece5; }
+body.dark-mode .reader-search-status,
+body.dark-mode .reader-search-empty { color: #aaa39a; }
+body.dark-mode .reader-search-result button { color: #e6e0d7; }
+body.dark-mode .reader-search-result button:hover,
+body.dark-mode .reader-search-result button:focus-visible { background: #303135; }
+
+@media (max-width: 1050px) {
+  .read-page-wrapper { padding: 14px 10px 72px; }
+  .book-container { width: 100%; min-height: calc(100dvh - 28px); padding: 34px clamp(17px, 5vw, 48px) 64px; border-radius: 16px; }
+  .book-header { margin-bottom: 22px; }
+  #sidebar {
+    top: max(10px, env(safe-area-inset-top));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: 10px;
+    width: min(260px, calc(100vw - 70px));
+    height: auto;
+    max-height: none;
+    padding: 64px 10px 16px;
+    overflow-y: auto;
+    border-radius: 18px;
+    transform: translateX(calc(-100% - 24px));
+    overscroll-behavior: contain;
+  }
+  #sidebar.show { transform: translateX(0); }
+  #sidebar.collapsed:not(.show) { transform: translateX(calc(-100% - 24px)); }
+  #sidebar-toggle-container { left: 12px; top: max(12px, env(safe-area-inset-top)); }
+  #bg-peek-mobile { top: calc(max(12px, env(safe-area-inset-top)) + 52px); }
+  #back-to-top-mobile { top: calc(max(12px, env(safe-area-inset-top)) + 104px); }
+  .nav-grid-popup {
+    left: 10px;
+    right: 10px;
+    top: max(68px, calc(env(safe-area-inset-top) + 58px));
+    width: auto;
+    max-height: calc(100dvh - 84px - env(safe-area-inset-bottom));
+    padding: 12px;
+    border-radius: 16px;
+  }
+  .nav-cell { min-width: 44px; height: 44px; }
+}
+
+@media (max-width: 560px) {
+  .read-page-wrapper { padding: 6px 5px 64px; }
+  .book-container { padding: 58px 16px 52px; border-radius: 11px; }
+  .book-header { padding-bottom: 20px; }
+  .book-header h1 { font-size: clamp(1.72rem, 9vw, 2.2rem); overflow-wrap: anywhere; }
+  .book-header p { font-size: 0.78rem; line-height: 1.65; }
+  .floor { padding: 20px 0 34px; }
+  .floor-header { align-items: center; gap: 8px; font-size: 0.75rem; }
+  .floor-header .comment-view-btn { min-height: 38px; padding-inline: 10px; }
+  .floor-body,
+  .page-view .ql-editor,
+  .book-content > .ql-container .ql-editor { font-size: 16px; line-height: 1.86; overflow-wrap: anywhere; }
+  #book-content img,
+  .floor-body img,
+  .page-view .ql-editor img {
+    max-width: 100%;
+    max-height: 72dvh;
+    height: auto;
+    margin: 14px auto;
+    border-radius: 8px;
+  }
+  #book-content .ax-image-layout { margin: 17px 0; }
+  #book-content .ax-reader-image-row { gap: 5px; }
+  #book-content .ax-reader-image-stage { border-radius: 7px; }
+  #book-content .ax-reader-image-item figcaption { margin-top: 6px; font-size: .74rem; line-height: 1.4; }
+  .page-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .page-footer button { min-height: 44px; }
+  .page-footer #page-indicator { grid-column: 1 / -1; grid-row: 1; text-align: center; }
+  .page-footer .page-view-comment-btn { grid-column: 1 / -1; }
+  .reader-search-modal { padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)); }
+  .reader-search-dialog { width: 100%; max-height: 100%; border-radius: 15px; }
+  .reader-search-head { padding: 18px 17px 9px; }
+  .reader-search-form { display: grid; grid-template-columns: 1fr auto; padding: 8px 17px 12px; }
+  .reader-search-input { width: 100%; min-height: 46px; font-size: 16px; }
+  .reader-search-submit { min-height: 46px; padding-inline: 16px; }
+  .reader-search-status { padding-left: 17px; padding-right: 17px; }
+  .reader-search-results { padding-inline: 8px; }
+  .reader-search-result button { grid-template-columns: 52px minmax(0, 1fr); min-height: 52px; padding: 12px 9px; }
+  .comment-panel { width: min(94vw, 390px); border-radius: 18px 0 0 18px; }
+  #sidebar-toggle-container,
+  #bg-peek-mobile,
+  #back-to-top-mobile { box-shadow: 0 5px 18px rgba(40,32,24,0.18); }
+}
+
     </style>
 <div id="global-loading-bar"></div>
 
@@ -1294,6 +1717,10 @@ body.bg-peek-mobile-mode .read-page-wrapper > :not(#read-bg-wrapper):not(#bg-pee
       <button class="nav-toggle-icon" type="button" aria-expanded="false" aria-controls="nav-grid-popup" title="打开导航">&#8635;</button>
       <span>导航</span>
     </div>
+    <div class="sidebar-btn-group" id="text-search-btn">
+      <button type="button" aria-haspopup="dialog" aria-controls="reader-search-modal" title="搜索全文">&#8981;</button>
+      <span>文内搜索</span>
+    </div>
     <div class="sidebar-btn-group" id="back-to-top-btn">
       <button>↑</button>
       <span>回到顶部</span>
@@ -1324,6 +1751,20 @@ body.bg-peek-mobile-mode .read-page-wrapper > :not(#read-bg-wrapper):not(#bg-pee
   </aside>
 
   <div class="nav-grid-popup" id="nav-grid-popup" role="dialog" aria-label="章节导航" aria-hidden="true" tabindex="-1"></div>
+  <div class="reader-search-modal" id="reader-search-modal" hidden>
+    <section class="reader-search-dialog" role="dialog" aria-modal="true" aria-labelledby="reader-search-title">
+      <div class="reader-search-head">
+        <h2 id="reader-search-title">文内搜索</h2>
+        <button class="reader-search-close" id="reader-search-close" type="button" aria-label="关闭搜索">&times;</button>
+      </div>
+      <form class="reader-search-form" id="reader-search-form">
+        <input class="reader-search-input" id="reader-search-input" type="search" placeholder="输入要查找的词语" autocomplete="off">
+        <button class="reader-search-submit" id="reader-search-submit" type="submit">搜索</button>
+      </form>
+      <p class="reader-search-status" id="reader-search-status" aria-live="polite">输入词语后，将搜索作品的全部楼层。</p>
+      <ol class="reader-search-results" id="reader-search-results"></ol>
+    </section>
+  </div>
 <!-- 懒加载 / 弱网切换 提示 -->
 <div id="lazy-load-toast" class="lazy-load-toast" aria-live="polite">
   <div class="spinner" aria-hidden="true"></div>
@@ -1403,11 +1844,189 @@ static create(value) {
     // 注册自定义 Blot
     Quill.register(HiddenTextBlot);
 
+    /* ---------- 兼容创作端保存的可缩放图片 ---------- */
+    const ReaderBaseImage = Quill.import('formats/image');
+
+    class ReaderImage extends ReaderBaseImage {
+        static create(value) {
+            let src = '';
+            let width = '';
+            let alt = '';
+
+            if (typeof value === 'string') {
+                src = value;
+            } else if (value) {
+                if (typeof value === 'object') {
+                    if (typeof value.src === 'string') src = value.src;
+                    else if (typeof value.url === 'string') src = value.url;
+                    if (typeof value.width === 'string') width = value.width.trim();
+                    if (typeof value.alt === 'string') alt = value.alt;
+                }
+            }
+
+            const node = super.create(src);
+            node.setAttribute('loading', 'lazy');
+            node.setAttribute('decoding', 'async');
+            node.style.maxWidth = '100%';
+            node.style.height = 'auto';
+            node.style.display = 'block';
+            node.style.margin = '12px auto';
+
+            if (alt) node.setAttribute('alt', alt);
+
+            // 只接受创作端会产生的百分比或像素宽度，避免异常样式污染阅读页。
+            const validPercent = /^(?:100|[1-9]?\d)%$/.test(width);
+            const validPixels = /^(?:[1-9]\d{0,3})px$/.test(width);
+            if (validPercent) {
+                node.style.width = width;
+                node.setAttribute('data-width', width);
+            } else if (validPixels) {
+                node.style.width = width;
+                node.setAttribute('data-width', width);
+            }
+
+            return node;
+        }
+
+        static value(node) {
+            const src = node.getAttribute('src') || '';
+            const width = node.getAttribute('data-width') || node.style.width || '';
+            const alt = node.getAttribute('alt') || '';
+            if (!width) {
+                if (!alt) return src;
+            }
+            return { src: src, width: width, alt: alt };
+        }
+    }
+
+    // 覆盖默认 image blot，同时兼容旧的纯 URL 与新的对象型图片数据。
+    Quill.register(ReaderImage, true);
+
+    /* ---------- 同行图片组、裁剪与注释 ---------- */
+    const ReaderImageLayoutBlock = Quill.import('blots/block/embed');
+
+    function readerClampImageNumber(value, min, max, fallback) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return fallback;
+        return Math.max(min, Math.min(max, number));
+    }
+
+    function readerSafeImageSource(value) {
+        const source = String(value || '').trim();
+        if (!source) return '';
+        if (/^data:image\//i.test(source)) return source;
+        if (/^blob:/i.test(source)) return source;
+        try {
+            const parsed = new URL(source, window.location.href);
+            if (parsed.protocol === 'https:') return parsed.href;
+            if (parsed.protocol === 'http:') return parsed.href;
+        } catch (error) {
+            console.warn('阅读端无法解析图片地址', error);
+        }
+        return '';
+    }
+
+    function normalizeReaderImageItem(value) {
+        const source = typeof value === 'string' ? { src: value } : (value || {});
+        const allowedAspects = ['auto', '1 / 1', '4 / 3', '3 / 4', '16 / 9'];
+        const cropAspect = allowedAspects.indexOf(source.cropAspect) >= 0 ? source.cropAspect : 'auto';
+        let width = source.width;
+        if (typeof width === 'string') width = parseFloat(width);
+        return {
+            src: readerSafeImageSource(source.src || source.url || ''),
+            alt: String(source.alt || '').slice(0, 300),
+            caption: String(source.caption || '').slice(0, 300),
+            width: readerClampImageNumber(width, 12, 100, 70),
+            cropAspect: cropAspect,
+            cropZoom: readerClampImageNumber(source.cropZoom, 100, 250, 100),
+            cropX: readerClampImageNumber(source.cropX, 0, 100, 50),
+            cropY: readerClampImageNumber(source.cropY, 0, 100, 50)
+        };
+    }
+
+    function normalizeReaderImageLayout(value) {
+        const source = value ? value : {};
+        let rawItems = [];
+        if (Array.isArray(source.items)) rawItems = source.items.slice(0, 4);
+        const items = rawItems.map(normalizeReaderImageItem).filter(function (item) {
+            return Boolean(item.src);
+        });
+        if (!items.length) {
+            if (source.src) items.push(normalizeReaderImageItem(source));
+        }
+        return { version: 1, items: items };
+    }
+
+    function renderReaderImageLayout(node, rawValue) {
+        const layout = normalizeReaderImageLayout(rawValue);
+        node.dataset.layout = JSON.stringify(layout);
+        node.innerHTML = '';
+        const row = document.createElement('div');
+        row.className = 'ax-reader-image-row';
+
+        layout.items.forEach(function (item) {
+            const figure = document.createElement('figure');
+            figure.className = 'ax-reader-image-item';
+            figure.style.flexBasis = item.width + '%';
+            figure.style.maxWidth = item.width + '%';
+
+            const stage = document.createElement('div');
+            stage.className = 'ax-reader-image-stage';
+            if (item.cropAspect !== 'auto') {
+                stage.classList.add('is-cropped');
+                stage.style.aspectRatio = item.cropAspect;
+            }
+
+            const image = document.createElement('img');
+            image.src = item.src;
+            image.alt = item.alt;
+            image.loading = 'lazy';
+            image.decoding = 'async';
+            if (item.cropAspect !== 'auto') {
+                image.style.objectPosition = item.cropX + '% ' + item.cropY + '%';
+                image.style.transform = 'scale(' + (item.cropZoom / 100) + ')';
+            }
+            stage.appendChild(image);
+            figure.appendChild(stage);
+
+            if (item.caption) {
+                const caption = document.createElement('figcaption');
+                caption.textContent = item.caption;
+                figure.appendChild(caption);
+            }
+            row.appendChild(figure);
+        });
+        node.appendChild(row);
+    }
+
+    class ReaderImageLayout extends ReaderImageLayoutBlock {
+        static create(value) {
+            const node = super.create();
+            renderReaderImageLayout(node, value);
+            return node;
+        }
+
+        static value(node) {
+            try {
+                return normalizeReaderImageLayout(JSON.parse(node.dataset.layout || '{}'));
+            } catch (error) {
+                console.warn('阅读端读取图片组失败', error);
+                return normalizeReaderImageLayout({});
+            }
+        }
+    }
+
+    ReaderImageLayout.blotName = 'imageLayout';
+    ReaderImageLayout.tagName = 'div';
+    ReaderImageLayout.className = 'ax-image-layout';
+    Quill.register(ReaderImageLayout, true);
+
       // ================= 自定义特效（阅读端）全局配置 =================
 const EFFECT_API_BASE_URL = 'https://api.anchorx.ca/api/effects/public';
 
 let customEffectFnMap = {};
 let customEffectsLoaded = false;
+let customEffectsLoadedWorkId = '';
 
       const EFFECT_DEBUG = true;           // ⭐ 打开调试日志
       const EFFECT_BG_DEBUG = true;        // ⭐ 新增：背景系统调试开关
@@ -1428,6 +2047,7 @@ let effectObserver = null;
 // 重写 initEffectObserver —— 触发条件改成“句子到达屏幕下方 1/5”
 // ---------------------------------------------------------------------
 function initEffectObserver() {
+    if (effectObserver) return effectObserver;
     if (!('IntersectionObserver' in window)) {
         if (EFFECT_DEBUG) {
             console.log('⚠️ [effects] 当前环境不支持 IntersectionObserver，改用滚动监听方案');
@@ -1459,7 +2079,7 @@ function initEffectObserver() {
         t = t + 0.1;     // 每 0.1 一个点，你也可以改成 0.05 更细
     }
 
-    effectObserver = new IntersectionObserver(function (entries) {
+    var observer = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
             var target = entry.target;
             var cb = target.__effectTrigger;
@@ -1495,12 +2115,13 @@ function initEffectObserver() {
 
             try {
                 cb(target);
+                target.dataset.effectTriggered = '1';
             } catch (err) {
                 console.error('执行特效时出错:', err);
             }
 
             // 只触发一次就取消监听
-            effectObserver.unobserve(target);
+            observer.unobserve(target);
             delete target.__effectTrigger;
         });
     }, {
@@ -1508,7 +2129,7 @@ function initEffectObserver() {
         threshold: thresholds
     });
 
-
+    effectObserver = observer;
     return effectObserver;
 }
 
@@ -1518,6 +2139,7 @@ function initEffectObserver() {
 // 把某个元素注册进“滚动触发一次”的队列（调试版）
 function registerEffectTrigger(targetEl, cb) {
     if (!targetEl || typeof cb !== 'function') return;
+    if (targetEl.dataset.effectTriggered === '1') return;
 
     const sid = targetEl.getAttribute('data-sentence-id') || '(no-id)';
 
@@ -1564,6 +2186,7 @@ function registerEffectTrigger(targetEl, cb) {
     }
 
     // ⭐ 新增：顶部补触发逻辑（兼容旧转换器版本）
+    var triggeredImmediately = false;
     (function () {
         var rect = targetEl.getBoundingClientRect();
         var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
@@ -1596,6 +2219,8 @@ function registerEffectTrigger(targetEl, cb) {
                 }
                 try {
                     cb(targetEl);
+                    targetEl.dataset.effectTriggered = '1';
+                    triggeredImmediately = true;
                 } catch (err) {
                     console.error('❌ [registerEffectTrigger] 顶部补触发失败:', sid, err);
                 }
@@ -1604,6 +2229,8 @@ function registerEffectTrigger(targetEl, cb) {
             }
         }
     })();
+
+    if (triggeredImmediately) return;
 
     // 正常情况：交给 IntersectionObserver，等它滚到屏幕下方 1/5 再触发
     targetEl.__effectTrigger = cb;
@@ -1682,12 +2309,14 @@ function findFirstSuspiciousChar(raw) {
 
 
 // 只在第一次需要时，从后端加载自定义特效列表
-async function ensureCustomEffectsLoaded() {
-    if (customEffectsLoaded) return;
+async function ensureCustomEffectsLoaded(workIdValue) {
+    var workId = String(workIdValue || '').trim();
+    if (!workId) return;
+    if (customEffectsLoaded) {
+      if (customEffectsLoadedWorkId === workId) return;
+    }
 
     try {
-        const workId = activeWork ? (activeWork._id || activeWork.workId) : null;
-        if (!workId) return;
         const res = await fetch(`${EFFECT_API_BASE_URL}?workId=${encodeURIComponent(workId)}`);
         if (!res.ok) throw new Error('请求失败');
 
@@ -1749,7 +2378,10 @@ list.forEach(function (item) {
 
 
         customEffectsLoaded = true;
+        customEffectsLoadedWorkId = workId;
     } catch (err) {
+        customEffectsLoaded = false;
+        customEffectsLoadedWorkId = '';
         console.error('加载自定义特效失败:', err);
     }
 }
@@ -1769,6 +2401,17 @@ list.forEach(function (item) {
         const likeCounter = likeWorkBtn.querySelector('.like-counter');
         const likeIcon = likeWorkBtn.querySelector('.like-icon');
         const sidebar = document.getElementById('sidebar');
+        const textSearchBtn = document.getElementById('text-search-btn');
+        const readerSearchModal = document.getElementById('reader-search-modal');
+        const readerSearchDialog = readerSearchModal ? readerSearchModal.querySelector('.reader-search-dialog') : null;
+        const readerSearchClose = document.getElementById('reader-search-close');
+        const readerSearchForm = document.getElementById('reader-search-form');
+        const readerSearchInput = document.getElementById('reader-search-input');
+        const readerSearchSubmit = document.getElementById('reader-search-submit');
+        const readerSearchStatus = document.getElementById('reader-search-status');
+        const readerSearchResults = document.getElementById('reader-search-results');
+        let readerSearchMatches = [];
+        let readerSearchReturnFocus = null;
 
         function closeNavigationPopup(restoreFocus) {
           const navPopup = document.getElementById('nav-grid-popup');
@@ -1859,6 +2502,7 @@ const bgPeekMobileBtn = document.getElementById('bg-peek-mobile-btn');
         let currentPageIndex = 0;
         let activeSentenceEl = null; // 被点击用于评论的段落元素
         let pageQuill = null;        // 在翻页模式下动态创建的 Quill 实例
+        let pageLoadToken = 0;       // 防止快速翻页时旧请求覆盖新页面
         let rendererQuill = null;    // 隐藏的 Quill 用于 Delta -> HTML 转换
 
         // 楼层懒加载相关
@@ -2612,6 +3256,36 @@ if (typeof type === 'string' ? type.startsWith('custom:') : false) {
             rendererQuill = new Quill(r, { theme: 'snow', modules: { toolbar: false }, readOnly: true });
         })();
 
+// 清理从网页复制时混入的“默认白底深色字”。只影响阅读渲染，不改数据库内容。
+function sanitizeReaderDeltaFormatting(delta) {
+    if (!delta) return delta;
+    if (typeof delta !== 'object') return delta;
+    if (!Array.isArray(delta.ops)) return delta;
+
+    const whiteBackgrounds = ['#fff', '#ffffff', 'white', 'rgb(255,255,255)', 'rgba(255,255,255,1)', 'rgba(255,255,255,0.9)'];
+    const defaultDarkColors = ['#000', '#000000', 'black', '#333', '#333333', '#363636', 'rgb(0,0,0)', 'rgb(51,51,51)', 'rgb(54,54,54)'];
+
+    return {
+      ...delta,
+      ops: delta.ops.map(function (op) {
+        if (!op) return op;
+        if (!op.attributes) return op;
+        const attributes = { ...op.attributes };
+        const background = String(attributes.background || '').toLowerCase().replace(/\s+/g, '');
+        const color = String(attributes.color || '').toLowerCase().replace(/\s+/g, '');
+        var removedWhiteBackground = whiteBackgrounds.includes(background);
+        if (!removedWhiteBackground) {
+          if (background.startsWith('rgba(255,255,255,')) removedWhiteBackground = true;
+        }
+        if (removedWhiteBackground) {
+          delete attributes.background;
+          if (defaultDarkColors.includes(color)) delete attributes.color;
+        }
+        return { ...op, attributes: attributes };
+      })
+    };
+}
+
 // Delta -> HTML（安全降级：如果传入的是字符串就直接返回字符串）
 function deltaToHtml(deltaOrHtml) {
     try {
@@ -2622,7 +3296,7 @@ if (typeof deltaOrHtml === 'string') {
         const maybeDelta = JSON.parse(deltaOrHtml);
         if (maybeDelta) {
     if (maybeDelta.ops) {
-        rendererQuill.setContents(maybeDelta);
+        rendererQuill.setContents(sanitizeReaderDeltaFormatting(maybeDelta));
         return rendererQuill.root.innerHTML;
     }
 }
@@ -2632,7 +3306,7 @@ if (typeof deltaOrHtml === 'string') {
     return deltaOrHtml;
 }
         
-        rendererQuill.setContents(deltaOrHtml);
+        rendererQuill.setContents(sanitizeReaderDeltaFormatting(deltaOrHtml));
         const contentHtml = rendererQuill.root.innerHTML;
 
         // 💥 关键修改：检测是否已有 .ql-editor 容器，防止嵌套
@@ -2704,7 +3378,7 @@ async function loadWorkContentById(id) {
 
     // ✅ 2) 特效（仍然只加载一次）
     const effectsPublished = meta.effectsPublished || [];
-    await ensureCustomEffectsLoaded();
+    await ensureCustomEffectsLoaded(meta._id || meta.workId || id);
     activeWork.effectsPublished = effectsPublished;
 
     // ✅ 3) pages：真懒加载模式下只建“空壳数组”，不填 content
@@ -2980,6 +3654,7 @@ function hydrateRenderedFloorsRange(startIndex, endIndex) {
 
     floorBody.innerHTML = page.segmentedHtml;
     floorBody.dataset.hydrated = '1';
+    delete floorBody.dataset.effectsApplied;
     processContentForSentenceIds(floorBody);
     // 如果评论标记还在路上：等它到了再给本楼补一次“评论符号”
 if (commentedIdsReadyPromise) {
@@ -3692,22 +4367,42 @@ footer.innerHTML = `
 
   const pageCommentBtn = document.getElementById('page-view-comment-btn');
 if (pageCommentBtn) {
-    const commentCount = getCommentsCountForPage(pageIndex);
+    const commentCount = getCommentsCountForPage(currentPageIndex);
     pageCommentBtn.textContent = `查看评论 (${commentCount})`;
 }
 processContentForSentenceIds(bookContent);
 }
 
         // 【修改 script.txt: 91-96 行附近，在 loadPageIntoPageQuill 函数体内部】
-function loadPageIntoPageQuill(pageIndex) {
+async function loadPageIntoPageQuill(pageIndex) {
     if (!pageQuill) return;
+    const loadToken = pageLoadToken + 1;
+    pageLoadToken = loadToken;
+
+    pageQuill.root.innerHTML = '<p class="lazy-floor-placeholder">正在加载本页内容…</p>';
+    try {
+      await ensurePagesPreparedUpTo(pageIndex + 1, { userInitiated: true });
+    } catch (error) {
+      console.error('翻页内容准备失败:', error);
+      if (loadToken === pageLoadToken) {
+        if (pageQuill) {
+          pageQuill.root.innerHTML = '<p>本页加载失败，请重试。</p>';
+        }
+      }
+      return;
+    }
+    if (loadToken !== pageLoadToken) return;
+    if (!pageQuill) return;
+
     const pageObj = activePages[pageIndex] || { content: { ops: [] } };
     
     let contentHtml = '';
     
     // 1. 获取原始内容（通常是 Delta 或 HTML）
     try {
-        if (typeof pageObj.content === 'object') {
+        if (typeof pageObj.segmentedHtml === 'string') {
+            contentHtml = pageObj.segmentedHtml;
+        } else if (typeof pageObj.content === 'object') {
             // 将 Delta 转换为 HTML
             contentHtml = deltaToHtml(pageObj.content); 
         } else {
@@ -3725,11 +4420,14 @@ function loadPageIntoPageQuill(pageIndex) {
     
     // 3. 调用无副作用的 ID 注入函数，使用固定的起始索引
     // 注意：不更新全局 contentIndexCounter
-    const result = segmentContentAndAddIds(contentHtml, activeWork._id, pageStartIndex);
+    const result = typeof pageObj.segmentedHtml === 'string'
+      ? { element: null }
+      : segmentContentAndAddIds(contentHtml, activeWork._id, pageStartIndex);
     
     // 4. 将带有 ID 的 HTML 注入到 Quill 的根元素中 (绕过 setContents 导致的 ID 丢失)
     // ⚠️ 必须直接操作 root.innerHTML
-    pageQuill.root.innerHTML = result.element.innerHTML;
+    pageQuill.root.innerHTML = result.element ? result.element.innerHTML : contentHtml;
+    delete pageQuill.root.dataset.effectsApplied;
 
     // 更新页码指示
     const indicator = document.getElementById('page-indicator');
@@ -4867,23 +5565,29 @@ async function openCommentPanelForSentence(sentenceId, isNewCommentMode = false)
 
 
 function processContentForSentenceIds(containerEl) {
+  if (!containerEl) return;
   // 只清本容器的评论符号（避免越跑越多）
   containerEl.querySelectorAll('.comment-indicator').forEach(el => el.remove());
 
-  // 特效只应用一次（避免重复包裹/重复注入）
-  if (!containerEl.dataset.effectsApplied) {
+  const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
+
+  // 占位容器没有句子，不能提前写入“已应用”标记，否则内容加载后会永远跳过。
+  if (sentenceElements.length) {
     if (activeWork
       ? (Array.isArray(activeWork.effectsPublished)
         ? Boolean(activeWork.effectsPublished.length)
         : false)
       : false) {
       const workIdForEffect = activeWork._id || activeWork.workId;
-      applyEffectsToBlocks(containerEl, activeWork.effectsPublished, workIdForEffect);
+      const firstSentenceId = sentenceElements[0].getAttribute('data-sentence-id') || '';
+      const lastSentenceId = sentenceElements[sentenceElements.length - 1].getAttribute('data-sentence-id') || '';
+      const effectApplyKey = String(workIdForEffect || '') + ':' + firstSentenceId + ':' + lastSentenceId;
+      if (containerEl.dataset.effectsApplied !== effectApplyKey) {
+        applyEffectsToBlocks(containerEl, activeWork.effectsPublished, workIdForEffect);
+        containerEl.dataset.effectsApplied = effectApplyKey;
+      }
     }
-    containerEl.dataset.effectsApplied = '1';
   }
-
-  const sentenceElements = containerEl.querySelectorAll('[data-sentence-id]');
 
   sentenceElements.forEach(el => {
     const sentenceId = el.getAttribute('data-sentence-id');
@@ -5068,15 +5772,6 @@ function renderCurrentMode() {
                 renderPageMode();
             }
 
-            setTimeout(() => {
-                const root = currentMode === 'scroll'
-                    ? bookContent
-                    : (pageQuill?.root || bookContent);
-                if (root) {
-                    processContentForSentenceIds(root);
-                    console.log('✅ 评论句子点击绑定完成（恢复阅读位置）');
-                }
-            }, 50);
             return; // 已按记录渲染，不再走下面的默认逻辑
         }
 
@@ -5091,16 +5786,195 @@ function renderCurrentMode() {
         renderPageMode();
     }
 
-    setTimeout(() => {
-        const root = currentMode === 'scroll'
-            ? bookContent
-            : (pageQuill?.root || bookContent);
-        if (root) {
-            processContentForSentenceIds(root);
-            console.log('✅ 评论句子点击绑定完成');
-        }
-    }, 50);
 }
+
+        /* ---------- 文内搜索 ---------- */
+        function openReaderSearch() {
+            if (!readerSearchModal) return;
+            closeNavigationPopup(false);
+            readerSearchReturnFocus = document.activeElement;
+            readerSearchModal.hidden = false;
+            document.body.classList.add('reader-search-open');
+            requestAnimationFrame(function () {
+                if (readerSearchInput) readerSearchInput.focus();
+            });
+        }
+
+        function closeReaderSearch(restoreFocus) {
+            if (!readerSearchModal) return;
+            readerSearchModal.hidden = true;
+            document.body.classList.remove('reader-search-open');
+            if (restoreFocus) {
+                if (readerSearchReturnFocus) readerSearchReturnFocus.focus();
+            }
+        }
+
+        function normalizeReaderSearchText(value) {
+            return String(value || '').replace(/\s+/g, ' ').trim();
+        }
+
+        function makeReaderSearchSnippet(text, keyword) {
+            const cleanText = normalizeReaderSearchText(text);
+            const lowerText = cleanText.toLocaleLowerCase();
+            const lowerKeyword = keyword.toLocaleLowerCase();
+            const foundAt = lowerText.indexOf(lowerKeyword);
+            const radius = 58;
+            const start = Math.max(0, foundAt - radius);
+            const end = Math.min(cleanText.length, foundAt + keyword.length + radius);
+            const prefix = start > 0 ? '…' : '';
+            const suffix = end < cleanText.length ? '…' : '';
+            return prefix + cleanText.slice(start, end) + suffix;
+        }
+
+        function collectReaderSearchMatches(keyword) {
+            const matches = [];
+            const seen = new Set();
+            const lowerKeyword = keyword.toLocaleLowerCase();
+
+            activePages.forEach(function (page, pageIndex) {
+                if (!page) return;
+                if (!page.segmentedHtml) return;
+                const holder = document.createElement('div');
+                holder.innerHTML = page.segmentedHtml;
+                const sentenceNodes = holder.querySelectorAll('[data-sentence-id]');
+                sentenceNodes.forEach(function (node, sentenceIndex) {
+                    const text = normalizeReaderSearchText(node.textContent);
+                    if (!text) return;
+                    if (!text.toLocaleLowerCase().includes(lowerKeyword)) return;
+                    const sentenceId = node.getAttribute('data-sentence-id') || '';
+                    const identity = String(pageIndex) + ':' + sentenceId + ':' + String(sentenceIndex);
+                    if (seen.has(identity)) return;
+                    seen.add(identity);
+                    matches.push({
+                        pageIndex: pageIndex,
+                        sentenceId: sentenceId,
+                        sentenceIndex: sentenceIndex,
+                        snippet: makeReaderSearchSnippet(text, keyword)
+                    });
+                });
+            });
+
+            return matches;
+        }
+
+        function renderReaderSearchMatches(matches) {
+            if (!readerSearchResults) return;
+            readerSearchResults.textContent = '';
+            if (!matches.length) {
+                const empty = document.createElement('li');
+                empty.className = 'reader-search-empty';
+                empty.textContent = '没有找到包含该词语的句子或段落。';
+                readerSearchResults.appendChild(empty);
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            matches.forEach(function (match, index) {
+                const item = document.createElement('li');
+                item.className = 'reader-search-result';
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.setAttribute('data-search-result-index', String(index));
+                const floor = document.createElement('strong');
+                floor.className = 'reader-search-floor';
+                floor.textContent = '第 ' + String(match.pageIndex + 1) + ' 楼';
+                const snippet = document.createElement('span');
+                snippet.className = 'reader-search-snippet';
+                snippet.textContent = match.snippet;
+                button.appendChild(floor);
+                button.appendChild(snippet);
+                item.appendChild(button);
+                fragment.appendChild(item);
+            });
+            readerSearchResults.appendChild(fragment);
+        }
+
+        async function runReaderSearch() {
+            if (!readerSearchInput) return;
+            const keyword = readerSearchInput.value.trim();
+            if (!keyword) {
+                readerSearchStatus.textContent = '请先输入要搜索的词语。';
+                readerSearchInput.focus();
+                return;
+            }
+
+            readerSearchSubmit.disabled = true;
+            readerSearchStatus.textContent = '正在载入并搜索全部楼层…';
+            readerSearchResults.textContent = '';
+            try {
+                await ensurePagesFetchedUpTo(activePages.length, false);
+                await ensurePagesPreparedUpTo(activePages.length, { userInitiated: true });
+                readerSearchMatches = collectReaderSearchMatches(keyword);
+                renderReaderSearchMatches(readerSearchMatches);
+                readerSearchStatus.textContent = readerSearchMatches.length
+                    ? '找到 ' + String(readerSearchMatches.length) + ' 处匹配，点击结果可跳转。'
+                    : '全部楼层中均未找到“' + keyword + '”。';
+            } catch (error) {
+                console.error('reader search failed', error);
+                readerSearchStatus.textContent = '搜索失败，请检查网络后重试。';
+            } finally {
+                readerSearchSubmit.disabled = false;
+            }
+        }
+
+        function findRenderedSentence(sentenceId, sentenceIndex) {
+            const nodes = document.querySelectorAll('[data-sentence-id]');
+            for (let index = 0; index < nodes.length; index += 1) {
+                if (sentenceId) {
+                    if (nodes[index].getAttribute('data-sentence-id') === sentenceId) return nodes[index];
+                }
+            }
+            if (nodes[sentenceIndex]) return nodes[sentenceIndex];
+            return null;
+        }
+
+        async function jumpToReaderSearchMatch(match) {
+            if (!match) return;
+            closeReaderSearch(false);
+            currentPageIndex = match.pageIndex;
+            if (isWeakLazyMode) currentMode = 'page';
+
+            if (currentMode === 'page') {
+                renderPageMode();
+            } else {
+                await renderScrollMode(match.pageIndex);
+            }
+
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    const previousTarget = document.querySelector('.reader-search-target');
+                    if (previousTarget) previousTarget.classList.remove('reader-search-target');
+                    const target = findRenderedSentence(match.sentenceId, match.sentenceIndex);
+                    if (!target) return;
+                    target.classList.remove('reader-search-target');
+                    void target.offsetWidth;
+                    target.classList.add('reader-search-target');
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(function () {
+                        target.classList.remove('reader-search-target');
+                    }, 3600);
+                });
+            });
+        }
+
+        if (textSearchBtn) textSearchBtn.addEventListener('click', openReaderSearch);
+        if (readerSearchClose) readerSearchClose.addEventListener('click', function () { closeReaderSearch(true); });
+        if (readerSearchForm) readerSearchForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            runReaderSearch();
+        });
+        if (readerSearchModal) readerSearchModal.addEventListener('click', function (event) {
+            if (event.target === readerSearchModal) closeReaderSearch(true);
+        });
+        if (readerSearchDialog) readerSearchDialog.addEventListener('click', function (event) {
+            event.stopPropagation();
+        });
+        if (readerSearchResults) readerSearchResults.addEventListener('click', function (event) {
+            const button = event.target.closest('[data-search-result-index]');
+            if (!button) return;
+            const resultIndex = Number(button.getAttribute('data-search-result-index'));
+            jumpToReaderSearchMatch(readerSearchMatches[resultIndex]);
+        });
 
         /* ---------- 作品点赞功能 ---------- */
         async function toggleWorkLike() {
@@ -5187,6 +6061,11 @@ function renderCurrentMode() {
 
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
+            if (readerSearchModal ? !readerSearchModal.hidden : false) {
+                e.preventDefault();
+                closeReaderSearch(true);
+                return;
+            }
             const navPopup = document.getElementById('nav-grid-popup');
             if (navPopup ? navPopup.classList.contains('show') : false) {
                 e.preventDefault();

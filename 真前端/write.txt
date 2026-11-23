@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
     <title>创作页面</title>
-    <link href="https://api.anchorx.ca/vendor_assets/quill.snow.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://unpkg.com/quill@2.0.3/dist/quill.snow.css';">
 
 <style> /* 隐藏类 */ .hidden {
   display:none !important;
@@ -1661,6 +1661,197 @@ body {
   outline-offset: 4px;
 }
 
+#editor .ql-editor img.ax-image-selected{
+  outline: 3px solid var(--axPrimary);
+  outline-offset: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+#ax-imgsize-panel .ax-imgsize-main{
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) 44px auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+#ax-imgsize-panel .ax-imgsize-presets{
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+#ax-imgsize-panel #imgSizeRange{
+  width: 180px;
+  max-width: 100%;
+  min-height: 32px;
+  touch-action: pan-x;
+}
+
+#ax-imgsize-panel #imgSizeLabel{
+  width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#ax-imgsize-panel .ax-image-panel-actions,
+#ax-imgsize-panel .ax-crop-ratios,
+#ax-imgsize-panel .ax-caption-editor-actions{
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+
+#ax-imgsize-panel .ax-crop-editor,
+#ax-imgsize-panel .ax-caption-editor{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.18);
+}
+
+#ax-imgsize-panel .ax-crop-control{
+  display: grid;
+  grid-template-columns: 74px minmax(120px, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+#ax-imgsize-panel .ax-crop-control input{ width: 100%; }
+#ax-imgsize-panel .ax-caption-input{
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--axBtnBd);
+  border-radius: 9px;
+  padding: 9px 10px;
+  background: rgba(255,255,255,0.1);
+  color: var(--axPanelFg);
+  font-size: 14px;
+}
+
+#editor .ql-editor .ax-image-layout{
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 18px 0;
+  padding: 12px 42px;
+  border: 1px dashed transparent;
+  border-radius: 14px;
+  transition: border-color .18s ease, background .18s ease;
+}
+
+#editor .ql-editor .ax-image-layout:hover,
+#editor .ql-editor .ax-image-layout:focus-within{
+  border-color: rgba(74,163,255,0.5);
+  background: rgba(74,163,255,0.045);
+}
+
+#editor .ql-editor .ax-image-row{
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+#editor .ql-editor .ax-image-item{
+  min-width: 0;
+  margin: 0;
+  transition: transform .18s ease, filter .18s ease;
+}
+
+#editor .ql-editor .ax-image-item:hover{ transform: translateY(-2px); }
+#editor .ql-editor .ax-image-stage{
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  border-radius: 11px;
+  background: rgba(30,38,48,0.08);
+  box-shadow: 0 5px 16px rgba(25,32,40,0.1);
+}
+
+#editor .ql-editor .ax-image-stage > img{
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  border-radius: inherit;
+  transition: filter .18s ease, box-shadow .18s ease;
+}
+
+#editor .ql-editor .ax-image-stage.is-cropped > img{
+  height: 100%;
+  object-fit: cover;
+}
+
+#editor .ql-editor .ax-image-item:hover .ax-image-stage > img{ filter: brightness(.88); }
+#editor .ql-editor .ax-image-hover-actions{
+  position: absolute;
+  inset: auto 7px 7px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+#editor .ql-editor .ax-image-item:hover .ax-image-hover-actions,
+#editor .ql-editor .ax-image-item:focus-within .ax-image-hover-actions{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#editor .ql-editor .ax-image-action{
+  min-height: 30px;
+  border: 1px solid rgba(255,255,255,0.42);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(20,27,35,0.82);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  backdrop-filter: blur(7px);
+}
+
+#editor .ql-editor .ax-image-action:hover{ background: var(--axPrimary); }
+#editor .ql-editor .ax-image-add{
+  position: relative;
+  z-index: 3;
+  flex: 0 0 34px;
+  align-self: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(74,163,255,0.5);
+  border-radius: 50%;
+  background: var(--axPanelBg);
+  color: var(--axPrimary);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: .72;
+  transform: none;
+  transition: opacity .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+#editor .ql-editor .ax-image-add:hover{
+  opacity: 1;
+  transform: scale(1.08);
+  box-shadow: 0 5px 15px rgba(74,163,255,0.28);
+}
+
+#editor .ql-editor .ax-image-item figcaption{
+  margin-top: 7px;
+  color: #697386;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 /* =========================
    ✅ 精准：仅作用于作品标签弹窗（#tag-modal-backdrop）
    目标：按钮/输入框/标签chip上色 + hover/active
@@ -2524,6 +2715,883 @@ body.ax-editor-fullscreen #main-page {
   }
 }
 
+/* ==========================================================
+   AnchorX creative studio v3 — calmer project shelf + paper
+   ========================================================== */
+:root {
+  --studio-ink: #282621;
+  --studio-muted: #756f65;
+  --studio-paper: #fffdf8;
+  --studio-canvas: #ece8df;
+  --studio-line: rgba(67, 58, 46, 0.14);
+  --studio-accent: #8b5d3b;
+  --studio-accent-dark: #684129;
+  --studio-accent-soft: #f1e5d7;
+  --studio-nav: #252722;
+  --studio-nav-muted: #bbb8ad;
+  --ax-blue: var(--studio-accent);
+  --ax-blue-dark: var(--studio-accent-dark);
+  --ax-blue-soft: var(--studio-accent-soft);
+  --ax-border: #d9d3c9;
+  --ax-muted: var(--studio-muted);
+  --ax-surface: var(--studio-paper);
+  --ax-workspace: var(--studio-canvas);
+}
+
+body {
+  color: var(--studio-ink);
+  background: var(--studio-canvas);
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+}
+
+.page-container { background: var(--studio-canvas); }
+
+.sidebar-nav {
+  padding: 24px 14px;
+  border-right: 0;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(210, 164, 119, 0.18), transparent 28%),
+    linear-gradient(180deg, #292b26 0%, var(--studio-nav) 100%);
+  box-shadow: 8px 0 28px rgba(31, 28, 23, 0.1);
+}
+
+.sidebar-nav::before {
+  content: "创作中心";
+  display: block;
+  margin: 2px 10px 28px;
+  color: #f4efe6;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.6;
+  letter-spacing: 0.12em;
+  white-space: pre;
+}
+
+.sidebar-nav.sidebar-collapsed::before {
+  content: "AX";
+  margin: 4px 0 24px;
+  text-align: center;
+}
+
+.sidebar-nav .nav-link {
+  min-height: 46px;
+  margin-bottom: 6px;
+  padding: 11px 13px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--studio-nav-muted);
+}
+
+.sidebar-nav .nav-link:hover {
+  border-color: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  transform: translateX(2px);
+}
+
+.sidebar-nav .nav-link.active {
+  border-color: rgba(224, 184, 144, 0.2);
+  background: rgba(210, 164, 119, 0.15);
+  color: #f1cfad;
+}
+
+.sidebar-nav .nav-link .nav-icon svg,
+.sidebar-nav .nav-link.active .nav-icon svg { fill: currentColor; }
+
+#main-page.main-content {
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 72px) clamp(22px, 5vw, 72px) 90px;
+  background: transparent;
+}
+
+#main-page .content-header {
+  position: relative;
+  margin-bottom: 34px;
+  padding: 28px 30px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 22px;
+  background: rgba(255,253,248,0.86);
+  box-shadow: 0 18px 48px rgba(53, 45, 34, 0.09);
+  backdrop-filter: blur(14px);
+}
+
+#main-page .content-header::after {
+  content: "APPLY YOUR COLOR";
+  position: absolute;
+  right: 26px;
+  bottom: -8px;
+  color: rgba(139, 93, 59, 0.07);
+  font: 800 clamp(1.8rem, 4vw, 4rem)/1 Georgia, serif;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+#main-page .header-left,
+#main-page .header-right { position: relative; z-index: 1; }
+
+#main-page .header-title h2 {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: clamp(1.45rem, 2.3vw, 2.15rem);
+  letter-spacing: 0.04em;
+}
+
+#main-page .icon-plane {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--studio-accent-soft);
+  color: var(--studio-accent);
+}
+
+#main-page .create-button {
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--studio-accent);
+  border-radius: 12px;
+  background: var(--studio-accent);
+  box-shadow: 0 7px 16px rgba(104, 65, 41, 0.17);
+}
+
+#main-page .create-button:hover {
+  background: var(--studio-accent-dark);
+  transform: translateY(-1px);
+}
+
+#main-page #bulk-delete-btn {
+  border-color: #d8d0c5;
+  background: rgba(255,255,255,0.72);
+  color: #675f56;
+  box-shadow: none;
+}
+
+#main-page #bulk-delete-btn:hover { border-color: #b45d5d; background: #fff2f1; color: #9b3e3e; }
+
+#main-page .sort-button {
+  min-height: 42px;
+  padding-inline: 15px;
+  border-color: #d8d0c5;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.7);
+  color: #5f584f;
+}
+
+#main-page .work-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  gap: 18px;
+}
+
+#main-page .work-list > p { grid-column: 1 / -1; }
+
+#main-page .work-item-wrapper {
+  min-height: 142px;
+  margin: 0;
+  overflow: visible;
+  border: 1px solid rgba(101, 85, 63, 0.13);
+  border-radius: 18px;
+  background: rgba(255,253,248,0.94);
+  box-shadow: 0 10px 30px rgba(53, 45, 34, 0.07);
+}
+
+#main-page .work-item-wrapper::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 0;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--studio-accent);
+  opacity: 0.68;
+}
+
+#main-page .work-item-wrapper:hover {
+  transform: translateY(-4px);
+  border-color: rgba(139, 93, 59, 0.28);
+  box-shadow: 0 18px 38px rgba(53, 45, 34, 0.12);
+}
+
+#main-page .work-item {
+  min-height: 142px;
+  align-items: flex-start;
+  padding: 22px 20px 18px 24px;
+  border-radius: inherit;
+}
+
+#main-page .work-title {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: 1.18rem;
+  line-height: 1.45;
+}
+
+#main-page .work-date { margin-bottom: 8px; color: var(--studio-muted); }
+#main-page .work-status { border-radius: 999px; background: var(--studio-accent-soft); color: var(--studio-accent-dark); }
+
+#main-page .work-actions-buttons button {
+  border: 1px solid #ddd5ca;
+  border-radius: 9px;
+  background: #fff;
+  color: #635b52;
+}
+
+#main-page .menu-container {
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  box-shadow: 0 16px 38px rgba(42, 35, 27, 0.18);
+}
+
+.modal { z-index: 30000; background: rgba(26, 23, 19, 0.48); backdrop-filter: blur(7px); }
+.modal-content {
+  border: 1px solid rgba(255,255,255,0.72);
+  border-radius: 20px;
+  background: var(--studio-paper);
+  box-shadow: 0 28px 80px rgba(26, 22, 17, 0.28);
+}
+.modal-content input,
+.modal-content textarea { border-color: #d8d0c5; border-radius: 11px; background: #fff; }
+.modal-content input:focus,
+.modal-content textarea:focus { border-color: var(--studio-accent); outline: 3px solid rgba(139,93,59,0.12); }
+
+/* Editor chrome is deliberately quiet so the manuscript remains dominant. */
+#editor-page.main-content { background: var(--studio-canvas); }
+
+#editor-page .editor-toolbar-container {
+  border-bottom-color: rgba(82, 70, 55, 0.16);
+  background: rgba(255,253,248,0.95);
+  box-shadow: 0 8px 26px rgba(51, 43, 33, 0.09);
+  backdrop-filter: blur(18px) saturate(115%);
+}
+
+#editor-page .editor-toolbar { min-height: 64px; padding: 10px 18px; }
+#editor-page .editor-title {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: 1.08rem;
+}
+
+#editor-page .editor-word-count {
+  border-color: var(--studio-line);
+  background: rgba(139,93,59,0.06);
+  color: var(--studio-muted);
+}
+
+#editor-page .page-current,
+#editor-page .editor-toolbar-actions button,
+#editor-page .back-button {
+  border-color: #d6cec2;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.78);
+  color: #49433b;
+}
+
+#editor-page .editor-toolbar-actions button:hover,
+#editor-page .back-button:hover { border-color: var(--studio-accent); background: var(--studio-accent-soft); color: var(--studio-accent-dark); }
+
+#editor-page #publishBtn {
+  border-color: var(--studio-accent);
+  background: var(--studio-accent);
+  color: #fff;
+  box-shadow: 0 6px 15px rgba(104,65,41,0.18);
+}
+
+#editor-page #saveBtn { border-color: var(--studio-accent); color: var(--studio-accent-dark); }
+#editor-page .ax-ribbon { border-top-color: var(--studio-line); background: rgba(249,246,240,0.96); }
+#editor-page .ax-ribbon-tabs { border-bottom-color: var(--studio-line); }
+#editor-page .ax-ribbon-tab { color: #595249; }
+#editor-page .ax-ribbon-tab:hover { background: rgba(139,93,59,0.07); }
+#editor-page #toolbar-quill.ax-ribbon-panels { background: rgba(255,253,248,0.94); }
+#editor-page .ax-ribbon-group { border-right-color: var(--studio-line); }
+
+#editor-page .editor-workspace {
+  padding: clamp(18px, 3vw, 38px);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,0.58), transparent 38%),
+    var(--studio-canvas);
+}
+
+#editor-page #editor {
+  width: min(100%, 940px);
+  border: 1px solid rgba(91, 77, 59, 0.16);
+  border-radius: 8px;
+  background: var(--studio-paper);
+  box-shadow: 0 22px 58px rgba(48, 40, 30, 0.13);
+}
+
+#editor-page #editor .ql-editor {
+  padding: clamp(48px, 7vw, 88px) clamp(34px, 9vw, 104px);
+  color: #2b2823;
+  font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+  font-size: 17px;
+  line-height: 1.9;
+  letter-spacing: 0.018em;
+}
+
+#editor-page #editor .ql-editor p { margin-bottom: 0.85em; }
+
+#editor-page .right-sidebar {
+  padding: 16px;
+  border-color: rgba(91, 77, 59, 0.15);
+  border-radius: 16px;
+  background: rgba(255,253,248,0.92);
+  box-shadow: 0 12px 34px rgba(48, 40, 30, 0.09);
+  backdrop-filter: blur(14px);
+}
+
+#editor-page .ax-side-panel-header h3 {
+  color: var(--studio-ink);
+  font-family: "Noto Serif SC", "Songti SC", serif;
+}
+
+#editor-page .dropdown-container {
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid var(--studio-line);
+  border-radius: 11px;
+  background: rgba(255,255,255,0.64);
+}
+
+#editor-page .dropdown-header { background: transparent; color: #4b453d; }
+
+@media (max-width: 1180px) {
+  #main-page .content-header { align-items: flex-start; gap: 18px; }
+  #main-page .header-left { flex-wrap: wrap; }
+}
+
+@media (max-width: 900px) {
+  .sidebar-nav::before { display: none; }
+  .sidebar-nav,
+  .sidebar-nav.sidebar-collapsed {
+    background: #292b26;
+    box-shadow: 0 5px 18px rgba(31,28,23,0.14);
+  }
+  #main-page.main-content { padding: 22px 14px 60px; }
+  #main-page .content-header { padding: 20px; border-radius: 17px; }
+  #main-page .content-header::after { display: none; }
+  #main-page .work-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  #editor-page #editor { border-radius: 5px; }
+}
+
+@media (max-width: 620px) {
+  #main-page .content-header { display: block; }
+  #main-page .header-left { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #main-page .header-title { grid-column: 1 / -1; margin-bottom: 6px; }
+  #main-page .header-right { margin-top: 10px; }
+  #main-page .create-button { justify-content: center; }
+  #main-page .sort-button { width: 100%; justify-content: space-between; }
+  #editor-page #editor .ql-editor { padding: 30px 20px; font-size: 16px; line-height: 1.78; }
+}
+
+/* ==========================================================
+   Creative studio v4 — card actions and assistant drawer
+   ========================================================== */
+#main-page .work-item-wrapper {
+  min-height: 190px;
+}
+
+#main-page .work-item {
+  height: 100%;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 21px 20px 0 24px;
+}
+
+#main-page .work-info {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-right: 42px;
+  padding-bottom: 18px;
+}
+
+#main-page .work-details { align-items: flex-start; }
+#main-page .work-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+#main-page .work-actions-buttons {
+  width: calc(100% + 44px);
+  min-height: 55px;
+  margin: auto -20px 0 -24px;
+  padding: 8px 11px 8px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--studio-line);
+  background: rgba(247, 242, 234, 0.72);
+  border-radius: 0 0 17px 17px;
+}
+
+#main-page .work-actions-buttons button {
+  min-width: 0;
+  min-height: 36px;
+  margin: 0;
+  padding: 7px 9px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #62594f;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+#main-page .work-actions-buttons button:hover {
+  background: #fff;
+  color: var(--studio-accent-dark);
+  box-shadow: 0 3px 10px rgba(53,45,34,0.08);
+}
+
+#main-page .cover-settings-btn::before { content: "▣ "; }
+#main-page .tag-settings-btn::before { content: "⌑ "; }
+#main-page .work-actions-buttons .menu-button {
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  width: 38px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid var(--studio-line);
+  background: rgba(255,255,255,0.72);
+  color: var(--studio-muted);
+  font-size: 0;
+}
+#main-page .work-actions-buttons .menu-button::after { content: "•••"; font-size: 0.76rem; letter-spacing: 0.08em; }
+
+#main-page .menu-container {
+  top: 52px;
+  right: 12px;
+  bottom: auto;
+  width: 132px;
+}
+
+/* 中文 Ribbon：分组文字更清晰，不再像英文 Office 工具栏。 */
+#editor-page .ax-ribbon-tab { min-width: 58px; }
+#editor-page .ax-ribbon-group-label {
+  color: #756c62;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+/* 创作辅助改为不挤占稿纸宽度的右侧抽屉。 */
+#editor-page .editor-container {
+  display: block;
+}
+
+#editor-page .right-sidebar,
+#editor-page .right-sidebar.collapsed {
+  position: fixed;
+  top: calc(var(--ax-toolbar-height) + 18px);
+  right: 18px;
+  bottom: 18px;
+  z-index: 1750;
+  display: block;
+  width: min(370px, calc(100vw - 36px)) !important;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(91,77,59,0.17);
+  border-radius: 20px;
+  background: rgba(255,253,248,0.97);
+  box-shadow: 0 24px 68px rgba(38,31,23,0.22);
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  pointer-events: auto;
+  backdrop-filter: blur(18px) saturate(112%);
+  transition: transform 0.24s ease, opacity 0.2s ease, visibility 0.2s ease;
+}
+
+#editor-page .right-sidebar.collapsed {
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(calc(100% + 30px));
+  pointer-events: none;
+}
+
+#editor-page .right-sidebar .tool-section {
+  height: 100%;
+  padding: 0 15px 18px;
+  overflow-y: auto;
+  scrollbar-color: #c8baa9 transparent;
+}
+
+#editor-page .ax-side-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 -15px 14px;
+  padding: 17px 17px 14px;
+  border-bottom: 1px solid var(--studio-line);
+  background: rgba(255,253,248,0.96);
+  backdrop-filter: blur(14px);
+}
+
+#editor-page .ax-side-panel-header h3 {
+  margin: 0 0 4px;
+  font-size: 1.12rem;
+}
+
+#editor-page .ax-side-panel-header p {
+  margin: 0;
+  color: var(--studio-muted);
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+
+#editor-page .right-sidebar-toggle {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 10px;
+  background: #f1ebe3;
+  color: #62594f;
+  font-size: 1.1rem;
+}
+
+#editor-page .dropdown-container {
+  margin-bottom: 9px;
+  overflow: hidden;
+  border: 1px solid var(--studio-line);
+  border-radius: 13px;
+  background: rgba(255,255,255,0.66);
+}
+
+#editor-page .dropdown-header {
+  min-height: 53px;
+  padding: 10px 12px;
+  border-radius: 0;
+  background: transparent;
+  color: #494239;
+  font-size: 0.88rem;
+  font-weight: 650;
+  outline: none;
+}
+
+#editor-page .dropdown-header:hover,
+#editor-page .dropdown-header:focus-visible {
+  background: #f5eee6;
+}
+
+#editor-page .dropdown-header.open {
+  background: var(--studio-accent-soft);
+  color: var(--studio-accent-dark);
+}
+
+#editor-page .dropdown-header > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+#editor-page .tool-section-icon {
+  width: 29px;
+  height: 29px;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  background: #eee6dc;
+  color: var(--studio-accent-dark);
+  font-family: "Songti SC", STSong, serif;
+  font-size: 0.76rem;
+  font-style: normal;
+}
+
+#editor-page .dropdown-header.open .tool-section-icon {
+  background: var(--studio-accent);
+  color: #fff;
+}
+
+#editor-page .dropdown-header .arrow {
+  color: #948a7e;
+  font-size: 0.8rem;
+}
+
+#editor-page .dropdown-content {
+  padding: 12px;
+  border-top: 1px solid var(--studio-line);
+  background: #fbf8f3;
+}
+
+#editor-page .role-list,
+#editor-page #historyList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#editor-page #historyList li,
+#editor-page #diceLogList li {
+  margin-bottom: 6px;
+  padding: 9px 10px;
+  border: 1px solid rgba(91,77,59,0.1);
+  border-radius: 9px;
+  background: #fff;
+  color: #5f574e;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+#editor-page .add-role-btn {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 9px;
+  border: 1px dashed #c9b8a6;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--studio-accent-dark);
+  cursor: pointer;
+}
+
+#editor-page .add-role-btn:hover { background: var(--studio-accent-soft); }
+
+.floating-sidebar-btn {
+  right: 20px;
+  bottom: 22px;
+  z-index: 1800;
+  width: auto;
+  height: 46px;
+  min-width: 116px;
+  display: none;
+  padding: 0 15px;
+  flex-direction: row;
+  gap: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 999px;
+  background: var(--studio-accent);
+  box-shadow: 0 12px 30px rgba(63,43,29,0.26);
+  color: #fff;
+}
+
+.floating-sidebar-btn.is-editor-visible { display: flex; }
+.floating-sidebar-btn:hover {
+  background: var(--studio-accent-dark);
+  transform: translateY(-2px);
+}
+.floating-sidebar-icon { width: 19px; height: 19px; }
+.floating-sidebar-label { font-size: 0.82rem; font-weight: 700; letter-spacing: 0.04em; }
+
+@media (max-width: 900px) {
+  #editor-page .right-sidebar,
+  #editor-page .right-sidebar.collapsed {
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 2100;
+    display: block !important;
+    width: min(390px, calc(100vw - 20px)) !important;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(calc(100% + 24px));
+    pointer-events: none;
+  }
+  #editor-page .right-sidebar.mobile-open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+  .floating-sidebar-btn,
+  .floating-sidebar-btn.is-editor-visible {
+    right: 13px;
+    bottom: max(13px, env(safe-area-inset-bottom));
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .floating-sidebar-label { display: none; }
+}
+
+@media (max-width: 520px) {
+  #main-page .work-item-wrapper,
+  #main-page .work-item { min-height: 176px; }
+  #main-page .work-actions-buttons { grid-template-columns: 1fr 1fr; }
+  #main-page .work-actions-buttons button { font-size: 0.78rem; }
+}
+
+/* ===== 移动端最终适配层 ===== */
+@media (max-width: 900px) {
+  body.ax-editor-fullscreen,
+  body.ax-editor-fullscreen-fallback { overscroll-behavior: none; }
+  #main-page .content-header { display: block; }
+  #main-page .header-left {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  #main-page .header-title { grid-column: 1 / -1; }
+  #main-page .header-right { margin-top: 9px; }
+  #main-page .create-button,
+  #main-page .sort-button { min-height: 44px; justify-content: center; }
+  #main-page .sort-dropdown,
+  #main-page .sort-button { width: 100%; }
+  #main-page .work-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+  #editor-page .editor-toolbar-container {
+    top: env(safe-area-inset-top, 0px);
+    max-height: calc(100dvh - env(safe-area-inset-top));
+  }
+  #editor-page .editor-toolbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 7px 8px;
+  }
+  #editor-page .editor-toolbar > .back-button { min-width: 48px; min-height: 42px; }
+  #editor-page .page-current { min-height: 42px; }
+  #editor-page .editor-toolbar-actions button,
+  #editor-page #autoSaveToggleBtn { min-height: 42px; }
+  #editor-page .page-select-dropdown {
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    right: 10px;
+    left: 10px;
+    z-index: 2300;
+    width: auto;
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-radius: 15px;
+    box-shadow: 0 24px 70px rgba(35,29,22,0.3);
+  }
+  #editor-page .ax-ribbon-tabs { min-height: 42px; }
+  #editor-page .ax-ribbon-tab { min-height: 42px; }
+  #editor-page .ax-ribbon-panel { min-height: 62px; }
+  #editor-page #toolbar-quill button,
+  #editor-page #toolbar-quill select,
+  #editor-page #toolbar-quill .ql-picker-label { min-width: 38px; min-height: 38px; }
+  #editor-page .editor-workspace { padding: 7px 4px max(70px, env(safe-area-inset-bottom)); }
+  #editor-page #editor { min-height: calc(var(--ax-viewport-height) - var(--ax-toolbar-height) - 14px); }
+  #editor-page .right-sidebar,
+  #editor-page .right-sidebar.collapsed {
+    max-height: none;
+    border-radius: 18px;
+  }
+  #editor-page .dropdown-header { min-height: 56px; }
+  #editor-page .dropdown-content { max-height: min(48dvh, 420px); overflow-y: auto; }
+  .modal { padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+  .modal-content {
+    width: min(100%, 560px);
+    max-width: 100%;
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 22px 16px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .modal-content input,
+  .modal-content textarea,
+  .modal-content select { font-size: 16px; }
+  #ax-imgsize-panel {
+    box-sizing: border-box;
+    right: 8px !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    left: 8px !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none;
+    padding: 13px !important;
+    border-radius: 16px !important;
+  }
+  #ax-imgsize-panel .ax-imgsize-main {
+    grid-template-columns: minmax(0, 1fr) 46px 50px 46px;
+    gap: 8px;
+  }
+  #ax-imgsize-panel .ax-imgsize-title { grid-column: 1 / -1; font-size: 14px; }
+  #ax-imgsize-panel #imgSizeRange { width: 100% !important; min-height: 44px; }
+  #ax-imgsize-panel #imgSizeReset,
+  #ax-imgsize-panel #imgSizeClose { min-width: 44px; min-height: 44px; padding: 0 !important; }
+  #ax-imgsize-panel #imgSizeClose { display: grid; place-items: center; line-height: 1 !important; }
+  #ax-imgsize-panel .ax-imgsize-presets {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 10px;
+  }
+  #ax-imgsize-panel button[data-preset] {
+    min-width: 0;
+    min-height: 44px;
+    padding: 6px 3px !important;
+    touch-action: manipulation;
+  }
+  #ax-imgsize-panel input[type="range"]::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+    margin-top: -10px;
+  }
+  #ax-imgsize-panel input[type="range"]::-moz-range-thumb { width: 26px; height: 26px; }
+  #editor .ql-editor img { touch-action: manipulation; }
+  #ax-imgsize-panel { max-height: min(72dvh, 620px); overflow-y: auto; overscroll-behavior: contain; }
+  #ax-imgsize-panel .ax-image-panel-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  #ax-imgsize-panel .ax-image-panel-actions button { min-height: 44px; }
+  #ax-imgsize-panel .ax-crop-control { grid-template-columns: 62px minmax(0, 1fr) 40px; }
+  #ax-imgsize-panel .ax-caption-input { font-size: 16px; }
+  #editor .ql-editor .ax-image-layout { padding: 12px 34px; }
+  #editor .ql-editor .ax-image-row { gap: 6px; }
+  #editor .ql-editor .ax-image-add { flex-basis: 32px; width: 32px; height: 44px; border-radius: 12px; opacity: 1; }
+  #editor .ql-editor .ax-image-hover-actions {
+    inset: auto 4px 4px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    opacity: 1;
+    transform: none;
+  }
+  #editor .ql-editor .ax-image-action { min-height: 34px; padding: 3px 5px; font-size: 10px; }
+  #editor .ql-editor .ax-image-item figcaption { font-size: 12px; }
+}
+
+@media (max-width: 560px) {
+  #main-page.main-content { padding: 12px 8px 58px; }
+  #main-page .content-header { padding: 16px 13px; }
+  #main-page .header-title h2 { font-size: 1.45rem; }
+  #main-page .work-list { gap: 10px; }
+  #main-page .work-item-wrapper,
+  #main-page .work-item { min-height: 166px; }
+  #main-page .work-item { padding: 17px 14px 0 18px; }
+  #main-page .work-info { padding-right: 38px; }
+  #main-page .work-actions-buttons {
+    width: calc(100% + 32px);
+    margin-inline: -18px -14px;
+    padding-inline: 9px;
+  }
+  #editor-page .editor-title { font-size: 0.84rem; }
+  #editor-page .editor-word-counts { max-width: 100%; }
+  #editor-page .editor-toolbar-actions { padding-bottom: 3px; }
+  #editor-page .ax-ribbon-quick-actions { padding-left: 3px; }
+  #editor-page .ax-ribbon-quick-actions .ax-chrome-button { min-width: 42px; min-height: 40px; }
+  #editor-page #editor .ql-editor { min-height: inherit; padding: 28px 17px 70px; font-size: 16px; line-height: 1.78; }
+  #editor-page .right-sidebar,
+  #editor-page .right-sidebar.collapsed { width: calc(100vw - 12px) !important; inset-inline: 6px; top: max(6px, env(safe-area-inset-top)); bottom: max(6px, env(safe-area-inset-bottom)); }
+  .floating-sidebar-btn,
+  .floating-sidebar-btn.is-editor-visible { right: max(10px, env(safe-area-inset-right)); }
+  .gallery-modal-content { width: 100%; }
+  .gallery-image-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 380px) {
+  #main-page .header-left { grid-template-columns: 1fr; }
+  #main-page .header-title { grid-column: auto; }
+  #editor-page .editor-toolbar { grid-template-columns: auto minmax(0, 1fr); }
+  #editor-page .page-controls { grid-column: 1 / -1; }
+  #editor-page .editor-toolbar-actions { grid-column: 1 / -1; }
+  #editor-page .editor-word-counts .editor-word-count:last-child { display: none; }
+}
+
 </style>
 </head>
 
@@ -2709,15 +3777,15 @@ body.ax-editor-fullscreen #main-page {
                 <div class="ax-ribbon" aria-label="文档编辑工具栏">
                     <div class="ax-ribbon-tabs" role="tablist" aria-label="工具栏菜单">
                         <button class="ax-ribbon-tab is-active" type="button" role="tab"
-                            aria-selected="true" data-ribbon-tab="home">Home</button>
+                            aria-selected="true" data-ribbon-tab="home">常用</button>
                         <button class="ax-ribbon-tab" type="button" role="tab"
-                            aria-selected="false" data-ribbon-tab="insert">Insert</button>
+                            aria-selected="false" data-ribbon-tab="insert">插入</button>
                         <button class="ax-ribbon-tab" type="button" role="tab"
-                            aria-selected="false" data-ribbon-tab="design">Design</button>
+                            aria-selected="false" data-ribbon-tab="design">排版</button>
                         <button class="ax-ribbon-tab" type="button" role="tab"
-                            aria-selected="false" data-ribbon-tab="review">Review</button>
+                            aria-selected="false" data-ribbon-tab="review">审阅</button>
                         <button class="ax-ribbon-tab" type="button" role="tab"
-                            aria-selected="false" data-ribbon-tab="view">View</button>
+                            aria-selected="false" data-ribbon-tab="view">视图</button>
 
                         <div class="ax-ribbon-quick-actions" aria-label="视图快捷操作">
                             <button class="ax-chrome-button" id="leftSidebarToggleBtn" type="button"
@@ -2752,7 +3820,7 @@ body.ax-editor-fullscreen #main-page {
                                         <path d="M12 10v-3H5V5h7V2l4 4-4 4z"></path>
                                     </svg>
                                 </button>
-                                <span class="ax-ribbon-group-label">History</span>
+                                <span class="ax-ribbon-group-label">撤销与重做</span>
                             </div>
 
                             <div class="ax-ribbon-group">
@@ -2773,7 +3841,7 @@ body.ax-editor-fullscreen #main-page {
                                     <option value="large">大</option>
                                     <option value="huge">特大</option>
                                 </select>
-                                <span class="ax-ribbon-group-label">Font</span>
+                                <span class="ax-ribbon-group-label">字体与字号</span>
                             </div>
 
                             <div class="ax-ribbon-group">
@@ -2783,7 +3851,7 @@ body.ax-editor-fullscreen #main-page {
                                 <button class="ql-strike" type="button" title="删除线"></button>
                                 <select class="ql-color" title="文字颜色"></select>
                                 <select class="ql-background" title="高亮颜色"></select>
-                                <span class="ax-ribbon-group-label">Format</span>
+                                <span class="ax-ribbon-group-label">文字格式</span>
                             </div>
 
                             <div class="ax-ribbon-group">
@@ -2792,7 +3860,7 @@ body.ax-editor-fullscreen #main-page {
                                 <button class="ql-indent" value="-1" type="button" title="减少缩进"></button>
                                 <button class="ql-indent" value="+1" type="button" title="增加缩进"></button>
                                 <select class="ql-align" title="对齐方式"></select>
-                                <span class="ax-ribbon-group-label">Paragraph</span>
+                                <span class="ax-ribbon-group-label">段落</span>
                             </div>
                         </div>
 
@@ -2801,19 +3869,19 @@ body.ax-editor-fullscreen #main-page {
                                 <button class="ax-text-tool" id="uploadImageBtn" type="button" title="上传图片">图片</button>
                                 <input type="file" id="uploadImageInput" accept="image/*" hidden>
                                 <button class="ql-link" type="button" title="插入链接"></button>
-                                <span class="ax-ribbon-group-label">Media</span>
+                                <span class="ax-ribbon-group-label">图片与链接</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <button class="ql-blockquote" type="button" title="引用"></button>
                                 <button class="ql-code-block" type="button" title="代码块"></button>
-                                <button class="ax-text-tool" id="listBtn" type="button" title="插入 1 至 10 列表">L10</button>
-                                <span class="ax-ribbon-group-label">Blocks</span>
+                                <button class="ax-text-tool" id="listBtn" type="button" title="插入 1 至 10 列表">十列</button>
+                                <span class="ax-ribbon-group-label">引用与列表</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <button class="ax-text-tool" id="diceBtn" type="button" title="掷骰子">骰子</button>
                                 <button class="ax-text-tool" id="insertThemeTriggerBtn" type="button"
                                     title="插入主题切换标记">主题标记</button>
-                                <span class="ax-ribbon-group-label">Story Tools</span>
+                                <span class="ax-ribbon-group-label">叙事工具</span>
                             </div>
                         </div>
 
@@ -2830,13 +3898,13 @@ body.ax-editor-fullscreen #main-page {
                                     <option value="large">大</option>
                                     <option value="huge">特大</option>
                                 </select>
-                                <span class="ax-ribbon-group-label">Typography</span>
+                                <span class="ax-ribbon-group-label">文档排版</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <select class="ql-color" title="主题文字颜色"></select>
                                 <select class="ql-background" title="主题背景颜色"></select>
                                 <button class="ql-direction" value="rtl" type="button" title="从右向左"></button>
-                                <span class="ax-ribbon-group-label">Theme</span>
+                                <span class="ax-ribbon-group-label">颜色与方向</span>
                             </div>
                         </div>
 
@@ -2845,12 +3913,12 @@ body.ax-editor-fullscreen #main-page {
                                 <button class="ax-text-tool" id="hiddenTextBtn" type="button"
                                     title="隐藏文本设置（剧透或暗骰）">隐藏文本</button>
                                 <button class="ql-clean" type="button" title="清除格式"></button>
-                                <span class="ax-ribbon-group-label">Review</span>
+                                <span class="ax-ribbon-group-label">内容检查</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <button class="ax-text-tool" id="openHistoryBtn" type="button">历史记录</button>
                                 <button class="ax-text-tool" id="openDiceLogBtn" type="button">骰子记录</button>
-                                <span class="ax-ribbon-group-label">Logs</span>
+                                <span class="ax-ribbon-group-label">创作记录</span>
                             </div>
                         </div>
 
@@ -2858,11 +3926,11 @@ body.ax-editor-fullscreen #main-page {
                             <div class="ax-ribbon-group">
                                 <button class="ax-text-tool" type="button" data-ui-action="toggle-left">切换左栏</button>
                                 <button class="ax-text-tool" type="button" data-ui-action="toggle-right">切换右栏</button>
-                                <span class="ax-ribbon-group-label">Sidebars</span>
+                                <span class="ax-ribbon-group-label">侧栏</span>
                             </div>
                             <div class="ax-ribbon-group">
                                 <button class="ax-text-tool" type="button" data-ui-action="toggle-fullscreen">切换全屏</button>
-                                <span class="ax-ribbon-group-label">Window</span>
+                                <span class="ax-ribbon-group-label">窗口</span>
                             </div>
                         </div>
                     </div>
@@ -2878,14 +3946,17 @@ body.ax-editor-fullscreen #main-page {
                     <aside id="rightSidebar" class="right-sidebar">
                         <div class="tool-section">
                             <div class="ax-side-panel-header">
-                                <h3>创作工具</h3>
+                                <div>
+                                    <h3>创作辅助</h3>
+                                    <p>角色资料、版本记录与骰子结果</p>
+                                </div>
                                 <button id="rightSidebarToggle" class="right-sidebar-toggle" type="button"
                                     aria-label="收起右侧栏" title="收起右侧栏">×</button>
                             </div>
 
                             <div class="dropdown-container">
-                                <div class="dropdown-header" id="roleDropdownHeader">
-                                    <span>角色差分图集</span>
+                                <div class="dropdown-header" id="roleDropdownHeader" role="button" tabindex="0" aria-expanded="false" aria-controls="roleDropdownContent">
+                                    <span><b class="tool-section-icon">角</b>角色与立绘</span>
                                     <span class="arrow">&gt;</span>
                                 </div>
                                 <div class="dropdown-content" id="roleDropdownContent">
@@ -2897,8 +3968,8 @@ body.ax-editor-fullscreen #main-page {
                             </div>
 
                             <div class="dropdown-container">
-                                <div class="dropdown-header" id="historyDropdownHeader">
-                                    <span>历史记录</span>
+                                <div class="dropdown-header" id="historyDropdownHeader" role="button" tabindex="0" aria-expanded="false" aria-controls="historyDropdownContent">
+                                    <span><b class="tool-section-icon">史</b>版本记录</span>
                                     <span class="arrow">&gt;</span>
                                 </div>
                                 <div class="dropdown-content" id="historyDropdownContent">
@@ -2907,11 +3978,11 @@ body.ax-editor-fullscreen #main-page {
                             </div>
 
                             <div class="dropdown-container">
-                                <div class="dropdown-header" id="diceLogDropdownHeader">
-                                    <span>🎲 骰子记录</span>
+                                <div class="dropdown-header" id="diceLogDropdownHeader" role="button" tabindex="0" aria-expanded="false" aria-controls="diceLogDropdownContent">
+                                    <span><b class="tool-section-icon">骰</b>骰子结果</span>
                                     <span class="arrow">&gt;</span>
                                 </div>
-                                <div class="dropdown-content open" id="diceLogDropdownContent">
+                                <div class="dropdown-content" id="diceLogDropdownContent">
                                     <ul class="role-list" id="diceLogList"
                                         style="list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto;">
                                     </ul>
@@ -2997,11 +4068,21 @@ body.ax-editor-fullscreen #main-page {
     <path d="M10 12v3"></path>
     <path d="M14 12v3"></path>
   </svg>
-  <span class="floating-sidebar-label">创作工具</span>
+  <span class="floating-sidebar-label">辅助工具</span>
 </button>
 
-  <script src="https://api.anchorx.ca/vendor_assets/quill.js"></script>
-  <script src="https://api.anchorx.ca/vendor_assets/browser-image-compression.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+  <script>
+    if (typeof window.Quill === 'undefined') {
+      document.write('<script src="https://unpkg.com/quill@2.0.3/dist/quill.js"><\/script>');
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+  <script>
+    if (typeof window.imageCompression === 'undefined') {
+      document.write('<script src="https://unpkg.com/browser-image-compression@2.0.2/dist/browser-image-compression.js"><\/script>');
+    }
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js"></script>
 
 <script>
@@ -3012,6 +4093,16 @@ body.ax-editor-fullscreen #main-page {
         window.location.href = 'https://zhidianworld.com/login/';
     }
 
+    if (typeof window.Quill === 'undefined') {
+        const dependencyMessage = '文本编辑器资源加载失败，请检查网络后刷新页面。';
+        document.addEventListener('DOMContentLoaded', () => {
+            const loadingText = document.querySelector('.loading-text, .work-list-loading');
+            if (loadingText) loadingText.textContent = dependencyMessage;
+        });
+        alert(dependencyMessage);
+        throw new Error('Quill failed to load from both configured CDNs');
+    }
+
     /* --------- 进入 DOMContentLoaded 后初始化所有逻辑 --------- */
     document.addEventListener('DOMContentLoaded', () => {
 
@@ -3019,6 +4110,7 @@ body.ax-editor-fullscreen #main-page {
 let autoSaveTimer = null;
 let hasUnsavedChanges = false;
 let isSaving = false; // 防止多重保存请求
+let editRevision = 0; // 保存期间继续输入时，不能把新改动误判为已保存
       let autoSaveEnabled = true;
 
 
@@ -3116,6 +4208,42 @@ const hiddenTextSecretOption = document.getElementById('hiddenTextSecretOption')
 const hiddenTextBtn = document.getElementById('hiddenTextBtn');
 
 const toggleBtn2 = document.getElementById('toggleSidebarBtn');
+
+function setCreativeToolSection(activeHeader, activeContent, forceOpen) {
+  const shouldOpen = typeof forceOpen === 'boolean'
+    ? forceOpen
+    : !activeContent.classList.contains('open');
+  const sections = [
+    [roleDropdownHeader, roleDropdownContent],
+    [historyDropdownHeader, historyDropdownContent],
+    [diceLogDropdownHeader, diceLogDropdownContent]
+  ];
+  sections.forEach(function (section) {
+    const header = section[0];
+    const content = section[1];
+    if (header) {
+      header.classList.remove('open');
+      header.setAttribute('aria-expanded', 'false');
+    }
+    if (content) content.classList.remove('open');
+  });
+  if (shouldOpen) {
+    activeHeader.classList.add('open');
+    activeHeader.setAttribute('aria-expanded', 'true');
+    activeContent.classList.add('open');
+  }
+}
+
+[roleDropdownHeader, historyDropdownHeader, diceLogDropdownHeader].forEach(function (header) {
+  if (!header) return;
+  header.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter') {
+      if (event.key !== ' ') return;
+    }
+    event.preventDefault();
+    header.click();
+  });
+});
 
 /* ---------- Editor chrome: ribbon, sidebars, sticky offset, fullscreen ---------- */
 (function initEditorChrome() {
@@ -3268,15 +4396,18 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
   if (toggleBtn2) {
     toggleBtn2.addEventListener('click', (event) => {
       event.stopPropagation();
-      const open = rightSidebar.classList.contains('mobile-open');
+      const open = mobileQuery.matches
+        ? rightSidebar.classList.contains('mobile-open')
+        : !rightSidebar.classList.contains('collapsed');
       setRightSidebar(!open);
     });
   }
 
   function openSidebarSection(header, content) {
     setRightSidebar(true);
-    header?.classList.add('open');
-    content?.classList.add('open');
+    if (header) {
+      if (content) setCreativeToolSection(header, content, true);
+    }
   }
 
   openHistoryBtn?.addEventListener('click', () => {
@@ -3356,12 +4487,21 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
   sidebarObserver.observe(sidebar, { attributes: true, attributeFilter: ['class'] });
   sidebarObserver.observe(rightSidebar, { attributes: true, attributeFilter: ['class'] });
 
-  const visibilityObserver = new MutationObserver(scheduleStickySync);
+  function syncCreativeToolLauncher() {
+    if (!toggleBtn2) return;
+    toggleBtn2.classList.toggle('is-editor-visible', isEditorVisible());
+  }
+
+  const visibilityObserver = new MutationObserver(function () {
+    scheduleStickySync();
+    syncCreativeToolLauncher();
+  });
   visibilityObserver.observe(editorPage, { attributes: true, attributeFilter: ['class'] });
   visibilityObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   const handleMobileChange = () => {
     rightSidebar.classList.remove('mobile-open');
+    rightSidebar.classList.add('collapsed');
     setMobileRibbon(!mobileQuery.matches);
     syncSidebarButtons();
     scheduleStickySync();
@@ -3390,15 +4530,32 @@ const toggleBtn2 = document.getElementById('toggleSidebarBtn');
   });
 
   document.addEventListener('click', (event) => {
-    if (!mobileQuery.matches || !rightSidebar.classList.contains('mobile-open')) return;
-    if (rightSidebar.contains(event.target) || toggleBtn2?.contains(event.target)) return;
+    const open = mobileQuery.matches
+      ? rightSidebar.classList.contains('mobile-open')
+      : !rightSidebar.classList.contains('collapsed');
+    if (!open) return;
+    if (rightSidebar.contains(event.target)) return;
+    if (toggleBtn2 ? toggleBtn2.contains(event.target) : false) return;
+    const toolbarToggle = event.target.closest('[data-ui-action="toggle-right"]');
+    if (toolbarToggle) return;
     setRightSidebar(false);
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    const open = mobileQuery.matches
+      ? rightSidebar.classList.contains('mobile-open')
+      : !rightSidebar.classList.contains('collapsed');
+    if (!open) return;
+    setRightSidebar(false);
+    if (toggleBtn2) toggleBtn2.focus();
   });
 
   setViewportHeight();
   activateRibbon('home', false);
   setMobileRibbon(!mobileQuery.matches);
   syncSidebarButtons();
+  syncCreativeToolLauncher();
   scheduleStickySync();
 })();
 
@@ -3417,10 +4574,7 @@ function startAutoSave() {
           if (!autoSaveEnabled) return; // 🔹新增：删除期间不执行自动保存
         if (hasUnsavedChanges && currentWorkId && !isSaving) {
             console.log('自动保存触发...');
-            const success = await saveWork(true); // 传入 true 表示是自动保存
-            if (success) {
-                hasUnsavedChanges = false; // 成功保存后重置状态
-            }
+            await saveWork(true); // saveWork 会按编辑版本判断是否仍有未保存改动
         }
     }, 5000); // 5000 毫秒 = 5 秒
 }
@@ -3472,6 +4626,7 @@ function updateWordCounts() {
 // ⚠️ 此函数在所有内容变动（Quill/Plain Text）的事件监听器中被调用
 function markAsChanged() {
     updateWordCounts();
+    editRevision += 1;
 
     if (!hasUnsavedChanges) {
         hasUnsavedChanges = true;
@@ -3555,8 +4710,7 @@ hiddenTextSecretOption.addEventListener('click', () => {
 
         // 折叠/展开
         historyDropdownHeader.addEventListener('click', () => {
-            historyDropdownContent.classList.toggle('open');
-            historyDropdownHeader.classList.toggle('open');
+            setCreativeToolSection(historyDropdownHeader, historyDropdownContent);
         });
 
         // 新增历史记录的函数
@@ -3568,7 +4722,7 @@ hiddenTextSecretOption.addEventListener('click', () => {
 
 
         /* ---------- 全局状态 ---------- */
-        let pages = [{ content: { ops: [] } }];
+        let pages = [{ index: 0, content: { ops: [] } }];
  // 始终和后端 schema 对齐：数组，每项至少有 content 字段
         let currentPageIndex = 0;       // 使用索引管理页码（避免自造 id）
         let currentWorkId = null;       // 编辑时的 work._id
@@ -3694,6 +4848,192 @@ class ResizableImage extends BaseImage {
 // 覆盖默认 image blot
 Quill.register(ResizableImage, true);
 
+/* =========================
+   图片组：同行排列、独立缩放、裁剪与注释
+   ========================= */
+const ImageLayoutBlock = Quill.import('blots/block/embed');
+const IMAGE_LAYOUT_MAX_ITEMS = 4;
+
+function axClampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, number));
+}
+
+function axSafeImageSrc(value) {
+  const source = String(value || '').trim();
+  if (!source) return '';
+  if (/^data:image\//i.test(source) || /^blob:/i.test(source)) return source;
+  try {
+    const parsed = new URL(source, window.location.href);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return parsed.href;
+  } catch (error) {
+    console.warn('无法解析图片地址', error);
+  }
+  return '';
+}
+
+function axNormalizeImageItem(value) {
+  const source = typeof value === 'string' ? { src: value } : (value || {});
+  const cropAspects = ['auto', '1 / 1', '4 / 3', '3 / 4', '16 / 9'];
+  const aspect = cropAspects.includes(source.cropAspect) ? source.cropAspect : 'auto';
+  let width = source.width;
+  if (typeof width === 'string') width = parseFloat(width);
+  return {
+    src: axSafeImageSrc(source.src || source.url || ''),
+    alt: String(source.alt || '').slice(0, 300),
+    caption: String(source.caption || '').slice(0, 300),
+    width: axClampNumber(width, 15, 100, 70),
+    cropAspect: aspect,
+    cropZoom: axClampNumber(source.cropZoom, 100, 250, 100),
+    cropX: axClampNumber(source.cropX, 0, 100, 50),
+    cropY: axClampNumber(source.cropY, 0, 100, 50)
+  };
+}
+
+function axCreateImageLayoutValue(imageValue, width) {
+  const item = axNormalizeImageItem(imageValue);
+  if (width != null) item.width = axClampNumber(parseFloat(width), 15, 100, 70);
+  return {
+    version: 1,
+    id: 'axl_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+    items: [item]
+  };
+}
+
+function axNormalizeImageLayout(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  let items = Array.isArray(source.items) ? source.items : [];
+  items = items.slice(0, IMAGE_LAYOUT_MAX_ITEMS).map(axNormalizeImageItem).filter(item => item.src);
+  if (!items.length && source.src) items = [axNormalizeImageItem(source)];
+  return {
+    version: 1,
+    id: String(source.id || ('axl_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8))),
+    items: items
+  };
+}
+
+function axCreateLayoutButton(label, action, title) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'ax-image-action';
+  button.dataset.imageAction = action;
+  button.textContent = label;
+  button.title = title;
+  button.setAttribute('aria-label', title);
+  return button;
+}
+
+function axRenderEditorImageLayout(node, rawValue) {
+  const layout = axNormalizeImageLayout(rawValue);
+  node.dataset.layout = JSON.stringify(layout);
+  node.dataset.layoutId = layout.id;
+  node.innerHTML = '';
+
+  const leftAdd = document.createElement('button');
+  leftAdd.type = 'button';
+  leftAdd.className = 'ax-image-add ax-image-add-left';
+  leftAdd.dataset.imageLayoutAdd = 'left';
+  leftAdd.textContent = '+';
+  leftAdd.title = '在同行左侧添加图片';
+  leftAdd.setAttribute('aria-label', '在同行左侧添加图片');
+
+  const rightAdd = leftAdd.cloneNode(true);
+  rightAdd.className = 'ax-image-add ax-image-add-right';
+  rightAdd.dataset.imageLayoutAdd = 'right';
+  rightAdd.title = '在同行右侧添加图片';
+  rightAdd.setAttribute('aria-label', '在同行右侧添加图片');
+
+  const row = document.createElement('div');
+  row.className = 'ax-image-row';
+
+  row.appendChild(leftAdd);
+
+  layout.items.forEach((item, index) => {
+    const figure = document.createElement('figure');
+    figure.className = 'ax-image-item';
+    figure.dataset.imageIndex = String(index);
+    figure.style.flexBasis = item.width + '%';
+    figure.style.maxWidth = item.width + '%';
+
+    const stage = document.createElement('div');
+    stage.className = 'ax-image-stage';
+    if (item.cropAspect !== 'auto') {
+      stage.classList.add('is-cropped');
+      stage.style.aspectRatio = item.cropAspect;
+    }
+
+    const image = document.createElement('img');
+    image.src = item.src;
+    image.alt = item.alt;
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.draggable = false;
+    image.dataset.imageIndex = String(index);
+    if (item.cropAspect !== 'auto') {
+      image.style.objectPosition = item.cropX + '% ' + item.cropY + '%';
+      image.style.transform = 'scale(' + (item.cropZoom / 100) + ')';
+    }
+    stage.appendChild(image);
+
+    const actions = document.createElement('div');
+    actions.className = 'ax-image-hover-actions';
+    actions.appendChild(axCreateLayoutButton('替换', 'replace', '重新上传并替换这张图片'));
+    actions.appendChild(axCreateLayoutButton('大小', 'size', '调整这张图片的宽度'));
+    actions.appendChild(axCreateLayoutButton('裁剪', 'crop', '裁剪这张图片'));
+    actions.appendChild(axCreateLayoutButton('注释', 'caption', '添加或编辑图片注释'));
+    actions.appendChild(axCreateLayoutButton('移除', 'remove', '从图片组中移除'));
+    stage.appendChild(actions);
+    figure.appendChild(stage);
+
+    if (item.caption) {
+      const caption = document.createElement('figcaption');
+      caption.textContent = item.caption;
+      figure.appendChild(caption);
+    }
+    row.appendChild(figure);
+  });
+
+  row.appendChild(rightAdd);
+  node.appendChild(row);
+}
+
+class ImageLayoutBlot extends ImageLayoutBlock {
+  static create(value) {
+    const node = super.create();
+    axRenderEditorImageLayout(node, value);
+    return node;
+  }
+
+  static value(node) {
+    try {
+      return axNormalizeImageLayout(JSON.parse(node.dataset.layout || '{}'));
+    } catch (error) {
+      console.warn('读取图片组失败', error);
+      return axNormalizeImageLayout({});
+    }
+  }
+}
+
+ImageLayoutBlot.blotName = 'imageLayout';
+ImageLayoutBlot.tagName = 'div';
+ImageLayoutBlot.className = 'ax-image-layout';
+Quill.register(ImageLayoutBlot, true);
+
+function axNormalizeEditorImageDelta(delta) {
+  if (!delta || !Array.isArray(delta.ops)) return delta;
+  return {
+    ops: delta.ops.map(op => {
+      if (op && op.insert && typeof op.insert === 'object' && Object.prototype.hasOwnProperty.call(op.insert, 'image')) {
+        const next = { insert: { imageLayout: axCreateImageLayoutValue(op.insert.image) } };
+        if (op.attributes) next.attributes = op.attributes;
+        return next;
+      }
+      return op;
+    })
+  };
+}
+
       /* ---------- 初始化 Quill ---------- */
     const quill = new Quill('#editor', {
         modules: {
@@ -3701,6 +5041,12 @@ Quill.register(ResizableImage, true);
         },
         theme: 'snow'
     });
+
+    // 旧作品里的单图会在载入编辑器时自动升级成可排列图片组。
+    const axNativeSetContents = quill.setContents.bind(quill);
+    quill.setContents = function (content, source) {
+      return axNativeSetContents(axNormalizeEditorImageDelta(content), source);
+    };
 
       // --- 新增代码：获取 Blot Formatter 的核心 Actions ---
 
@@ -3712,6 +5058,134 @@ Quill.register(ResizableImage, true);
       /* =========================
    ✅ 图片缩放 UI：点击图片弹出缩放条（%）
    ========================= */
+async function axVerifyUploadedImageUrl(imageUrl) {
+  const normalizedUrl = String(imageUrl || '')
+    .trim()
+    .replace(/^http:\/\/api\.anchorx\.ca\//i, 'https://api.anchorx.ca/');
+  if (!normalizedUrl) throw new Error('上传接口未返回图片地址');
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(normalizedUrl, window.location.href);
+  } catch (error) {
+    throw new Error('上传接口返回了无效的图片地址');
+  }
+  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+    throw new Error('上传接口返回了不支持的图片地址');
+  }
+
+  await new Promise((resolve, reject) => {
+    const probe = new Image();
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      probe.onload = null;
+      probe.onerror = null;
+      if (error) reject(error);
+      else resolve();
+    };
+    const timer = setTimeout(() => finish(), 12000);
+    probe.onload = () => finish();
+    probe.onerror = () => finish(new Error('图片上传完成，但返回地址无法访问'));
+    probe.src = parsedUrl.href;
+  });
+
+  return parsedUrl.href;
+}
+
+async function uploadImageToServer(file, options) {
+  if (!file) throw new Error('未选择图片');
+  if (file.type && !/^image\//i.test(file.type)) throw new Error('请选择图片文件');
+
+  const settings = options || {};
+  // 线上 Nginx 的请求体上限约为 1 MB。multipart 还会产生额外开销，
+  // 因此必须在 fetch 之前把文件控制在更安全的范围内，避免浏览器只报
+  // 一个没有意义的 “Failed to fetch”（Nginx 的 413 响应没有 CORS 头）。
+  const maxUploadBytes = 760 * 1024;
+  const compressionOptions = {
+    maxSizeMB: Math.min(Number(settings.maxSizeMB) || 0.7, 0.7),
+    maxWidthOrHeight: Number(settings.maxWidthOrHeight) || 1920,
+    useWebWorker: true,
+    alwaysKeepResolution: false
+  };
+  let uploadFile = file;
+  let compressionError = null;
+  if (typeof imageCompression === 'function') {
+    try {
+      uploadFile = await imageCompression(file, compressionOptions);
+      if (uploadFile.size > maxUploadBytes) {
+        uploadFile = await imageCompression(file, {
+          maxSizeMB: 0.58,
+          maxWidthOrHeight: Math.min(compressionOptions.maxWidthOrHeight, 1600),
+          useWebWorker: true,
+          alwaysKeepResolution: false
+        });
+      }
+    } catch (error) {
+      compressionError = error;
+      uploadFile = file;
+    }
+  }
+
+  if (uploadFile.size > maxUploadBytes) {
+    const sizeMB = (uploadFile.size / 1024 / 1024).toFixed(1);
+    if (compressionError) {
+      throw new Error(`图片压缩失败（当前 ${sizeMB} MB）。请先将图片另存为 JPG、PNG 或 WebP 后重试。`);
+    }
+    if (typeof imageCompression !== 'function') {
+      throw new Error(`图片压缩组件未能加载（当前 ${sizeMB} MB），请刷新页面后重试。`);
+    }
+    throw new Error(`图片压缩后仍有 ${sizeMB} MB，请缩小图片尺寸后重试。`);
+  }
+
+  const sourceName = String(file.name || 'uploaded-image').replace(/\.[^.]+$/, '');
+  const uploadType = String(uploadFile.type || file.type || 'image/jpeg').toLowerCase();
+  const extensionMap = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif'
+  };
+  const safeExtension = extensionMap[uploadType] || 'jpg';
+  const safeName = `${sourceName.replace(/[^a-zA-Z0-9._-]+/g, '-') || 'uploaded-image'}.${safeExtension}`;
+
+  const sendUpload = async () => {
+    const formData = new FormData();
+    formData.append('image', uploadFile, safeName);
+    // 此上传路由本身不鉴权。不要附带 Authorization，否则跨域请求会多一次
+    // OPTIONS 预检，并在部分移动网络/浏览器上增加无谓的失败点。
+    return fetch(`${API_BASE_URL}/upload`, {
+      method: 'POST',
+      body: formData
+    });
+  };
+
+  let response;
+  try {
+    response = await sendUpload();
+  } catch (firstError) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      throw new Error('当前设备处于离线状态，请恢复网络后重试。');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 650));
+    try {
+      response = await sendUpload();
+    } catch (secondError) {
+      throw new Error('无法连接图片上传服务，请检查网络后重试；若问题持续，请刷新创作页面。');
+    }
+  }
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 413) {
+      throw new Error('图片仍超过服务器上传限制，请缩小图片尺寸后重试。');
+    }
+    throw new Error(result.message || `图片上传失败 (${response.status})`);
+  }
+  return axVerifyUploadedImageUrl(result.imageUrl);
+}
+
 (function setupImageResizeUI(quill) {
   let selectedImg = null;
 
@@ -3732,17 +5206,44 @@ Quill.register(ResizableImage, true);
     user-select: none;
   `;
 
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', '图片大小调整');
+  panel.setAttribute('aria-hidden', 'true');
   panel.innerHTML = `
-    <div style="display:flex; align-items:center; gap:10px;">
-      <span style="font-weight:700;">图片大小</span>
-      <input id="imgSizeRange" type="range" min="20" max="100" step="1" style="width:180px;">
-      <span id="imgSizeLabel" style="width:44px; text-align:right;">70%</span>
-      <button id="imgSizeReset" type="button" style="border:1px solid #ccc;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer;">重置</button>
-      <button id="imgSizeClose" type="button" style="border:0;background:transparent;cursor:pointer;font-size:16px;line-height:1;">×</button>
+    <div class="ax-imgsize-main">
+      <span class="ax-imgsize-title" style="font-weight:700;">图片大小</span>
+      <input id="imgSizeRange" type="range" min="20" max="100" step="1" aria-label="图片宽度百分比">
+      <span id="imgSizeLabel" aria-live="polite">70%</span>
+      <button id="imgSizeReset" type="button">重置</button>
+      <button id="imgSizeClose" type="button" aria-label="关闭图片大小调整">×</button>
     </div>
-    <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+    <div class="ax-imgsize-presets" aria-label="常用图片宽度">
       ${[25,50,70,85,100].map(v=>`<button data-preset="${v}" type="button"
-        style="border:1px solid #ddd;background:#fff;border-radius:999px;padding:4px 10px;cursor:pointer;">${v}%</button>`).join('')}
+        aria-label="设为 ${v}%">${v}%</button>`).join('')}
+    </div>
+    <div class="ax-image-panel-actions">
+      <button id="imgCropToggle" type="button">裁剪图片</button>
+      <button id="imgCaptionToggle" type="button">添加注释</button>
+    </div>
+    <div class="ax-crop-editor" id="imgCropEditor" hidden>
+      <div class="ax-crop-ratios" aria-label="裁剪比例">
+        <button type="button" data-crop-aspect="auto">原图</button>
+        <button type="button" data-crop-aspect="1 / 1">1:1</button>
+        <button type="button" data-crop-aspect="4 / 3">4:3</button>
+        <button type="button" data-crop-aspect="3 / 4">3:4</button>
+        <button type="button" data-crop-aspect="16 / 9">16:9</button>
+      </div>
+      <label class="ax-crop-control"><span>画面缩放</span><input id="imgCropZoom" type="range" min="100" max="250" step="1"><output id="imgCropZoomValue">100%</output></label>
+      <label class="ax-crop-control"><span>水平位置</span><input id="imgCropX" type="range" min="0" max="100" step="1"><output id="imgCropXValue">50</output></label>
+      <label class="ax-crop-control"><span>垂直位置</span><input id="imgCropY" type="range" min="0" max="100" step="1"><output id="imgCropYValue">50</output></label>
+      <button id="imgCropDone" type="button">完成裁剪</button>
+    </div>
+    <div class="ax-caption-editor" id="imgCaptionEditor" hidden>
+      <input class="ax-caption-input" id="imgCaptionInput" maxlength="300" placeholder="输入图片注释（显示在图片底部中央）">
+      <div class="ax-caption-editor-actions">
+        <button id="imgCaptionSave" type="button">保存注释</button>
+        <button id="imgCaptionRemove" type="button">删除注释</button>
+      </div>
     </div>
   `;
   document.body.appendChild(panel);
@@ -3751,31 +5252,22 @@ Quill.register(ResizableImage, true);
   const label = panel.querySelector('#imgSizeLabel');
   const btnReset = panel.querySelector('#imgSizeReset');
   const btnClose = panel.querySelector('#imgSizeClose');
-
-  async function uploadImageToServer(file) {
-  const compressedFile = await imageCompression(file, {
-    maxSizeMB: 0.5,
-    maxWidthOrHeight: 1280
-  });
-
-  const formData = new FormData();
-  formData.append('image', compressedFile, file.name || 'pasted-image.png');
-
-  const res = await fetch(`${API_BASE_URL}/upload`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-    },
-    body: formData
-  });
-
-  if (!res.ok) {
-    throw new Error('图片上传失败');
-  }
-
-  const result = await res.json();
-  return result.imageUrl;
-}
+  const cropToggle = panel.querySelector('#imgCropToggle');
+  const captionToggle = panel.querySelector('#imgCaptionToggle');
+  const cropEditor = panel.querySelector('#imgCropEditor');
+  const captionEditor = panel.querySelector('#imgCaptionEditor');
+  const cropZoom = panel.querySelector('#imgCropZoom');
+  const cropX = panel.querySelector('#imgCropX');
+  const cropY = panel.querySelector('#imgCropY');
+  const cropZoomValue = panel.querySelector('#imgCropZoomValue');
+  const cropXValue = panel.querySelector('#imgCropXValue');
+  const cropYValue = panel.querySelector('#imgCropYValue');
+  const captionInput = panel.querySelector('#imgCaptionInput');
+  const layoutUploadInput = document.createElement('input');
+  layoutUploadInput.type = 'file';
+  layoutUploadInput.accept = 'image/*';
+  layoutUploadInput.hidden = true;
+  document.body.appendChild(layoutUploadInput);
 
 async function handleEditorPaste(e) {
   const items = e.clipboardData && e.clipboardData.items;
@@ -3791,7 +5283,7 @@ async function handleEditorPaste(e) {
       try {
         const imageUrl = await uploadImageToServer(file);
         const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
-        quill.insertEmbed(range.index, 'image', imageUrl, 'user');
+        quill.insertEmbed(range.index, 'imageLayout', axCreateImageLayoutValue(imageUrl, 70), 'user');
         quill.setSelection(range.index + 1, 0, 'silent');
         markAsChanged();
       } catch (err) {
@@ -3810,8 +5302,74 @@ quill.root.addEventListener('paste', handleEditorPaste);
     if (typeof window.markAsChanged === 'function') window.markAsChanged();
   }
 
+  function getLayoutContext(image = selectedImg) {
+    if (!image) return null;
+    const root = image.closest('.ax-image-layout');
+    if (!root) return null;
+    const figure = image.closest('.ax-image-item');
+    const index = figure ? Number(figure.dataset.imageIndex) : Number(image.dataset.imageIndex);
+    if (!Number.isInteger(index)) return null;
+    let layout;
+    try {
+      layout = axNormalizeImageLayout(JSON.parse(root.dataset.layout || '{}'));
+    } catch (error) {
+      console.warn('读取当前图片组失败', error);
+      return null;
+    }
+    if (!layout.items[index]) return null;
+    return { root, layout, index, item: layout.items[index] };
+  }
+
+  function rerenderLayoutSelection(context) {
+    const layoutId = context.layout.id;
+    const index = context.index;
+    axRenderEditorImageLayout(context.root, context.layout);
+    quill.update('user');
+    const image = context.root.querySelector('.ax-image-item[data-image-index="' + index + '"] img');
+    selectedImg = image || null;
+    if (selectedImg) selectedImg.classList.add('ax-image-selected');
+    context.root.dataset.layoutId = layoutId;
+    markChangedSafe();
+  }
+
+  function updateSelectedLayoutItem(mutator) {
+    const context = getLayoutContext();
+    if (!context) return false;
+    mutator(context.item, context.layout, context.index);
+    context.layout.items[context.index] = axNormalizeImageItem(context.item);
+    rerenderLayoutSelection(context);
+    syncAdvancedControls();
+    return true;
+  }
+
+  function redistributeLayoutWidths(layout, selectedIndex, requestedWidth) {
+    const count = layout.items.length;
+    if (count <= 1) {
+      layout.items[0].width = axClampNumber(requestedWidth, 15, 100, 70);
+      return;
+    }
+    const minimum = 15;
+    const selectedWidth = axClampNumber(requestedWidth, minimum, 100 - minimum * (count - 1), 50);
+    const remaining = 100 - selectedWidth;
+    const otherIndexes = layout.items.map((item, index) => index).filter(index => index !== selectedIndex);
+    const currentTotal = otherIndexes.reduce((sum, index) => sum + Number(layout.items[index].width || 0), 0);
+    layout.items[selectedIndex].width = selectedWidth;
+    otherIndexes.forEach(index => {
+      const ratio = currentTotal > 0 ? Number(layout.items[index].width || 0) / currentTotal : 1 / otherIndexes.length;
+      layout.items[index].width = Math.max(minimum, remaining * ratio);
+    });
+    const total = layout.items.reduce((sum, item) => sum + item.width, 0);
+    if (total !== 100) layout.items[otherIndexes[otherIndexes.length - 1]].width += 100 - total;
+  }
+
   function applyWidth(percent) {
     if (!selectedImg) return;
+    const context = getLayoutContext();
+    if (context) {
+      redistributeLayoutWidths(context.layout, context.index, Number(percent));
+      rerenderLayoutSelection(context);
+      return;
+    }
     const w = String(percent) + '%';
     selectedImg.style.width = w;
     selectedImg.setAttribute('data-width', w);
@@ -3821,16 +5379,72 @@ quill.root.addEventListener('paste', handleEditorPaste);
 
   function showNear(node) {
     const r = node.getBoundingClientRect();
-    const x = Math.min(window.innerWidth - 20, Math.max(10, r.left));
-    const y = Math.min(window.innerHeight - 20, Math.max(10, r.top - 70));
-    panel.style.left = x + 'px';
-    panel.style.top = y + 'px';
     panel.style.display = 'block';
+    panel.setAttribute('aria-hidden', 'false');
+
+    if (window.matchMedia('(max-width: 900px)').matches) {
+      panel.style.left = '';
+      panel.style.top = '';
+      return;
+    }
+
+    const panelRect = panel.getBoundingClientRect();
+    const x = Math.min(window.innerWidth - panelRect.width - 10, Math.max(10, r.left));
+    let y = r.top - panelRect.height - 10;
+    if (y < 10) y = Math.min(window.innerHeight - panelRect.height - 10, r.bottom + 10);
+    panel.style.left = x + 'px';
+    panel.style.top = Math.max(10, y) + 'px';
   }
 
   function hide() {
     panel.style.display = 'none';
+    panel.setAttribute('aria-hidden', 'true');
+    if (selectedImg) selectedImg.classList.remove('ax-image-selected');
     selectedImg = null;
+    cropEditor.hidden = true;
+    captionEditor.hidden = true;
+  }
+
+  function syncAdvancedControls() {
+    const context = getLayoutContext();
+    const item = context ? context.item : null;
+    cropToggle.disabled = !item;
+    captionToggle.disabled = !item;
+    if (!item) return;
+    cropZoom.value = item.cropZoom;
+    cropX.value = item.cropX;
+    cropY.value = item.cropY;
+    cropZoomValue.textContent = item.cropZoom + '%';
+    cropXValue.textContent = String(item.cropX);
+    cropYValue.textContent = String(item.cropY);
+    captionInput.value = item.caption || '';
+    captionToggle.textContent = item.caption ? '编辑注释' : '添加注释';
+  }
+
+  function selectImage(image) {
+    if (!image) return;
+    if (selectedImg) selectedImg.classList.remove('ax-image-selected');
+    selectedImg = image;
+    selectedImg.classList.add('ax-image-selected');
+    selectedImg.setAttribute('draggable', 'false');
+
+    const context = getLayoutContext(image);
+    const widthValue = context ? String(context.item.width) + '%' : (image.getAttribute('data-width') || image.style.width || '').trim();
+    let value = 70;
+    if (/%$/.test(widthValue)) {
+      value = parseInt(widthValue, 10);
+    } else if (/px$/.test(widthValue)) {
+      value = Math.round((parseFloat(widthValue) / Math.max(1, quill.root.clientWidth)) * 100);
+    } else if (image.clientWidth) {
+      value = Math.round((image.clientWidth / Math.max(1, quill.root.clientWidth)) * 100);
+    }
+    if (!Number.isFinite(value)) value = 70;
+    value = Math.max(20, Math.min(100, value));
+
+    range.value = value;
+    label.textContent = value + '%';
+    syncAdvancedControls();
+    showNear(image);
   }
 
   // 面板交互
@@ -3846,10 +5460,29 @@ quill.root.addEventListener('paste', handleEditorPaste);
       label.textContent = preset + '%';
       applyWidth(preset);
     }
+
+    const aspectButton = e.target.closest('[data-crop-aspect]');
+    if (aspectButton) {
+      const aspect = aspectButton.getAttribute('data-crop-aspect') || 'auto';
+      updateSelectedLayoutItem(item => { item.cropAspect = aspect; });
+    }
   });
 
   btnReset.addEventListener('click', () => {
     if (!selectedImg) return;
+    const context = getLayoutContext();
+    if (context) {
+      if (context.layout.items.length > 1) {
+        const equalWidth = 100 / context.layout.items.length;
+        context.layout.items.forEach(item => { item.width = equalWidth; });
+      } else {
+        context.item.width = 100;
+      }
+      rerenderLayoutSelection(context);
+      range.value = 100;
+      label.textContent = context.layout.items.length > 1 ? '均分' : '100%';
+      return;
+    }
     selectedImg.style.width = '';
     selectedImg.removeAttribute('data-width');
     quill.update('user');
@@ -3858,22 +5491,175 @@ quill.root.addEventListener('paste', handleEditorPaste);
     label.textContent = '100%';
   });
 
+  cropToggle.addEventListener('click', () => {
+    if (!getLayoutContext()) return;
+    cropEditor.hidden = !cropEditor.hidden;
+    captionEditor.hidden = true;
+  });
+
+  captionToggle.addEventListener('click', () => {
+    if (!getLayoutContext()) return;
+    captionEditor.hidden = !captionEditor.hidden;
+    cropEditor.hidden = true;
+    if (!captionEditor.hidden) setTimeout(() => captionInput.focus(), 0);
+  });
+
+  cropZoom.addEventListener('input', () => {
+    cropZoomValue.textContent = cropZoom.value + '%';
+    updateSelectedLayoutItem(item => { item.cropZoom = Number(cropZoom.value); });
+  });
+  cropX.addEventListener('input', () => {
+    cropXValue.textContent = cropX.value;
+    updateSelectedLayoutItem(item => { item.cropX = Number(cropX.value); });
+  });
+  cropY.addEventListener('input', () => {
+    cropYValue.textContent = cropY.value;
+    updateSelectedLayoutItem(item => { item.cropY = Number(cropY.value); });
+  });
+  panel.querySelector('#imgCropDone').addEventListener('click', () => { cropEditor.hidden = true; });
+  panel.querySelector('#imgCaptionSave').addEventListener('click', () => {
+    updateSelectedLayoutItem(item => { item.caption = captionInput.value.trim(); });
+    captionEditor.hidden = true;
+  });
+  panel.querySelector('#imgCaptionRemove').addEventListener('click', () => {
+    captionInput.value = '';
+    updateSelectedLayoutItem(item => { item.caption = ''; });
+    captionEditor.hidden = true;
+  });
+
   btnClose.addEventListener('click', hide);
 
-  // 点击图片选中
-  quill.root.addEventListener('click', (e) => {
+  let lastTouchSelectionAt = 0;
+  let pendingLayoutUpload = null;
+
+  layoutUploadInput.addEventListener('change', async () => {
+    const file = layoutUploadInput.files && layoutUploadInput.files[0];
+    const pending = pendingLayoutUpload;
+    layoutUploadInput.value = '';
+    pendingLayoutUpload = null;
+    if (!file || !pending) return;
+
+    const root = Array.from(quill.root.querySelectorAll('.ax-image-layout'))
+      .find(element => element.dataset.layoutId === pending.layoutId);
+    if (!root) return;
+
+    let layout;
+    try {
+      layout = axNormalizeImageLayout(JSON.parse(root.dataset.layout || '{}'));
+      if (pending.type === 'replace') {
+        if (!layout.items[pending.index]) return;
+        const imageUrl = await uploadImageToServer(file);
+        layout.items[pending.index].src = imageUrl;
+        axRenderEditorImageLayout(root, layout);
+        quill.update('user');
+        markChangedSafe();
+        const replacedImage = root.querySelector('.ax-image-item[data-image-index="' + pending.index + '"] img');
+        if (replacedImage) selectImage(replacedImage);
+        return;
+      }
+      if (layout.items.length >= IMAGE_LAYOUT_MAX_ITEMS) {
+        alert('同一行最多排列 ' + IMAGE_LAYOUT_MAX_ITEMS + ' 张图片。');
+        return;
+      }
+      const imageUrl = await uploadImageToServer(file);
+      const nextItem = axNormalizeImageItem({ src: imageUrl, width: 50 });
+      if (pending.side === 'left') layout.items.unshift(nextItem);
+      else layout.items.push(nextItem);
+      const equalWidth = 100 / layout.items.length;
+      layout.items.forEach(item => { item.width = equalWidth; });
+      axRenderEditorImageLayout(root, layout);
+      quill.update('user');
+      markChangedSafe();
+      const addedIndex = pending.side === 'left' ? 0 : layout.items.length - 1;
+      const addedImage = root.querySelector('.ax-image-item[data-image-index="' + addedIndex + '"] img');
+      if (addedImage) selectImage(addedImage);
+    } catch (error) {
+      console.error('同行图片上传失败', error);
+      alert('同行图片添加失败，请稍后重试。');
+    }
+  });
+
+  // 鼠标点击或移动端触摸图片均可选中。
+  quill.root.addEventListener('pointerup', (e) => {
     const t = e.target;
     if (t && t.tagName === 'IMG') {
-      selectedImg = t;
+      if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+        lastTouchSelectionAt = Date.now();
+        selectImage(t);
+      }
+    }
+  });
 
-      // 读取当前宽度（默认 70%）
-      const w = (t.getAttribute('data-width') || t.style.width || '70%').trim();
-      const num = parseInt(w.replace('%',''), 10);
-      const val = (!isNaN(num) ? num : 70);
+  quill.root.addEventListener('click', (e) => {
+    const t = e.target;
+    const addButton = t.closest('[data-image-layout-add]');
+    if (addButton) {
+      e.preventDefault();
+      e.stopPropagation();
+      const root = addButton.closest('.ax-image-layout');
+      if (!root) return;
+      const layout = axNormalizeImageLayout(JSON.parse(root.dataset.layout || '{}'));
+      if (layout.items.length >= IMAGE_LAYOUT_MAX_ITEMS) {
+        alert('同一行最多排列 ' + IMAGE_LAYOUT_MAX_ITEMS + ' 张图片。');
+        return;
+      }
+      pendingLayoutUpload = {
+        type: 'add',
+        layoutId: root.dataset.layoutId,
+        side: addButton.getAttribute('data-image-layout-add')
+      };
+      layoutUploadInput.click();
+      return;
+    }
 
-      range.value = val;
-      label.textContent = val + '%';
-      showNear(t);
+    const actionButton = t.closest('[data-image-action]');
+    if (actionButton) {
+      e.preventDefault();
+      e.stopPropagation();
+      const figure = actionButton.closest('.ax-image-item');
+      const image = figure ? figure.querySelector('img') : null;
+      if (!image) return;
+      selectImage(image);
+      const action = actionButton.getAttribute('data-image-action');
+      if (action === 'replace') {
+        const context = getLayoutContext();
+        if (!context) return;
+        pendingLayoutUpload = {
+          type: 'replace',
+          layoutId: context.layout.id,
+          index: context.index
+        };
+        layoutUploadInput.click();
+      } else if (action === 'crop') {
+        cropEditor.hidden = false;
+        captionEditor.hidden = true;
+      } else if (action === 'caption') {
+        captionEditor.hidden = false;
+        cropEditor.hidden = true;
+        setTimeout(() => captionInput.focus(), 0);
+      } else if (action === 'remove') {
+        const context = getLayoutContext();
+        if (!context) return;
+        context.layout.items.splice(context.index, 1);
+        if (!context.layout.items.length) {
+          const blot = Quill.find(context.root);
+          const blotIndex = quill.getIndex(blot);
+          hide();
+          quill.deleteText(blotIndex, 1, 'user');
+          markChangedSafe();
+          return;
+        }
+        const equalWidth = 100 / context.layout.items.length;
+        context.layout.items.forEach(item => { item.width = equalWidth; });
+        context.index = Math.min(context.index, context.layout.items.length - 1);
+        rerenderLayoutSelection(context);
+      }
+      return;
+    }
+
+    if (t && t.tagName === 'IMG') {
+      if (Date.now() - lastTouchSelectionAt < 450) return;
+      selectImage(t);
       return;
     }
     hide();
@@ -3898,48 +5684,22 @@ quill.root.addEventListener('paste', handleEditorPaste);
             return h;
         }
 
-        /* ---------- 图片上传（imggb helper）---------- */
-        // 注意：强烈建议把 imgbb API key 放到后端，前端只调用后端上传接口以避免泄露。
-        async function uploadFileToImgBB(file) {
-            const reader = new FileReader();
-            return new Promise((resolve, reject) => {
-                reader.onloadend = async () => {
-                    try {
-                        const base64Image = reader.result.split(',')[1];
-                        const formData = new FormData();
-                        formData.append('image', base64Image);
-                        // 目前仍然直接请求 imgbb（不安全），建议你改为：POST /api/upload （后端代理）
-                        const response = await fetch('https://api.imgbb.com/1/upload?key=040dbc9e6e680f321e09d9e05f447094', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        const data = await response.json();
-                        if (data && data.success) {
-                            resolve(data.data.url);
-                        } else {
-                            reject(new Error('图床上传失败'));
-                        }
-                    } catch (err) {
-                        reject(err);
-                    }
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-
         // Quill 工具栏里的文件輸入逻辑
         if (uploadImageBtn && uploadImageInput) {
             uploadImageBtn.addEventListener('click', () => uploadImageInput.click());
 uploadImageInput.addEventListener('change', async () => {
     const file = uploadImageInput.files[0];
+    uploadImageInput.value = '';
     if (!file) return;
+    uploadImageBtn.disabled = true;
+    uploadImageBtn.setAttribute('aria-busy', 'true');
     try {
-        const imageUrl = await uploadFileToImgBB(file);
+        const imageUrl = await uploadImageToServer(file);
        const range = quill.getSelection(); // [cite: 528]
         if (range) {
-            quill.insertEmbed(range.index, 'image', { src: imageUrl, width: '70%' });
+            quill.insertEmbed(range.index, 'imageLayout', axCreateImageLayoutValue({ src: imageUrl }, 70), 'user');
         } else {
-            quill.insertEmbed(quill.getLength(), 'image', imageUrl);// [cite: 529]
+            quill.insertEmbed(quill.getLength(), 'imageLayout', axCreateImageLayoutValue(imageUrl, 70), 'user');// [cite: 529]
         }
 
         // 【新增：插入图片后自动触发保存】
@@ -3947,7 +5707,10 @@ uploadImageInput.addEventListener('change', async () => {
 
     } catch (err) {
         console.error('图片上传失败', err);// [cite: 529]
-        alert('图片上传失败，请稍后再试。');
+        alert(err.message || '图片上传失败，请稍后再试。');
+    } finally {
+        uploadImageBtn.disabled = false;
+        uploadImageBtn.removeAttribute('aria-busy');
     }
 });
         }
@@ -4197,8 +5960,11 @@ function showTagEditModal(workId, workTitle) {
                     return;
                 }
                 try {
-                    // 上传图床并把 URL 发给后端
-                    const imgUrl = await uploadFileToImgBB(selectedFile);
+                    // 上传到站内图片存储，并把 URL 发给后端
+                    const imgUrl = await uploadImageToServer(selectedFile, {
+                      maxSizeMB: 0.8,
+                      maxWidthOrHeight: 1600
+                    });
                     const res = await fetch(`${API_BASE_URL}/${workId}/cover`, {
                         method: 'PATCH',
                         headers: authHeaders(true),
@@ -4307,8 +6073,16 @@ async function fetchWorkPagesForEditor(workId) {
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(j.message || `获取 pages 失败 (${res.status})`);
-  const pages = Array.isArray(j.pages) && j.pages.length ? j.pages : [{ content: { ops: [] } }];
-  return pages;
+  const fetchedPages = Array.isArray(j.pages) && j.pages.length
+    ? j.pages
+    : [{ index: 0, content: { ops: [] } }];
+  return fetchedPages.map((page, position) => ({
+    ...page,
+    index: Number.isInteger(Number(page?.index)) ? Number(page.index) : position,
+    content: page?.content && typeof page.content === 'object'
+      ? page.content
+      : { ops: [] },
+  }));
 }
 
 // 保存单页：PATCH /:id/pages/:pageIndex
@@ -4319,7 +6093,10 @@ async function saveOnePage(workId, pageIndex, content, title) {
     body: JSON.stringify({ content, title }),
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(j.message || `保存单页失败 (${res.status})`);
+  if (!res.ok) {
+    const reason = j.message || `保存单页失败 (${res.status})`;
+    throw new Error(`${reason}（目标页：${Number(pageIndex) + 1}）`);
+  }
   return true;
 }
 
@@ -4398,14 +6175,14 @@ function renderDiceHistory(history) {
                                     <span class="work-title">${work.title}</span>
                                 </div>
                             </div>
-   <div class="work-actions-buttons">
-  <button class="cover-settings-btn" data-work-id="${work._id}">封面设置</button>
+   <div class="work-actions-buttons" aria-label="作品设置">
+  <button class="cover-settings-btn" data-work-id="${work._id}" title="设置作品封面">封面</button>
   <button class="tag-settings-btn"
           data-work-id="${work._id}"
           data-work-title="${encodeURIComponent(work.title || '')}">
-    作品标签${Array.isArray(work.tags) && work.tags.length ? `(${work.tags.length})` : ''}
+    标签${Array.isArray(work.tags) && work.tags.length ? ` · ${work.tags.length}` : ''}
   </button>
-  <button class="menu-button" data-action="toggle-menu">⋯</button>
+  <button class="menu-button" data-action="toggle-menu" title="更多操作" aria-label="更多操作">更多</button>
 </div>
                         </div>
                         <div class="menu-container hidden">
@@ -4567,6 +6344,12 @@ if (e.target.closest('.tag-settings-btn')) {
             plainEditor.classList.add('hidden');
 
             sidebar.classList.add('sidebar-collapsed');
+            rightSidebar.classList.remove('collapsed');
+            if (window.matchMedia('(max-width: 900px)').matches) {
+                rightSidebar.classList.add('mobile-open');
+            } else {
+                rightSidebar.classList.remove('mobile-open');
+            }
         }
 
 
@@ -4588,7 +6371,13 @@ async function loadWorkById(id) {
     else if (Array.isArray(work.content) && work.content.length) loadedPages = work.content;
   }
 
-  pages = loadedPages;
+  pages = loadedPages.map((page, position) => ({
+    ...page,
+    index: Number.isInteger(Number(page?.index)) ? Number(page.index) : position,
+    content: page?.content && typeof page.content === 'object'
+      ? page.content
+      : { ops: [] },
+  }));
   currentPageIndex = 0;
 
   pageHistories = {};
@@ -4646,27 +6435,34 @@ async function ensureWorkIsSeparate(workId) {
 async function performSave({ isAuto = false } = {}) {
   if (!currentWorkId) return false;
 
-  // 1) 同步当前页内容到 pages[currentPageIndex]
-  if (!pages || !pages[currentPageIndex]) {
-    pages = [{ content: { ops: [] } }];
+  // 保存开始时固定目标页。网络请求期间即使用户切页，也不能把内容写到别的页。
+  let savePosition = currentPageIndex;
+  if (!pages || !pages[savePosition]) {
+    pages = [{ index: 0, content: { ops: [] } }];
     currentPageIndex = 0;
+    savePosition = 0;
   }
 
   if (isQuillActive) {
-    pages[currentPageIndex].content = quill.getContents();
+    pages[savePosition].content = quill.getContents();
   } else {
     const lines = plainEditor.value.split('\n');
-    pages[currentPageIndex].content = { ops: lines.map(line => ({ insert: line + '\n' })) };
+    pages[savePosition].content = { ops: lines.map(line => ({ insert: line + '\n' })) };
   }
 
   const title = editorTitle.textContent.replace('正在编辑：', '').trim();
-  const currentContent = pages[currentPageIndex]?.content || { ops: [] };
+  const targetPage = pages[savePosition];
+  const currentContent = targetPage?.content || { ops: [] };
+  const storedIndex = Number(targetPage?.index);
+  const serverPageIndex = Number.isInteger(storedIndex) && storedIndex >= 0
+    ? storedIndex
+    : savePosition;
 
   try {
     isSaving = true;
 
     // ✅ 2) 只保存“当前页”（让后端判断是否已迁移）
-    await saveOnePage(currentWorkId, currentPageIndex, currentContent, title);
+    await saveOnePage(currentWorkId, serverPageIndex, currentContent, title);
 
     // ✅ 3) 可选：保存 meta（绝不包含 pages/content）
     const meta = {};
@@ -4709,11 +6505,12 @@ async function saveWork(isAuto = false) {
   // 手动保存时显示“正在保存...”
   if (!isAuto) saveBtn.textContent = '正在保存...';
 
+  const revisionBeforeSave = editRevision;
   const success = await performSave({ isAuto });
 
   if (success) {
     saveBtn.textContent = '已保存';
-    hasUnsavedChanges = false;
+    hasUnsavedChanges = editRevision !== revisionBeforeSave;
     addHistoryRecord(isAuto ? '自动保存' : '手动保存');
 
     setTimeout(() => {
@@ -4770,7 +6567,9 @@ function deltaToHtml(delta) {
   const q = ensureExportQuill();
   const safeDelta = delta && delta.ops ? delta : { ops: [{ insert: '\n' }] };
   q.setContents(safeDelta);
-  return q.root.innerHTML || '';
+  const exportRoot = q.root.cloneNode(true);
+  exportRoot.querySelectorAll('.ax-image-add, .ax-image-hover-actions').forEach(control => control.remove());
+  return exportRoot.innerHTML || '';
 }
 
 function buildDocxHtmlFromBackup(backupData) {
@@ -5035,7 +6834,11 @@ publishBtn.addEventListener('click', async () => {
 // ✅ 删页：用新接口，不要再 PATCH /works/:id 带 pages/content
 async function deleteCurrentPage() {
   if (!currentWorkId) return;
-  const deleteIndex = currentPageIndex;
+  const deletePosition = currentPageIndex;
+  const storedDeleteIndex = Number(pages[deletePosition]?.index);
+  const deleteIndex = Number.isInteger(storedDeleteIndex) && storedDeleteIndex >= 0
+    ? storedDeleteIndex
+    : deletePosition;
 
   // 先停自动保存（可选但推荐）
   const wasAutoSave = autoSaveEnabled;
@@ -5051,10 +6854,18 @@ async function deleteCurrentPage() {
     if (!r.ok) throw new Error(j.message || `删除页失败 (${r.status})`);
 
     // 2) 前端本地同步（把当前 pages 数组也删一页）
-    pages.splice(deleteIndex, 1);
-    if (pages.length === 0) pages = [{ content: { ops: [] } }];
+    pages.splice(deletePosition, 1);
+    pages.forEach((page, position) => {
+      const storedIndex = Number(page?.index);
+      if (Number.isInteger(storedIndex) && storedIndex > deleteIndex) {
+        page.index = storedIndex - 1;
+      } else if (!Number.isInteger(storedIndex)) {
+        page.index = position;
+      }
+    });
+    if (pages.length === 0) pages = [{ index: 0, content: { ops: [] } }];
 
-    currentPageIndex = Math.min(deleteIndex, pages.length - 1);
+    currentPageIndex = Math.min(deletePosition, pages.length - 1);
 
     // 3) 切到新当前页
     const nextContent = pages[currentPageIndex]?.content || { ops: [] };
@@ -5112,8 +6923,13 @@ addPageBtn.addEventListener('click', async () => {
   autoSaveEnabled = false;
 
   try {
-    // 先把当前页内容落到 pages[currentPageIndex]
-    pages[currentPageIndex].content = quill.getContents();
+    // 新增页之前先把当前页真正保存到服务器，避免切走后只留在内存里。
+    if (hasUnsavedChanges) {
+      const savedCurrentPage = await saveWork(true);
+      if (!savedCurrentPage) throw new Error('当前页尚未保存，已取消新增页面');
+    } else {
+      pages[currentPageIndex].content = quill.getContents();
+    }
 
     const r = await fetch(`${API_BASE_URL}/${currentWorkId}/pages`, {
       method: 'POST',
@@ -5124,8 +6940,8 @@ addPageBtn.addEventListener('click', async () => {
     if (!r.ok) throw new Error(j.message || `新增页失败 (${r.status})`);
 
     const newIndex = j.index;           // 后端返回的新页 index
-    pages[newIndex] = { content: { ops: [] } };
-    currentPageIndex = newIndex;
+    pages.push({ index: newIndex, content: { ops: [] } });
+    currentPageIndex = pages.length - 1;
 
 quill.setContents({ ops: [] }, 'silent');
 renderPageList();
@@ -5143,12 +6959,23 @@ updateWordCounts();
 
 
         /* ---------- 切换页码（带历史记录隔离）---------- */
-function goToPage(index) {
+async function goToPage(index) {
     if (index < 0 || index >= pages.length || index === currentPageIndex) return;
 
     // 1. 暂停自动保存，防止切页过程中的状态混乱
     const wasAutoSave = autoSaveEnabled;
     autoSaveEnabled = false;
+
+    // 每页分别存储；切页前必须先保存离开的页面，否则全局“已保存”状态会
+    // 被新页面覆盖，造成上一页只存在于浏览器内存中。
+    if (hasUnsavedChanges) {
+        const savedBeforeSwitch = await saveWork(true);
+        if (!savedBeforeSwitch) {
+            autoSaveEnabled = wasAutoSave;
+            alert('当前页保存失败，已留在本页以避免内容丢失。');
+            return;
+        }
+    }
 
     // 2. 【保存旧页】：保存当前页内容
     pages[currentPageIndex].content = quill.getContents();
@@ -5196,7 +7023,7 @@ pageDropdown.classList.add('hidden'); // 顺手关掉下拉菜单
         // 2. 切换骰子记录的显示/隐藏状态 (使用现有下拉菜单的逻辑)
         if (diceLogDropdownHeader) {
             diceLogDropdownHeader.addEventListener('click', () => {
-                diceLogDropdownContent.classList.toggle('open');
+                setCreativeToolSection(diceLogDropdownHeader, diceLogDropdownContent);
             });
         }
 
@@ -5250,13 +7077,6 @@ await fetch(`${API_BASE_URL}/${currentWorkId}/dice-log`, {
     } else {
         console.warn('未加载作品，跳过后端骰子记录。');
     }
-}
-
-// 2. 切换骰子记录的显示/隐藏状态 (使用现有下拉菜单的逻辑)
-if (diceLogDropdownHeader) {
-    diceLogDropdownHeader.addEventListener('click', () => {
-        diceLogDropdownContent.classList.toggle('open');
-    });
 }
 
 // 3. 绑定骰子按钮点击事件 (现在调用整合后的核心逻辑)
@@ -5503,8 +7323,7 @@ if (insertThemeTriggerBtn) {
     });
 
     roleDropdownHeader.addEventListener('click', () => {
-        roleDropdownContent.classList.toggle('open');
-        roleDropdownHeader.classList.toggle('open');
+        setCreativeToolSection(roleDropdownHeader, roleDropdownContent);
     });
 
   // 从 URL 中简单提取一个“文件名”当作预览名称
@@ -5554,41 +7373,11 @@ imageUploadInput.addEventListener('change', async (e) => {
 
     for (const file of files) {
         try {
-            // 定义压缩选项
-            const options = {
-                maxSizeMB: 0.5, // 最大文件大小，单位MB。如果图片小于这个值，则不压缩。
-                maxWidthOrHeight: 1920, // 允许的最大宽度或高度
-                useWebWorker: true // 使用 Web Worker，可以避免阻塞主线程
-            };
-
-            // 调用压缩函数
-            const compressedFile = await imageCompression(file, options);
-            console.log('原始文件大小:', (file.size / 1024).toFixed(2), 'KB');
-            console.log('压缩后文件大小:', (compressedFile.size / 1024).toFixed(2), 'KB');
-
-            // 使用 FormData 来包装压缩后的文件
-            const formData = new FormData();
-            // 在 append 时提供原始文件名，防止后端存储时丢失文件扩展名
-            formData.append('image', compressedFile, file.name);
-
-            // 发送到后端上传接口
-            const res = await fetch(`${API_BASE_URL}/upload`, {
-                method: 'POST',
-                headers: {
-                    // 注意：上传 FormData 时，不要手动设置 'Content-Type'
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: formData
+            const imageUrl = await uploadImageToServer(file, {
+                maxSizeMB: 0.5,
+                maxWidthOrHeight: 1920
             });
-
-            if (!res.ok) {
-                throw new Error('图片上传失败');
-            }
-
-            const result = await res.json();
-
-            // 将后端返回的真实 URL 添加到数组
-            galleryImages.push(result.imageUrl);
+            galleryImages.push(imageUrl);
 
         } catch (err) {
             console.error('上传错误（请在讨论页/贴吧汇报给站长！你将会收获一份诚心诚意土下座大礼包以及修复方案）:', err);
@@ -5600,42 +7389,6 @@ imageUploadInput.addEventListener('change', async (e) => {
     renderGalleryImages();
     // hideLoadingIndicator();
 });
-
-// 同样，你也可以将压缩逻辑应用到 Quill 的图片上传中
-// 找到 uploadFileToImgBB(file) 函数，并在内部调用 imageCompression
-async function uploadFileToImgBB(file) {
-  try {
-    const compressedFile = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280 });
-    const reader = new FileReader();
-    return new Promise((resolve, reject) => {
-      reader.onloadend = async () => {
-        try {
-          // ... (此处保留你原有的 imgbb 上传逻辑，但使用 compressedFile)
-          const base64Image = reader.result.split(',')[1];
-          const formData = new FormData();
-          formData.append('image', base64Image);
-          // 仍然直接请求 imgbb，建议改为后端代理
-          const response = await fetch('https://api.imgbb.com/1/upload?key=040dbc9e6e680f321e09d9e05f447094', {
-              method: 'POST',
-              body: formData
-          });
-          const data = await response.json();
-          if (data && data.success) {
-              resolve(data.data.url);
-          } else {
-              reject(new Error('图床上传失败'));
-          }
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.readAsDataURL(compressedFile);
-    });
-  } catch (err) {
-    console.error('图片压缩失败或上传到ImgBB失败:', err);
-    throw err;
-  }
-}
 
 // 图片删除 / 展开预览 / 选择插入 事件监听
 galleryImageList.addEventListener('click', (e) => {
@@ -5662,7 +7415,7 @@ galleryImageList.addEventListener('click', (e) => {
     else if (target.tagName === 'IMG') {
         const range = quill.getSelection(true);
         if (range) {
-            quill.insertEmbed(range.index, 'image', target.src);
+            quill.insertEmbed(range.index, 'imageLayout', axCreateImageLayoutValue(target.src, 70), 'user');
             quill.setSelection(range.index + 1);
             galleryModal.style.display = 'none';
             document.body.classList.remove('modal-active');
@@ -5792,6 +7545,8 @@ autoSaveToggleBtn.addEventListener('click', () => {
     // 返回作品列表
     backBtn.addEventListener('click', () => {
         sidebar.classList.remove('sidebar-collapsed');
+        rightSidebar.classList.remove('mobile-open');
+        rightSidebar.classList.add('collapsed');
         editorPage.classList.add('hidden');
         mainPage.classList.remove('hidden');
         currentWorkId = null;
